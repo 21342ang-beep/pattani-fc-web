@@ -98,7 +98,11 @@ printf 'DATABASE_URL="postgresql://pattani:%s@localhost:5432/pattani_ticket?sche
   "$DB_PASSWORD" "$SESSION_SECRET" "$PAYLOAD_SECRET" "$DOMAIN" "$DOMAIN" "$SEED_ADMIN_PASSWORD" \
   > "$APP_DIR/.env.local"
 chmod 600 "$APP_DIR/.env.local"
-echo "✓ .env.local written"
+
+# Prisma CLI reads .env (ไม่ใช่ .env.local) — copy ให้อีกไฟล์
+cp "$APP_DIR/.env.local" "$APP_DIR/.env"
+chmod 600 "$APP_DIR/.env"
+echo "✓ .env + .env.local written"
 
 # ────────────────────────────────────────────────
 # npm install + prisma
