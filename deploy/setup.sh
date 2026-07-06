@@ -37,9 +37,19 @@ echo "✓ All required tools present"
 echo ""
 echo "── [1/6] PostgreSQL setup ──"
 
-if sudo -u postgres psql -tAc "SELECT usename FROM pg_user WHERE usename='pattani';" | grep -q pattani; then
-  echo "✓ User 'pattani' already exists — skipping"
+USER_EXISTS=$(sudo -u postgres psql -tAc "SELECT usename FROM pg_user WHERE usename='pattani';" | grep -c pattani || true)
+SECRETS_EXISTS=$([ -f /root/.secrets/pattani-fc.env ] && echo 1 || echo 0)
+
+if [ "$USER_EXISTS" = "1" ] && [ "$SECRETS_EXISTS" = "1" ]; then
+  echo "✓ Postgres user + secrets file already exist — skipping"
 else
+  # ถ้าสถานะไม่สอดคล้อง (user มีแต่ secrets หาย หรือกลับกัน) — reset ทั้งคู่
+  if [ "$USER_EXISTS" = "1" ]; then
+    echo "⚠️ User 'pattani' exists but secrets file missing — resetting"
+    sudo -u postgres psql -c "DROP DATABASE IF EXISTS pattani_ticket;"
+    sudo -u postgres psql -c "DROP USER IF EXISTS pattani;"
+  fi
+
   DB_PASSWORD=$(openssl rand -hex 24)
   SESSION_SECRET=$(openssl rand -base64 32)
   PAYLOAD_SECRET=$(openssl rand -base64 32)
