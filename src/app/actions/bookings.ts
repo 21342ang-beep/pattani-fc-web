@@ -1,0 +1,117 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { bookingCreateSchema } from "@/lib/validations";
+import { verifyAdmin } from "@/lib/dal";
+import { readCustomerSession } from "@/lib/customer-session";
+
+export type BookingFormState = {
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+  bookingCode?: string;
+} | undefined;
+
+// สาธารณะ — สร้างการจองได้ทั้ง member และ guest (ไม่ต้องสมัครสมาชิก)
+// อีเมลถูกบังคับมาจาก session เท่านั้น (ไม่ trust client) → กัน spoof / abuse
+// guest = customerEmail = null, ใช้ phone + bookingCode ในการตรวจสอบจองภายหลัง
+export async function createBooking(
+  _prev: BookingFormState,
+  formData: FormData
+): Promise<BookingFormState> {
+  // login เสริม (optional) — ถ้ามี session จะใช้อีเมลของบัญชี
+  // ถ้าไม่มี session = guest booking (อีเมล null)
+  const session = await readCustomerSession();
+
+  const parsed = bookingCreateSchema.safeParse({
+    matchId: formData.get("matchId"),
+    customerName: formData.get("customerName"),
+    customerEmail: session?.email ?? null, // ← session-only, ไม่อ่านจาก form
+    customerPhone: formData.get("customerPhone"),
+    quantity: Number(formData.get("quantity") ?? 0),
+    notes: (formData.get("notes") as string) || undefined,
+  });
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  try {
+    const booking = await prisma.$transaction(
+      async (tx) => {
+        const match = await tx.match.findUnique({ where: { id: parsed.data.matchId } });
+        if (!match) throw new Error("ไม่พบแมตช์ที่ต้องการ");
+        if (match.status !== "ON_SALE") throw new Error("แมตช์นี้ยังไม่เปิดจอง หรือปิดการจองแล้ว");
+        // defense-in-depth — แมตช์ ON_SALE ควรมีข้อมูลครบเสมอ (validate ตอน save)
+        // ถ้ามาถึงตรงนี้แล้ว field ขาด แสดงว่ามีข้อมูลผิดปกติ — refuse booking
+        if (match.totalSeats == null || match.pricePerSeat == null) {
+          throw new Error("ข้อมูลแมตช์ยังไม่สมบูรณ์ ไม่สามารถจองได้");
+        }
+
+        const sold = await tx.booking.aggregate({
+          where: { matchId: match.id, status: { in: ["PENDING", "CONFIRMED"] } },
+          _sum: { quantity: true },
+        });
+        const remaining = match.totalSeats - (sold._sum.quantity ?? 0);
+        if (parsed.data.quantity > remaining) {
+          throw new Error(`ที่นั่งเหลือ ${remaining} ที่ ไม่พอ`);
+        }
+
+        // ใช้ `match: { connect }` แทน `matchId` — ชัดเจน + รองรับ
+        // client เวอร์ชั่นเก่าใน dev memory cache (กัน error "match is missing")
+        return tx.booking.create({
+          data: {
+            match: { connect: { id: match.id } },
+            customerName: parsed.data.customerName,
+            customerEmail: parsed.data.customerEmail ?? null,
+            customerPhone: parsed.data.customerPhone,
+            quantity: parsed.data.quantity,
+            totalAmount: match.pricePerSeat * parsed.data.quantity,
+            notes: parsed.data.notes,
+          },
+        });
+      },
+      // เพิ่ม wait ให้ทนกับ cold-compile/hot-reload ใน Turbopack dev
+      // (ใน prod เร็วกว่านี้มาก ไม่กระทบประสิทธิภาพ)
+      { maxWait: 10000, timeout: 15000 }
+    );
+    revalidatePath("/");
+    revalidatePath(`/matches/${parsed.data.matchId}`);
+    return { bookingCode: booking.bookingCode };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "เกิดข้อผิดพลาด" };
+  }
+}
+
+// Admin — เปลี่ยนสถานะการจอง
+export async function updateBookingStatus(
+  bookingId: string,
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "REFUNDED"
+): Promise<{ ok: true } | { error: string }> {
+  await verifyAdmin();
+  try {
+    await prisma.booking.update({ where: { id: bookingId }, data: { status } });
+    revalidatePath("/admin/bookings");
+    return { ok: true };
+  } catch {
+    return { error: "อัปเดตไม่สำเร็จ" };
+  }
+}
+
+// Admin — ลบรายการจอง (หลังจบแมตช์, ทำความสะอาดข้อมูล)
+// validate bookingId format → กัน inject ผ่าน params
+export async function deleteBooking(
+  bookingId: string
+): Promise<{ ok: true } | { error: string }> {
+  await verifyAdmin();
+  if (typeof bookingId !== "string" || !/^[a-z0-9]+$/i.test(bookingId)) {
+    return { error: "รหัสไม่ถูกต้อง" };
+  }
+  try {
+    await prisma.booking.delete({ where: { id: bookingId } });
+    revalidatePath("/admin/bookings");
+    return { ok: true };
+  } catch {
+    return { error: "ลบไม่สำเร็จ" };
+  }
+}

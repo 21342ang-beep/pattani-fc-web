@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Payload CMS uploads (user-generated content)
+/public/uploads/
+
+# VS Code Local History plugin (dev scratch)
+/.lh/
+
+# Screenshots ที่ save ไว้ในโฟลเดอร์ project (ไม่ใช่ asset ของแอป)
+/Screenshot*.png

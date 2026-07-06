@@ -1,0 +1,194 @@
+// Prisma schema สำหรับระบบจองตั๋วฟุตบอลออนไลน์
+// ใช้ PostgreSQL (Docker container `pattani_pg` บน port 5435)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Admin user สำหรับเข้าหลังบ้าน
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         Role     @default(ADMIN)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  SUPER_ADMIN
+}
+
+// ลูกค้า (Customer) — แยกออกจาก User admin
+// ใช้สำหรับสมัครสมาชิก ซื้อสินค้า/บัตร และดูกิจกรรมลุ้นรางวัล
+model Customer {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  name            String
+  phone           String?
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([email])
+}
+
+// แมตช์ฟุตบอล
+// fields ที่ optional (venue/kickoffAt/totalSeats/pricePerSeat) เพื่อให้
+// admin บันทึก "ฉบับร่าง" ได้แม้ข้อมูลยังไม่ครบ
+// แต่ก่อนเปลี่ยนเป็น ON_SALE ระบบจะบังคับให้ครบทุก field (validate ที่ schema)
+model Match {
+  id            String      @id @default(cuid())
+  homeTeam      String
+  awayTeam      String
+  homeTeamLogo  String?     // path เช่น /uploads/matches/<uuid>.png (validate ที่ Zod)
+  awayTeamLogo  String?
+  venue         String?
+  kickoffAt     DateTime?
+  totalSeats    Int?
+  pricePerSeat  Int?        // ราคาเป็นสตางค์ (เลี่ยง floating point)
+  status        MatchStatus @default(SCHEDULED)
+  description   String?
+  bookings      Booking[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([kickoffAt])
+  @@index([status])
+}
+
+enum MatchStatus {
+  SCHEDULED
+  ON_SALE
+  SOLD_OUT
+  CANCELLED
+  FINISHED
+}
+
+// การจองตั๋ว
+// customerEmail = nullable เพื่อรองรับ guest checkout (ไม่ต้องสมัครสมาชิก)
+// member จะมี email จาก session, guest จะเป็น null
+model Booking {
+  id              String        @id @default(cuid())
+  bookingCode     String        @unique @default(cuid())
+  matchId         String
+  match           Match         @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  customerName    String
+  customerEmail   String?       // guest = null, member = session email
+  customerPhone   String
+  quantity        Int
+  totalAmount     Int           // ราคารวม (สตางค์)
+  status          BookingStatus @default(PENDING)
+  paymentMethod   String?       // "PROMPTPAY" | "MOBILE_BANKING" | "CREDIT_CARD"
+  paidAt          DateTime?
+  seatNumbers     String[]      // ที่นั่งที่ออกให้ เช่น ["A-101","A-102"]
+  notes           String?
+  // gate check (สแกนเข้างาน) — sync จาก offline gate-check page
+  // null = ยังไม่ได้สแกน, มีค่า = สแกนเข้างานแล้ว → กันใช้ซ้ำที่ประตู
+  scannedAt       DateTime?
+  scannedBy       String?       // userId ของ admin ที่กด scan (เก็บไว้ audit)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([matchId])
+  @@index([status])
+  @@index([customerEmail])
+  @@index([customerPhone])
+  @@index([scannedAt])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+// ออเดอร์ร้านค้าออนไลน์
+// แยก order code ออกจาก id เพื่อใช้เปิดเผยใน URL ได้ (ไม่หลุด PK)
+// ราคา/ชื่อสินค้าทุกบรรทัด snapshot ลงในแถว ShopOrderItem
+// — กันสินค้าหรือราคาใน CMS เปลี่ยนหลังจากออเดอร์ถูกสร้าง
+model ShopOrder {
+  id              String              @id @default(cuid())
+  orderCode       String              @unique @default(cuid())
+  // customer (รองรับทั้ง guest + member; member จะมี customerEmail จาก session)
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  // shipping address (nullable เพื่อรองรับ PICKUP)
+  shippingMethod  ShopShippingMethod
+  shippingFee     Int                 // satang
+  shipAddress     String?
+  shipCity        String?
+  shipProvince    String?
+  shipPostalCode  String?
+  shipNote        String?
+  // money (ทุก field เก็บเป็นสตางค์ — กัน floating point)
+  subtotal        Int                 // ผลรวมของ items
+  totalAmount     Int                 // subtotal + shippingFee
+  // payment
+  paymentMethod   ShopPaymentMethod
+  paidAt          DateTime?
+  // fulfillment
+  status          ShopOrderStatus     @default(PENDING)
+  trackingNumber  String?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  cancelReason    String?
+  notes           String?
+  items           ShopOrderItem[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([status])
+  @@index([customerPhone])
+  @@index([customerEmail])
+}
+
+model ShopOrderItem {
+  id          String     @id @default(cuid())
+  orderId     String
+  order       ShopOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // snapshot จาก Payload products (productId เก็บเป็น string เพราะ Payload อาจเป็น number/string)
+  productId   String
+  productName String
+  imageUrl    String?
+  unitPrice   Int        // ราคาเป็นสตางค์
+  quantity    Int
+  size        String?
+  lineTotal   Int        // unitPrice * quantity (snapshot)
+  createdAt   DateTime   @default(now())
+
+  @@index([orderId])
+}
+
+enum ShopOrderStatus {
+  PENDING         // ยังไม่ชำระ
+  PAID            // ชำระแล้ว รอจัดส่ง
+  PROCESSING      // กำลังเตรียมพัสดุ
+  SHIPPED         // จัดส่งแล้ว
+  DELIVERED       // ส่งถึงปลายทาง
+  CANCELLED
+  REFUNDED
+}
+
+enum ShopShippingMethod {
+  STANDARD        // ไปรษณีย์ไทย / EMS — 50 บาท
+  EXPRESS         // Kerry / Flash — 80 บาท
+  PICKUP          // รับเองที่สนาม — ฟรี
+}
+
+enum ShopPaymentMethod {
+  PROMPTPAY
+  BANK_TRANSFER
+  COD             // เก็บปลายทาง
+}

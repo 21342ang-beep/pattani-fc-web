@@ -1,26 +1,133 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 0 0% 100%;
+  --foreground: 142 35% 10%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 142 35% 10%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 142 35% 10%;
+
+  --primary: 142 75% 22%;
+  --primary-foreground: 48 96% 60%;
+
+  --secondary: 48 96% 96%;
+  --secondary-foreground: 142 75% 18%;
+
+  --muted: 142 12% 95%;
+  --muted-foreground: 142 8% 40%;
+
+  --accent: 48 96% 53%;
+  --accent-foreground: 142 75% 18%;
+
+  --destructive: 0 84% 50%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 142 10% 88%;
+  --input: 142 10% 88%;
+  --ring: 142 75% 22%;
+
+  --radius: 0.625rem;
+
+  --chart-1: 142 75% 35%;
+  --chart-2: 48 96% 55%;
+  --chart-3: 25 90% 55%;
+  --chart-4: 195 80% 45%;
+  --chart-5: 280 60% 55%;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-db-heavent), "DB Heavent", system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  /* DB Heavent ขนาดเล็กจะอ่านลำบาก — ขยับ base ขึ้นมาที่ 22px
+     เพื่อให้ทุก rem (text-sm, text-base, text-lg ฯลฯ) ใหญ่ขึ้นพร้อมกัน
+     โดยไม่กระทบ proportions ของเว็บ */
+  font-size: 22px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-db-heavent), "DB Heavent", system-ui, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+/* ===== Print mode =====
+ * เวลา user กด "พิมพ์ตั๋ว" / Ctrl+P ในหน้า E-Ticket
+ * ซ่อน chrome ของเว็บ (top nav, footer, scroll progress)
+ * ให้เหลือเฉพาะตั๋วใบเดียว — ประหยัดกระดาษและดูเรียบร้อย
+ */
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+  }
+  /* ซ่อน global chrome ของหน้าเว็บ — header, footer, top nav ของ public layout */
+  body > div > header,
+  body > div > footer,
+  body > div > [aria-hidden="true"].fixed {
+    display: none !important;
+  }
+  /* บังคับไม่ตัดบัตรกลางใบ */
+  article[aria-label^="E-Ticket"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* ใช้สีให้เหมือนหน้าจอ (พื้นเขียวเข้ม) แทนการตัดสีออก */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }
