@@ -42,6 +42,8 @@ SECRETS_EXISTS=$([ -f /root/.secrets/pattani-fc.env ] && echo 1 || echo 0)
 
 if [ "$USER_EXISTS" = "1" ] && [ "$SECRETS_EXISTS" = "1" ]; then
   echo "✓ Postgres user + secrets file already exist — skipping"
+  # Idempotent: ensure Payload schema exists even for pre-existing installs
+  sudo -u postgres psql -d pattani_ticket -c "CREATE SCHEMA IF NOT EXISTS payload AUTHORIZATION pattani;" >/dev/null
 else
   # ถ้าสถานะไม่สอดคล้อง (user มีแต่ secrets หาย หรือกลับกัน) — reset ทั้งคู่
   if [ "$USER_EXISTS" = "1" ]; then
@@ -59,6 +61,8 @@ else
   sudo -u postgres psql -c "CREATE DATABASE pattani_ticket OWNER pattani;"
   sudo -u postgres psql -d pattani_ticket -c "GRANT ALL ON SCHEMA public TO pattani;"
   sudo -u postgres psql -d pattani_ticket -c "ALTER SCHEMA public OWNER TO pattani;"
+  # Payload CMS uses schemaName: "payload" — schema must exist before push
+  sudo -u postgres psql -d pattani_ticket -c "CREATE SCHEMA IF NOT EXISTS payload AUTHORIZATION pattani;"
 
   mkdir -p /root/.secrets && chmod 700 /root/.secrets
   printf 'DB_PASSWORD=%s\nSESSION_SECRET=%s\nPAYLOAD_SECRET=%s\nSEED_ADMIN_PASSWORD=%s\nDATABASE_URL="postgresql://pattani:%s@localhost:5432/pattani_ticket?schema=public"\n' \
@@ -122,6 +126,16 @@ npx prisma migrate deploy
 echo ""
 echo "── [5/6] Building Next.js (3-5 minutes) ──"
 NODE_OPTIONS="--max-old-space-size=8192" npm run build
+
+# ────────────────────────────────────────────────
+# Payload schema push (Payload skips auto-push when NODE_ENV=production,
+# so bootstrap once with NODE_ENV=development to sync collections into
+# the "payload" schema. PM2 runs the app with NODE_ENV=production.)
+# ────────────────────────────────────────────────
+echo ""
+echo "── Payload schema push ──"
+NODE_ENV=development PAYLOAD_FORCE_DRIZZLE_PUSH=true \
+  npx payload run scripts/pushPayloadSchema.ts
 
 # ────────────────────────────────────────────────
 # PM2
