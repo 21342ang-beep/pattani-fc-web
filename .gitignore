@@ -48,3 +48,9 @@ next-env.d.ts
 
 # Screenshots ที่ save ไว้ในโฟลเดอร์ project (ไม่ใช่ asset ของแอป)
 /Screenshot*.png
+/test-*.png
+
+# Playwright MCP scratch dir + k6 summary exports
+/.playwright-mcp/
+/load-test/*-summary.json
+

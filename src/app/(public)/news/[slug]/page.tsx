@@ -6,7 +6,7 @@ import { payload } from "@/lib/payload";
 import { formatDateTime } from "@/lib/format";
 import { isValidSlug, resolveCover, type NewsDoc } from "../_helpers";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 type Params = Promise<{ slug: string }>;
 

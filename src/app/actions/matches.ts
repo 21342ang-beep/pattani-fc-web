@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { matchCreateSchema, matchUpdateSchema } from "@/lib/validations";
@@ -128,6 +128,7 @@ export async function createMatch(
   revalidatePath("/admin/matches");
   revalidatePath("/");
   revalidatePath("/matches");
+  revalidateTag("matches", { expire: 0 });
   redirect("/admin/matches");
 }
 
@@ -163,6 +164,7 @@ export async function updateMatch(
   revalidatePath(`/admin/matches/${matchId}`);
   revalidatePath("/");
   revalidatePath("/matches");
+  revalidateTag("matches", { expire: 0 });
   redirect("/admin/matches");
 }
 
@@ -184,6 +186,7 @@ export async function deleteMatch(matchId: string): Promise<{ ok: true } | { err
     if (m?.awayTeamLogo) await deleteTeamLogo(m.awayTeamLogo);
     revalidatePath("/admin/matches");
     revalidatePath("/");
+    revalidateTag("matches", { expire: 0 });
     return { ok: true };
   } catch {
     return { error: "ลบไม่สำเร็จ" };

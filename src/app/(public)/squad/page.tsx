@@ -11,7 +11,7 @@ const POSITION_ACCENT: Record<string, string> = {
   FW: "from-rose-400 via-red-500 to-red-600",
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 export const metadata = { title: "ผู้เล่นและสตาฟ — Pattani FC" };
 
 const POSITION_LABEL: Record<string, string> = {

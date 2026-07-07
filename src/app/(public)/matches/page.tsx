@@ -1,11 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Shield } from "lucide-react";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { getMatchesByFilter } from "@/lib/cached-queries";
 import { formatBaht, formatDateTime } from "@/lib/format";
-
-export const dynamic = "force-dynamic";
 
 const ALLOWED_FILTERS = ["all", "on_sale", "upcoming"] as const;
 type Filter = (typeof ALLOWED_FILTERS)[number];
@@ -27,17 +24,7 @@ export default async function MatchesListPage(props: {
     : undefined;
   const zoneQS = zone ? `?zone=${zone}` : "";
 
-  const where: Prisma.MatchWhereInput =
-    filter === "on_sale"
-      ? { status: "ON_SALE" }
-      : filter === "upcoming"
-      ? { status: { in: ["SCHEDULED", "ON_SALE"] } }
-      : { status: { notIn: ["CANCELLED"] } };
-
-  const matches = await prisma.match.findMany({
-    where,
-    orderBy: { kickoffAt: "asc" },
-  });
+  const matches = await getMatchesByFilter(filter);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">

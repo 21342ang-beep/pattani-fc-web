@@ -7,7 +7,7 @@ import { formatDateTime } from "@/lib/format";
 import PageHero from "../_components/PageHero";
 import { resolveCover, type NewsDoc } from "./_helpers";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 export const metadata = { title: "ข่าวสาร — Pattani FC" };
 
 export default async function NewsPage() {

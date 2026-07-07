@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Handshake, ArrowRight } from "lucide-react";
 import { payload } from "@/lib/payload";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 export const metadata = { title: "พาร์ทเนอร์ — Pattani FC" };
 
 type SponsorDoc = {

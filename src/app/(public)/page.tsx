@@ -9,7 +9,7 @@ import FeaturedMatches from "./_components/FeaturedMatches";
 import BentoQuickLinks from "./_components/BentoQuickLinks";
 import SponsorMarquee from "./_components/SponsorMarquee";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();

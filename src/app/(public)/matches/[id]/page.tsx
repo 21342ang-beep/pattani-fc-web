@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getMatchById, getSoldSeats } from "@/lib/cached-queries";
 import { readCustomerSession } from "@/lib/customer-session";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import BookingForm from "./BookingForm";
-
-export const dynamic = "force-dynamic";
 
 // whitelist โซน — กัน XSS ผ่าน URL
 const ALLOWED_ZONES = [
@@ -22,19 +21,16 @@ export default async function MatchDetailPage(props: {
     ? zoneRaw
     : undefined;
 
-  const [match, session] = await Promise.all([
-    prisma.match.findUnique({ where: { id } }),
+  const [match, session, soldQty] = await Promise.all([
+    getMatchById(id),
     readCustomerSession(),
+    getSoldSeats(id),
   ]);
   if (!match) notFound();
 
-  const sold = await prisma.booking.aggregate({
-    where: { matchId: id, status: { in: ["PENDING", "CONFIRMED"] } },
-    _sum: { quantity: true },
-  });
   // ON_SALE จะถูก validate ว่า field ครบเสมอ — null guard เพื่อ type-safety
   const remaining =
-    match.totalSeats != null ? match.totalSeats - (sold._sum.quantity ?? 0) : 0;
+    match.totalSeats != null ? match.totalSeats - soldQty : 0;
   const canBook =
     match.status === "ON_SALE" &&
     remaining > 0 &&

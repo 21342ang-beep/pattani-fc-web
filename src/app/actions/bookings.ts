@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { bookingCreateSchema } from "@/lib/validations";
@@ -77,6 +77,8 @@ export async function createBooking(
     );
     revalidatePath("/");
     revalidatePath(`/matches/${parsed.data.matchId}`);
+    // invalidate unstable_cache queries — ที่นั่งเหลือต้องอัปเดตทันที
+    revalidateTag("bookings", { expire: 0 });
     return { bookingCode: booking.bookingCode };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "เกิดข้อผิดพลาด" };
