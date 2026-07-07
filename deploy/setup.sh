@@ -135,7 +135,7 @@ NODE_OPTIONS="--max-old-space-size=8192" npm run build
 echo ""
 echo "── Payload schema push ──"
 NODE_ENV=development PAYLOAD_FORCE_DRIZZLE_PUSH=true \
-  npx payload run scripts/pushPayloadSchema.ts
+  npx payload run scripts/pushPayloadSchema.mts
 
 # ────────────────────────────────────────────────
 # PM2
