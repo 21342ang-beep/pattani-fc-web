@@ -116,9 +116,11 @@ echo "── [4/6] npm ci (this takes 5-8 minutes) ──"
 npm ci
 
 echo ""
-echo "── Prisma generate + migrate ──"
+echo "── Prisma generate + migrate + seed ──"
 npx prisma generate
 npx prisma migrate deploy
+# Seed admin user + sample matches (idempotent via upsert)
+npm run db:seed
 
 # ────────────────────────────────────────────────
 # Build
