@@ -11,7 +11,11 @@
 import { getPayload } from "payload";
 import config from "../src/payload.config";
 
-const payload = await getPayload({ config });
-payload.logger.info("✓ Payload schema push complete");
-await payload.destroy();
-process.exit(0);
+// Wrapped in async IIFE because `payload run` transpiles to CJS,
+// which doesn't allow top-level await.
+(async () => {
+  const payload = await getPayload({ config });
+  payload.logger.info("✓ Payload schema push complete");
+  await payload.destroy();
+  process.exit(0);
+})();
