@@ -15,10 +15,17 @@ import { getPayload } from "payload";
 // Wrapped in async IIFE because `payload run` transpiles to CJS,
 // which doesn't allow top-level await.
 (async () => {
+  console.log("[push] NODE_ENV=", process.env.NODE_ENV);
+  console.log("[push] PAYLOAD_MIGRATING=", process.env.PAYLOAD_MIGRATING);
   const configPath = path.resolve(__dirname, "../src/payload.config.ts");
+  console.log("[push] loading config from", configPath);
   const configModule = await import(pathToFileURL(configPath).href);
+  console.log("[push] config loaded, calling getPayload...");
   const payload = await getPayload({ config: configModule.default });
-  payload.logger.info("✓ Payload schema push complete");
+  console.log("[push] ✓ Payload schema push complete");
   await payload.destroy();
   process.exit(0);
-})();
+})().catch((err) => {
+  console.error("[push] FAILED:", err);
+  process.exit(1);
+});
