@@ -8,13 +8,16 @@
 //   NODE_ENV=development PAYLOAD_FORCE_DRIZZLE_PUSH=true \
 //     npx payload run scripts/pushPayloadSchema.ts
 
+import path from "path";
+import { pathToFileURL } from "url";
 import { getPayload } from "payload";
-import config from "../src/payload.config";
 
 // Wrapped in async IIFE because `payload run` transpiles to CJS,
 // which doesn't allow top-level await.
 (async () => {
-  const payload = await getPayload({ config });
+  const configPath = path.resolve(__dirname, "../src/payload.config.ts");
+  const configModule = await import(pathToFileURL(configPath).href);
+  const payload = await getPayload({ config: configModule.default });
   payload.logger.info("✓ Payload schema push complete");
   await payload.destroy();
   process.exit(0);
