@@ -2,6 +2,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { buildConfig } from "payload";
 import { postgresAdapter } from "@payloadcms/db-postgres";
+import { pushDevSchema } from "@payloadcms/drizzle";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
 
 import { Users } from "./payload/collections/Users";
@@ -29,6 +30,20 @@ if (!process.env.DATABASE_URL) {
 
 export default buildConfig({
   serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL || "http://localhost:3000",
+  // Payload's connect() skips pushDevSchema when NODE_ENV=production
+  // (see @payloadcms/db-postgres/dist/connect.js). We run the app in
+  // production, so tables like payload.sponsors never get created.
+  // Trigger the push explicitly in onInit — idempotent, drizzle-kit compares
+  // schema and only applies deltas.
+  onInit: async (payload) => {
+    if (process.env.PAYLOAD_SKIP_INIT_PUSH === "true") return;
+    try {
+      await pushDevSchema(payload.db as never);
+      payload.logger.info("✓ Payload schema push (onInit) complete");
+    } catch (err) {
+      payload.logger.error({ err, msg: "Payload schema push failed" });
+    }
+  },
   admin: {
     user: Users.slug,
     meta: {

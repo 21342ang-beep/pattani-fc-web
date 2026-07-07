@@ -127,16 +127,8 @@ echo ""
 echo "── [5/6] Building Next.js (3-5 minutes) ──"
 NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
-# ────────────────────────────────────────────────
-# Payload schema push (Payload skips auto-push when NODE_ENV=production,
-# so bootstrap once with NODE_ENV=development to sync collections into
-# the "payload" schema. PM2 runs the app with NODE_ENV=production.)
-# ────────────────────────────────────────────────
-echo ""
-echo "── Payload schema push ──"
-NODE_ENV=development PAYLOAD_FORCE_DRIZZLE_PUSH=true \
-  npx payload run scripts/pushPayloadSchema.mts
-
+# Payload schema push now happens at runtime via onInit in payload.config.ts
+# (Payload skips auto-push when NODE_ENV=production; onInit is unconditional).
 # ────────────────────────────────────────────────
 # PM2
 # ────────────────────────────────────────────────
