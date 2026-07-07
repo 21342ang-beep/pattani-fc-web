@@ -111,6 +111,7 @@ function TeamBadge({ logo, name }: { logo: string | null; name: string }) {
             alt={name}
             width={24}
             height={24}
+            unoptimized
             className="size-full object-contain"
           />
         ) : (

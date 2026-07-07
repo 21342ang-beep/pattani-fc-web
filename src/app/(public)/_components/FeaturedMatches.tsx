@@ -36,6 +36,7 @@ function TeamCrest({ logo, name }: { logo: string | null; name: string }) {
             alt={name}
             width={64}
             height={64}
+            unoptimized
             className="size-full object-contain p-1"
           />
         ) : (
