@@ -34,6 +34,7 @@ async function handle(
   if (!isGoogleConfigured()) {
     return NextResponse.redirect(
       errorRedirectUrl(opts.intent, "provider_not_configured"),
+      303,
     );
   }
   const nonce = await createOAuthState(
@@ -41,5 +42,6 @@ async function handle(
     opts.intent,
     opts.pdpaConsent,
   );
-  return NextResponse.redirect(buildGoogleAuthUrl(nonce));
+  // 303 See Other → browser เปลี่ยน POST เป็น GET ก่อนไปที่ provider
+  return NextResponse.redirect(buildGoogleAuthUrl(nonce), 303);
 }

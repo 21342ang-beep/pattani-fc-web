@@ -29,8 +29,11 @@ async function handle(
   if (!isLineConfigured()) {
     return NextResponse.redirect(
       errorRedirectUrl(opts.intent, "provider_not_configured"),
+      303,
     );
   }
   const nonce = await createOAuthState("LINE", opts.intent, opts.pdpaConsent);
-  return NextResponse.redirect(buildLineAuthUrl(nonce, nonce));
+  // 303 See Other → browser เปลี่ยน POST เป็น GET ก่อนไปที่ LINE
+  // (307 จะยัง POST ต่อ → LINE ตอบ 405)
+  return NextResponse.redirect(buildLineAuthUrl(nonce, nonce), 303);
 }
