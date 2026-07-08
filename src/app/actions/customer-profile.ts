@@ -117,6 +117,12 @@ export async function changePassword(
   if (!row) {
     return { error: "ไม่พบบัญชี" };
   }
+  if (!row.passwordHash) {
+    return {
+      error:
+        "บัญชีนี้เข้าสู่ระบบด้วย Google/LINE จึงยังไม่มีรหัสผ่าน — ตั้งรหัสผ่านครั้งแรกได้ที่หน้าโปรไฟล์",
+    };
+  }
   const ok = await bcrypt.compare(parsed.data.currentPassword, row.passwordHash);
   if (!ok) {
     return {
@@ -176,12 +182,15 @@ export async function deleteAccount(
   if (!row) {
     return { error: "ไม่พบบัญชี" };
   }
-  const ok = await bcrypt.compare(parsed.data.password, row.passwordHash);
-  if (!ok) {
-    return {
-      error: "รหัสผ่านไม่ถูกต้อง",
-      fieldErrors: { password: "รหัสผ่านไม่ถูกต้อง" },
-    };
+  // บัญชี social-only ไม่มีรหัสผ่าน → skip password check
+  if (row.passwordHash) {
+    const ok = await bcrypt.compare(parsed.data.password, row.passwordHash);
+    if (!ok) {
+      return {
+        error: "รหัสผ่านไม่ถูกต้อง",
+        fieldErrors: { password: "รหัสผ่านไม่ถูกต้อง" },
+      };
+    }
   }
 
   await prisma.customer.delete({ where: { id: customer.id } });

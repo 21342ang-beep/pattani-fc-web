@@ -8,9 +8,25 @@ import MemberLoginForm from "./MemberLoginForm";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "เข้าสู่ระบบสมาชิก — Pattani FC" };
 
-export default async function MemberLoginPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  no_account:
+    "ยังไม่พบบัญชีนี้ในระบบ — กรุณาสมัครสมาชิกก่อน",
+  state_mismatch: "การเชื่อมต่อกับ provider หมดอายุ กรุณาลองใหม่",
+  provider_denied: "คุณยกเลิกการอนุญาตกับ provider",
+  provider_fetch_failed: "ไม่สามารถดึงข้อมูลจาก provider ได้",
+  provider_not_configured: "ยังไม่ได้เปิดใช้บริการนี้",
+  email_not_verified:
+    "อีเมลของบัญชี Google ยังไม่ได้ยืนยัน กรุณายืนยันก่อนเชื่อมต่อ",
+  conflict: "เกิดข้อผิดพลาดในการเชื่อมต่อบัญชี กรุณาลองใหม่",
+};
+
+export default async function MemberLoginPage(props: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await readCustomerSession();
   if (session) redirect("/member");
+  const sp = await props.searchParams;
+  const errorMessage = sp.error ? ERROR_MESSAGES[sp.error] : undefined;
 
   return (
     <main className="flex flex-1 items-center justify-center bg-gradient-to-br from-green-50 via-yellow-50 to-green-100 px-4 py-12">
@@ -31,7 +47,7 @@ export default async function MemberLoginPage() {
           </p>
         </div>
 
-        <MemberLoginForm />
+        <MemberLoginForm errorMessage={errorMessage} />
 
         <p className="mt-5 text-center text-sm text-slate-600">
           ยังไม่มีบัญชี?{" "}

@@ -8,9 +8,28 @@ import RegisterForm from "./RegisterForm";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "สมัครสมาชิก — Pattani FC" };
 
-export default async function RegisterPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  missing_consent: "กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนสมัครสมาชิก",
+  no_email:
+    "บัญชี LINE ของคุณไม่ได้ให้อีเมล — กรุณาสมัครด้วยอีเมลหรือใช้ Google แทน",
+  no_account:
+    "ยังไม่พบบัญชีนี้ในระบบ — กรุณาสมัครสมาชิกก่อน (ยอมรับนโยบายด้านล่างแล้วกดปุ่ม social)",
+  state_mismatch: "การเชื่อมต่อกับ provider หมดอายุ กรุณาลองใหม่",
+  provider_denied: "คุณยกเลิกการอนุญาตกับ provider",
+  provider_fetch_failed: "ไม่สามารถดึงข้อมูลจาก provider ได้",
+  provider_not_configured: "ยังไม่ได้เปิดใช้บริการนี้ กรุณาสมัครด้วยอีเมลก่อน",
+  email_not_verified:
+    "อีเมลของบัญชี Google ยังไม่ได้ยืนยัน กรุณายืนยันก่อนเชื่อมต่อ",
+  conflict: "เกิดข้อผิดพลาดในการเชื่อมต่อบัญชี กรุณาลองใหม่",
+};
+
+export default async function RegisterPage(props: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await readCustomerSession();
   if (session) redirect("/member");
+  const sp = await props.searchParams;
+  const errorMessage = sp.error ? ERROR_MESSAGES[sp.error] : undefined;
 
   return (
     <main className="flex flex-1 items-center justify-center bg-gradient-to-br from-green-50 via-yellow-50 to-green-100 px-4 py-12">
@@ -33,7 +52,7 @@ export default async function RegisterPage() {
           </p>
         </div>
 
-        <RegisterForm />
+        <RegisterForm errorMessage={errorMessage} />
 
         <p className="mt-5 text-center text-sm text-slate-600">
           มีบัญชีอยู่แล้ว?{" "}

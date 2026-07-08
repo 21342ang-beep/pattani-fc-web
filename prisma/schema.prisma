@@ -43,18 +43,42 @@ enum Permission {
 
 // ลูกค้า (Customer) — แยกออกจาก User admin
 // ใช้สำหรับสมัครสมาชิก ซื้อสินค้า/บัตร และดูกิจกรรมลุ้นรางวัล
+// passwordHash = nullable เพราะบัญชี social-only ไม่ต้องมีรหัสผ่าน
+// pdpaConsentAt = timestamp ที่ลูกค้ายอมรับนโยบายข้อมูลส่วนบุคคล (บังคับ)
 model Customer {
   id              String   @id @default(cuid())
   email           String   @unique
-  passwordHash    String
+  passwordHash    String?
   name            String
   phone           String?
   emailVerifiedAt DateTime?
   lastLoginAt     DateTime?
+  pdpaConsentAt   DateTime?
+  accounts        CustomerAccount[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([email])
+}
+
+// บัญชีจาก provider ภายนอก (Google / Line) ผูกกับ Customer
+// 1 Customer ผูกได้หลาย provider — auto-link ด้วยอีเมล
+model CustomerAccount {
+  id                String       @id @default(cuid())
+  customerId        String
+  customer          Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider          AuthProvider
+  providerAccountId String
+  providerEmail     String?
+  linkedAt          DateTime     @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([customerId])
+}
+
+enum AuthProvider {
+  GOOGLE
+  LINE
 }
 
 // แมตช์ฟุตบอล

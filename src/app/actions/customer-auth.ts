@@ -26,6 +26,9 @@ const registerSchema = z.object({
     .regex(/[A-Za-z]/, "ต้องมีตัวอักษร")
     .regex(/[0-9]/, "ต้องมีตัวเลข"),
   confirmPassword: z.string(),
+  pdpaConsent: z.literal("on", {
+    message: "กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนสมัคร",
+  }),
 }).refine((d) => d.password === d.confirmPassword, {
   message: "รหัสผ่านยืนยันไม่ตรงกัน",
   path: ["confirmPassword"],
@@ -58,6 +61,7 @@ export async function registerCustomer(
     phone: formData.get("phone") || "",
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
+    pdpaConsent: formData.get("pdpaConsent"),
   });
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -88,6 +92,7 @@ export async function registerCustomer(
         passwordHash,
         name,
         phone: phone || null,
+        pdpaConsentAt: new Date(),
       },
     });
     await createCustomerSession(customer.id, customer.email, customer.name);
@@ -135,11 +140,18 @@ export async function loginCustomer(
   const dummyHash = "$2b$12$QZJ/HRFVLd4HnZLjo8OBU.j8KD14Szu.WVM20ciuOHbEESySgkRN.";
   const ok = await bcrypt.compare(
     parsed.data.password,
-    customer?.passwordHash ?? dummyHash
+    customer?.passwordHash ?? dummyHash,
   );
 
   if (!customer || !ok) {
     return { error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
+  }
+
+  // บัญชี social-only ไม่มีรหัสผ่าน → แจ้งให้ใช้ social login
+  if (!customer.passwordHash) {
+    return {
+      error: "บัญชีนี้เข้าสู่ระบบด้วย Google/LINE — กรุณากดปุ่ม social ด้านบน",
+    };
   }
 
   await prisma.customer.update({
