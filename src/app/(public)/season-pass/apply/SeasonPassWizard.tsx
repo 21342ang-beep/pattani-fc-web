@@ -24,21 +24,31 @@ import {
 import {
   SEASON_MATCHES,
   SEASON_LABEL,
+  SEASON_PASS_PICKUP_LOCATIONS,
+  SEASON_PASS_SHIPPING_FEE_BAHT,
   type SeasonTier,
   type SeasonTierId,
 } from "@/lib/season-pass-tiers";
+import { createSeasonPassOrder } from "@/app/actions/season-passes";
 
-// ⚠️ MOCK ONLY — local dev flow
-// ไม่มี network request, ไม่บันทึก DB, ไม่เก็บข้อมูลบัตรที่ใดเลย
-// state ทั้งหมดอยู่ใน component นี้ — refresh หน้าแล้วหาย (โดยตั้งใจ)
+// Payment gateway ยังเป็น mock (ยังไม่ผูก provider จริง)
+// แต่หลัง mock payment สำเร็จ ระบบจะบันทึกออเดอร์ลง DB จริง → admin เห็นทันที
 
 type Step = "form" | "payment" | "success";
 type Method = "card" | "promptpay" | "banking";
+type DeliveryMethod = "SHIPPING" | "PICKUP";
 
 interface CustomerData {
   name: string;
   phone: string;
   email: string;
+  deliveryMethod: DeliveryMethod;
+  shipAddress: string;
+  shipCity: string;
+  shipProvince: string;
+  shipPostalCode: string;
+  shipNote: string;
+  pickupLocation: string;
 }
 
 const TIER_ICONS: Record<SeasonTierId, React.ReactNode> = {
@@ -64,20 +74,53 @@ export default function SeasonPassWizard({
     name: defaultName,
     phone: defaultPhone,
     email: memberEmail ?? "",
+    deliveryMethod: "PICKUP",
+    shipAddress: "",
+    shipCity: "",
+    shipProvince: "",
+    shipPostalCode: "",
+    shipNote: "",
+    pickupLocation: SEASON_PASS_PICKUP_LOCATIONS[0],
   });
   const [passCode, setPassCode] = useState<string>("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const shippingFee =
+    customer.deliveryMethod === "SHIPPING" ? SEASON_PASS_SHIPPING_FEE_BAHT : 0;
+  const totalBaht = tier.priceBaht + shippingFee;
 
   const isMember = !!memberEmail;
 
   function handleFormSubmit(data: CustomerData) {
     setCustomer(data);
+    setSaveError(null);
     setStep("payment");
   }
 
-  function handlePaymentSuccess() {
-    // สุ่ม passCode client-side — mock อย่างเดียว ไม่มีการ save ที่ไหน
-    setPassCode(makePassCode(tier.id));
+  // เรียก server action → บันทึกออเดอร์ลง DB → คืน passCode ที่แท้จริง
+  async function handlePaymentSuccess(paymentMethod: Method): Promise<boolean> {
+    setSaveError(null);
+    const res = await createSeasonPassOrder({
+      tierId: tier.id,
+      name: customer.name,
+      phone: customer.phone,
+      email: customer.email || "",
+      paymentMethod,
+      deliveryMethod: customer.deliveryMethod,
+      shipAddress: customer.shipAddress,
+      shipCity: customer.shipCity,
+      shipProvince: customer.shipProvince,
+      shipPostalCode: customer.shipPostalCode,
+      shipNote: customer.shipNote,
+      pickupLocation: customer.pickupLocation,
+    });
+    if (!res.ok) {
+      setSaveError(res.error);
+      return false;
+    }
+    setPassCode(res.passCode);
     setStep("success");
+    return true;
   }
 
   return (
@@ -91,14 +134,17 @@ export default function SeasonPassWizard({
               initial={customer}
               memberEmail={memberEmail}
               onSubmit={handleFormSubmit}
+              onDeliveryMethodChange={(m) =>
+                setCustomer((c) => ({ ...c, deliveryMethod: m }))
+              }
             />
           )}
           {step === "payment" && (
             <PaymentStep
-              tier={tier}
-              customer={customer}
+              totalBaht={totalBaht}
               onBack={() => setStep("form")}
               onSuccess={handlePaymentSuccess}
+              saveError={saveError}
             />
           )}
           {step === "success" && (
@@ -107,7 +153,12 @@ export default function SeasonPassWizard({
         </div>
       </div>
 
-      <TierSummary tier={tier} isMember={isMember} />
+      <TierSummary
+        tier={tier}
+        isMember={isMember}
+        shippingFee={shippingFee}
+        totalBaht={totalBaht}
+      />
     </div>
   );
 }
@@ -168,14 +219,25 @@ function FormStep({
   initial,
   memberEmail,
   onSubmit,
+  onDeliveryMethodChange,
 }: {
   initial: CustomerData;
   memberEmail: string | null;
   onSubmit: (data: CustomerData) => void;
+  onDeliveryMethodChange: (method: DeliveryMethod) => void;
 }) {
   const [name, setName] = useState(initial.name);
   const [phone, setPhone] = useState(initial.phone);
   const [email, setEmail] = useState(initial.email);
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(
+    initial.deliveryMethod,
+  );
+  const [shipAddress, setShipAddress] = useState(initial.shipAddress);
+  const [shipCity, setShipCity] = useState(initial.shipCity);
+  const [shipProvince, setShipProvince] = useState(initial.shipProvince);
+  const [shipPostalCode, setShipPostalCode] = useState(initial.shipPostalCode);
+  const [shipNote, setShipNote] = useState(initial.shipNote);
+  const [pickupLocation, setPickupLocation] = useState(initial.pickupLocation);
   const [errors, setErrors] = useState<Partial<Record<keyof CustomerData, string>>>({});
 
   function handleSubmit(e: React.FormEvent) {
@@ -187,6 +249,16 @@ function FormStep({
     if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       nextErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
     }
+    if (deliveryMethod === "SHIPPING") {
+      if (!shipAddress.trim()) nextErrors.shipAddress = "กรุณากรอกที่อยู่";
+      if (!shipCity.trim()) nextErrors.shipCity = "กรุณากรอกอำเภอ/เขต";
+      if (!shipProvince.trim()) nextErrors.shipProvince = "กรุณากรอกจังหวัด";
+      if (!/^\d{5}$/.test(shipPostalCode.trim()))
+        nextErrors.shipPostalCode = "รหัสไปรษณีย์ต้องเป็นเลข 5 หลัก";
+    } else {
+      if (!pickupLocation.trim())
+        nextErrors.pickupLocation = "กรุณาเลือกจุดรับบัตร";
+    }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -194,6 +266,13 @@ function FormStep({
       name: name.trim(),
       phone: phone.trim(),
       email: email.trim(),
+      deliveryMethod,
+      shipAddress: shipAddress.trim(),
+      shipCity: shipCity.trim(),
+      shipProvince: shipProvince.trim(),
+      shipPostalCode: shipPostalCode.trim(),
+      shipNote: shipNote.trim(),
+      pickupLocation: pickupLocation.trim(),
     });
   }
 
@@ -257,9 +336,116 @@ function FormStep({
         />
       </Field>
 
+      <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+        <p className="mb-2 text-sm font-semibold text-slate-800">
+          วิธีรับบัตรสมาชิก
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <DeliveryOption
+            id="delivery-pickup"
+            active={deliveryMethod === "PICKUP"}
+            onClick={() => {
+              setDeliveryMethod("PICKUP");
+              onDeliveryMethodChange("PICKUP");
+            }}
+            title="รับด้วยตัวเอง"
+            subtitle="ฟรี — เลือกจุดรับด้านล่าง"
+          />
+          <DeliveryOption
+            id="delivery-shipping"
+            active={deliveryMethod === "SHIPPING"}
+            onClick={() => {
+              setDeliveryMethod("SHIPPING");
+              onDeliveryMethodChange("SHIPPING");
+            }}
+            title="ส่งพัสดุ"
+            subtitle={`+${SEASON_PASS_SHIPPING_FEE_BAHT} บาท`}
+          />
+        </div>
+
+        {deliveryMethod === "SHIPPING" ? (
+          <div className="mt-4 space-y-3">
+            <Field label="ที่อยู่" htmlFor="sp-ship-address" error={errors.shipAddress}>
+              <input
+                id="sp-ship-address"
+                value={shipAddress}
+                onChange={(e) => setShipAddress(e.target.value)}
+                placeholder="บ้านเลขที่ / หมู่ / ซอย / ถนน"
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="อำเภอ/เขต" htmlFor="sp-ship-city" error={errors.shipCity}>
+                <input
+                  id="sp-ship-city"
+                  value={shipCity}
+                  onChange={(e) => setShipCity(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+                />
+              </Field>
+              <Field label="จังหวัด" htmlFor="sp-ship-province" error={errors.shipProvince}>
+                <input
+                  id="sp-ship-province"
+                  value={shipProvince}
+                  onChange={(e) => setShipProvince(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+                />
+              </Field>
+            </div>
+            <Field
+              label="รหัสไปรษณีย์"
+              htmlFor="sp-ship-postal"
+              error={errors.shipPostalCode}
+            >
+              <input
+                id="sp-ship-postal"
+                inputMode="numeric"
+                maxLength={5}
+                value={shipPostalCode}
+                onChange={(e) =>
+                  setShipPostalCode(e.target.value.replace(/\D/g, "").slice(0, 5))
+                }
+                placeholder="5 หลัก"
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20 sm:max-w-[180px]"
+              />
+            </Field>
+            <Field label="หมายเหตุ (ไม่บังคับ)" htmlFor="sp-ship-note">
+              <input
+                id="sp-ship-note"
+                value={shipNote}
+                onChange={(e) => setShipNote(e.target.value)}
+                placeholder="เช่น ฝากไว้ที่หน้าประตู"
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+              />
+            </Field>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <Field
+              label="เลือกจุดรับบัตร"
+              htmlFor="sp-pickup"
+              error={errors.pickupLocation}
+            >
+              <select
+                id="sp-pickup"
+                value={pickupLocation}
+                onChange={(e) => setPickupLocation(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+              >
+                {SEASON_PASS_PICKUP_LOCATIONS.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {loc}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        )}
+      </div>
+
       <p className="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
         <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
-        โหมดจำลอง — ข้อมูลจะอยู่ในหน้านี้เท่านั้น ไม่ถูกส่งไปที่เซิร์ฟเวอร์หรือบันทึกในระบบ
+        ข้อมูลนี้จะใช้ในการออกบัตรของคุณ — เมื่อชำระสำเร็จ ระบบจะบันทึกออเดอร์ลงระบบ
       </p>
 
       <button
@@ -269,6 +455,43 @@ function FormStep({
         ดำเนินการต่อ · ชำระเงิน
       </button>
     </form>
+  );
+}
+
+function DeliveryOption({
+  id,
+  active,
+  onClick,
+  title,
+  subtitle,
+}: {
+  id: string;
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <button
+      id={id}
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex flex-col rounded-xl border-2 p-3 text-left transition ${
+        active
+          ? "border-green-800 bg-green-50 shadow-sm"
+          : "border-slate-200 bg-white hover:border-slate-300"
+      }`}
+    >
+      <span
+        className={`text-sm font-semibold ${
+          active ? "text-green-900" : "text-slate-800"
+        }`}
+      >
+        {title}
+      </span>
+      <span className="text-[11px] text-slate-500">{subtitle}</span>
+    </button>
   );
 }
 
@@ -287,25 +510,29 @@ const METHODS: {
 ];
 
 function PaymentStep({
-  tier,
-  customer,
+  totalBaht,
   onBack,
   onSuccess,
+  saveError,
 }: {
-  tier: SeasonTier;
-  customer: CustomerData;
+  totalBaht: number;
   onBack: () => void;
-  onSuccess: () => void;
+  onSuccess: (method: Method) => Promise<boolean>;
+  saveError: string | null;
 }) {
   const [method, setMethod] = useState<Method>("card");
-  const [processing, setProcessing] = useState<null | "authorizing" | "confirming">(null);
+  const [processing, setProcessing] = useState<
+    null | "authorizing" | "confirming" | "saving"
+  >(null);
 
   async function runMockPayment() {
     setProcessing("authorizing");
     await sleep(900);
     setProcessing("confirming");
     await sleep(700);
-    onSuccess();
+    setProcessing("saving");
+    const ok = await onSuccess(method);
+    if (!ok) setProcessing(null); // stay on this step to show error
   }
 
   return (
@@ -322,9 +549,15 @@ function PaymentStep({
           </span>
         </div>
         <p className="mt-1 text-[11px] text-white/70">
-          โหมดจำลอง — ยังไม่ได้เชื่อมต่อ payment provider จริง ข้อมูลบัตรจะไม่ถูกบันทึกหรือส่งไปที่ระบบใด ๆ
+          โหมดจำลอง — ยังไม่ได้เชื่อมต่อ payment provider จริง แต่ออเดอร์จะถูกบันทึกลงระบบเพื่อให้ admin เห็น
         </p>
       </header>
+
+      {saveError && (
+        <div className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          ⚠️ {saveError}
+        </div>
+      )}
 
       <div className="border-b border-slate-200 bg-slate-50/60 p-4 md:p-5">
         <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
@@ -368,16 +601,16 @@ function PaymentStep({
       <div className="p-5 md:p-7">
         {method === "card" && (
           <CardPanel
-            amountBaht={tier.priceBaht}
+            amountBaht={totalBaht}
             processing={processing}
             onPay={runMockPayment}
           />
         )}
         {method === "promptpay" && (
-          <PromptPayPanel amountBaht={tier.priceBaht} processing={processing} onPay={runMockPayment} />
+          <PromptPayPanel amountBaht={totalBaht} processing={processing} onPay={runMockPayment} />
         )}
         {method === "banking" && (
-          <BankingPanel amountBaht={tier.priceBaht} processing={processing} onPay={runMockPayment} />
+          <BankingPanel amountBaht={totalBaht} processing={processing} onPay={runMockPayment} />
         )}
       </div>
 
@@ -405,7 +638,7 @@ function CardPanel({
   onPay,
 }: {
   amountBaht: number;
-  processing: null | "authorizing" | "confirming";
+  processing: null | "authorizing" | "confirming" | "saving";
   onPay: () => void;
 }) {
   const [cardNumber, setCardNumber] = useState("");
@@ -545,7 +778,7 @@ function PromptPayPanel({
   onPay,
 }: {
   amountBaht: number;
-  processing: null | "authorizing" | "confirming";
+  processing: null | "authorizing" | "confirming" | "saving";
   onPay: () => void;
 }) {
   return (
@@ -642,7 +875,7 @@ function BankingPanel({
   onPay,
 }: {
   amountBaht: number;
-  processing: null | "authorizing" | "confirming";
+  processing: null | "authorizing" | "confirming" | "saving";
   onPay: () => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -717,7 +950,7 @@ function PayButton({
 }: {
   amountBaht: number;
   canPay: boolean;
-  processing: null | "authorizing" | "confirming";
+  processing: null | "authorizing" | "confirming" | "saving";
   onClick?: () => void;
   label?: string;
 }) {
@@ -725,7 +958,9 @@ function PayButton({
   const displayLabel = busy
     ? processing === "authorizing"
       ? "กำลังตรวจสอบ..."
-      : "กำลังยืนยันการชำระ..."
+      : processing === "saving"
+        ? "กำลังบันทึกออเดอร์..."
+        : "กำลังยืนยันการชำระ..."
     : (label ?? `ชำระเงิน ${amountBaht.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท`);
 
   return (
@@ -759,7 +994,7 @@ function SuccessStep({
         <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
           <Check className="size-7" />
         </div>
-        <h2 className="mt-3 text-2xl font-black text-emerald-900">สมัครสำเร็จ! (mock)</h2>
+        <h2 className="mt-3 text-2xl font-black text-emerald-900">สมัครสำเร็จ!</h2>
         <p className="mt-1 text-sm text-emerald-800">
           บัตร {tier.name} ของคุณพร้อมใช้งานแล้ว — เก็บรหัสไว้เพื่อเข้าชม 15 แมตช์
         </p>
@@ -768,10 +1003,9 @@ function SuccessStep({
       <DigitalPass tier={tier} customer={customer} passCode={passCode} />
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
-        <p className="font-semibold">⚠️ โหมดจำลอง (Local dev)</p>
+        <p className="font-semibold">หมายเหตุ</p>
         <p className="mt-1 leading-relaxed">
-          รหัสบัตรนี้ไม่ได้ถูกบันทึกในระบบและจะหายไปเมื่อรีเฟรชหน้า —
-          ในโปรดักชันจะเชื่อมกับ DB จริงและส่งอีเมลยืนยัน
+          Payment gateway ยังเป็น mock แต่ออเดอร์ได้บันทึกลงระบบเรียบร้อยแล้ว — แสดง QR นี้ที่ประตูสนามในวันแข่ง
         </p>
       </div>
 
@@ -869,7 +1103,17 @@ function DigitalPass({
 // ────────────────────────────────────────────────────────────
 // Right column — สรุปบัตร
 // ────────────────────────────────────────────────────────────
-function TierSummary({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
+function TierSummary({
+  tier,
+  isMember,
+  shippingFee,
+  totalBaht,
+}: {
+  tier: SeasonTier;
+  isMember: boolean;
+  shippingFee: number;
+  totalBaht: number;
+}) {
   return (
     <aside className="h-fit space-y-5 rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
       <div>
@@ -884,10 +1128,28 @@ function TierSummary({ tier, isMember }: { tier: SeasonTier; isMember: boolean }
       </div>
 
       <div className="border-y border-slate-200 py-4">
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-slate-500">ราคา</span>
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="text-slate-500">ราคาบัตร</span>
+          <span className="font-semibold text-slate-800">
+            ฿{tier.priceBaht.toLocaleString("th-TH")}
+          </span>
+        </div>
+        <div className="mt-1 flex items-baseline justify-between text-sm">
+          <span className="text-slate-500">ค่าจัดส่ง</span>
+          <span
+            className={`font-semibold ${
+              shippingFee > 0 ? "text-slate-800" : "text-emerald-700"
+            }`}
+          >
+            {shippingFee > 0
+              ? `฿${shippingFee.toLocaleString("th-TH")}`
+              : "ฟรี"}
+          </span>
+        </div>
+        <div className="mt-3 flex items-baseline justify-between border-t border-dashed border-slate-200 pt-3">
+          <span className="text-sm font-semibold text-slate-700">ยอดรวม</span>
           <span className="text-3xl font-black text-green-900">
-            {tier.priceBaht.toLocaleString("th-TH")}
+            {totalBaht.toLocaleString("th-TH")}
             <span className="ml-1 text-sm font-medium text-slate-500">บาท</span>
           </span>
         </div>
@@ -978,15 +1240,6 @@ function detectBrand(digits: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-function makePassCode(tierId: SeasonTierId): string {
-  // client-side random — สั้นแบบอ่านง่าย ใช้จริงจะสร้างที่ server
-  const prefix = tierId.split("-").map((s) => s[0]?.toUpperCase() ?? "").join("");
-  const rand = Array.from({ length: 8 }, () =>
-    "ABCDEFGHJKMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]
-  ).join("");
-  return `SP-${prefix}-${rand}`;
 }
 
 function hashChar(s: string, i: number): number {

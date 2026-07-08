@@ -4,6 +4,16 @@
 export const SEASON_MATCHES = 15;
 export const SEASON_LABEL = "2026/27";
 
+// ค่าจัดส่งบัตรสมาชิก (พัสดุไปที่บ้าน) — ไม่คิดเมื่อรับด้วยตัวเอง
+export const SEASON_PASS_SHIPPING_FEE_BAHT = 50;
+
+// สถานที่ให้เลือกรับบัตรด้วยตัวเอง
+export const SEASON_PASS_PICKUP_LOCATIONS = [
+  "สนามเรนโบว์สเตเดียม (Pattani FC)",
+  "สำนักงานสโมสร Pattani FC",
+  "สนามกีฬาติณสูลานนท์",
+] as const;
+
 export type SeasonTierId = "vvip-elite" | "vip-advanced" | "premium" | "gold";
 
 export interface SeasonTier {

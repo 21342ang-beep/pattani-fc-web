@@ -4,13 +4,17 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import LocaleSwitcher from "./_components/LocaleSwitcher";
 import type { Dict, Locale } from "@/lib/i18n/dict";
 
 function isActive(path: string, href: string) {
   return href === "/" ? path === "/" : path.startsWith(href);
 }
+
+type NavItem =
+  | { href: string; label: string }
+  | { label: string; children: { href: string; label: string }[] };
 
 type CustomerInfo = { name: string; email: string } | null;
 
@@ -24,24 +28,34 @@ export default function TopNav({
   dict: Dict;
 }) {
   const path = usePathname();
-  const items = [
+  const items: NavItem[] = [
     { href: "/", label: dict.nav.home },
-    { href: "/club", label: dict.nav.club },
-    { href: "/news", label: dict.nav.news },
-    { href: "/management", label: dict.nav.management },
-    { href: "/squad", label: dict.nav.squad },
-    { href: "/youth", label: dict.nav.youth },
-    { href: "/matches", label: dict.nav.matches },
     { href: "/tickets", label: dict.nav.tickets },
-    { href: "/partners", label: dict.nav.partners },
     { href: "/shop", label: dict.nav.shop },
+    { href: "/news", label: dict.nav.news },
+    { href: "/matches", label: dict.nav.matches },
+    {
+      label: dict.nav.about,
+      children: [
+        { href: "/club", label: dict.nav.club },
+        { href: "/management", label: dict.nav.management },
+        { href: "/squad", label: dict.nav.squad },
+        { href: "/youth", label: dict.nav.youth },
+      ],
+    },
   ];
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   useMotionValueEvent(scrollY, "change", (y) => {
     setScrolled(y > 24);
   });
+
+  // ปิด dropdown เมื่อเปลี่ยนหน้า
+  useEffect(() => {
+    setOpenMenu(null);
+  }, [path]);
 
   return (
     <header className="sticky top-0 z-40">
@@ -165,17 +179,90 @@ export default function TopNav({
         </motion.div>
 
         <nav className="border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-auto px-2 py-2.5 text-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-visible px-2 py-2.5 text-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {items.map((it) => {
+              if ("children" in it) {
+                const active = it.children.some((c) => isActive(path, c.href));
+                const isOpen = openMenu === it.label;
+                return (
+                  <div
+                    key={it.label}
+                    className="relative"
+                    onMouseEnter={() => setOpenMenu(it.label)}
+                    onMouseLeave={() => setOpenMenu(null)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenMenu(isOpen ? null : it.label)
+                      }
+                      aria-expanded={isOpen}
+                      aria-haspopup="menu"
+                      className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-full px-6 py-2.5 font-bold tracking-wide transition-colors ${
+                        active ? "text-green-950" : "text-white hover:text-white"
+                      }`}
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="nav-pill"
+                          className="absolute inset-0 rounded-full bg-yellow-400"
+                          transition={{
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 30,
+                          }}
+                        />
+                      )}
+                      <span className="relative">{it.label}</span>
+                      <svg
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        aria-hidden
+                        className={`relative size-4 transition-transform ${
+                          isOpen ? "rotate-180" : ""
+                        }`}
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.4a.75.75 0 01-1.08 0l-4.25-4.4a.75.75 0 01.02-1.06z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                    {isOpen && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-base shadow-xl backdrop-blur-md"
+                      >
+                        {it.children.map((c) => {
+                          const childActive = isActive(path, c.href);
+                          return (
+                            <Link
+                              key={c.href}
+                              href={c.href}
+                              role="menuitem"
+                              className={`block whitespace-nowrap px-5 py-2.5 font-semibold transition-colors ${
+                                childActive
+                                  ? "bg-yellow-400 text-green-950"
+                                  : "text-yellow-100 hover:bg-green-900"
+                              }`}
+                            >
+                              {c.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
               const active = isActive(path, it.href);
               return (
                 <Link
                   key={it.href}
                   href={it.href}
                   className={`relative whitespace-nowrap rounded-full px-6 py-2.5 font-bold tracking-wide transition-colors ${
-                    active
-                      ? "text-green-950"
-                      : "text-white hover:text-white"
+                    active ? "text-green-950" : "text-white hover:text-white"
                   }`}
                 >
                   {active && (

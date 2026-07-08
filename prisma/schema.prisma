@@ -231,3 +231,52 @@ enum ShopPaymentMethod {
   BANK_TRANSFER
   COD             // เก็บปลายทาง
 }
+
+// บัตรสมาชิกรายปี (Season Pass)
+// tier + priceBaht + shippingFeeBaht เป็น snapshot ตอนซื้อ — กันราคาเปลี่ยนแล้วกระทบออเดอร์เก่า
+// customerId nullable = รองรับ guest checkout (member จะ link ผ่าน customerId)
+// deliveryMethod = SHIPPING → ต้องมี shipAddress; PICKUP → ต้องมี pickupLocation
+model SeasonPassOrder {
+  id               String                    @id @default(cuid())
+  passCode         String                    @unique
+  tierId           String                    // "vvip-elite" | "vip-advanced" | "premium" | "gold"
+  seasonLabel      String                    // "2026/27"
+  priceBaht        Int                       // สแนปช็อตราคาบัตร ณ วันซื้อ
+  shippingFeeBaht  Int                       @default(0)
+  // customer
+  customerId       String?
+  customerName     String
+  customerPhone    String
+  customerEmail    String?
+  // delivery
+  deliveryMethod   SeasonPassDeliveryMethod  @default(PICKUP)
+  shipAddress      String?
+  shipCity         String?
+  shipProvince     String?
+  shipPostalCode   String?
+  shipNote         String?
+  pickupLocation   String?
+  // payment / status
+  paymentMethod    String                    // "card" | "promptpay" | "banking"
+  status           SeasonPassOrderStatus     @default(CONFIRMED)
+  notes            String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@index([status])
+  @@index([customerPhone])
+  @@index([customerEmail])
+  @@index([customerId])
+}
+
+enum SeasonPassOrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+enum SeasonPassDeliveryMethod {
+  SHIPPING   // +50 บาท — ส่งบัตรสมาชิกทางไปรษณีย์
+  PICKUP     // ฟรี — รับด้วยตัวเองที่จุดรับ
+}
