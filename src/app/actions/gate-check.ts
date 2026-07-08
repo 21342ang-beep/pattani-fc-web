@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyAdmin } from "@/lib/dal";
+import { verifyPermission } from "@/lib/dal";
 
 // Server actions สำหรับหน้า /gate-check (ระบบสแกนเข้างานที่ประตูสนาม)
 // ทุก action ต้องผ่าน verifyAdmin → ป้องกันคนนอกใช้
@@ -16,7 +16,7 @@ import { verifyAdmin } from "@/lib/dal";
 // ─── 1) list แมตช์ที่จะคุมประตู ─────────────────────────────────
 // แสดงเฉพาะแมตช์ ON_SALE / SCHEDULED ที่ kickoff ยังไม่ผ่านนานเกิน 1 วัน
 export async function listGateMatches() {
-  await verifyAdmin();
+  await verifyPermission("GATE_CHECK");
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const matches = await prisma.match.findMany({
@@ -72,7 +72,7 @@ export type DownloadWhitelistResult =
 export async function downloadWhitelist(
   rawMatchId: string
 ): Promise<DownloadWhitelistResult> {
-  await verifyAdmin();
+  await verifyPermission("GATE_CHECK");
 
   const parsed = matchIdSchema.safeParse(rawMatchId);
   if (!parsed.success) return { ok: false, error: "matchId ไม่ถูกต้อง" };
@@ -139,7 +139,7 @@ export type SyncScansResult =
   | { ok: false; error: string };
 
 export async function syncScans(input: unknown): Promise<SyncScansResult> {
-  const session = await verifyAdmin();
+  const currentUser = await verifyPermission("GATE_CHECK");
 
   const parsed = syncBatchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "ข้อมูล sync ไม่ถูกต้อง" };
@@ -192,7 +192,7 @@ export async function syncScans(input: unknown): Promise<SyncScansResult> {
           },
           data: {
             scannedAt: w.scannedAt,
-            scannedBy: session.userId,
+            scannedBy: currentUser.id,
           },
         })
       )

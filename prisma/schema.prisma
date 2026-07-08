@@ -11,19 +11,34 @@ datasource db {
 }
 
 // Admin user สำหรับเข้าหลังบ้าน
+// permissions = สิทธิ์เข้าหมวดต่าง ๆ (SUPER_ADMIN ข้ามการเช็คทั้งหมด)
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String       @id @default(cuid())
+  email        String       @unique
   passwordHash String
   name         String?
-  role         Role     @default(ADMIN)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         Role         @default(ADMIN)
+  permissions  Permission[] @default([])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 enum Role {
   ADMIN
   SUPER_ADMIN
+}
+
+// สิทธิ์เข้าถึงแต่ละหมวดของหลังบ้าน
+// SUPER_ADMIN มีทุกสิทธิ์เสมอ (bypass); ADMIN จะเข้าได้เฉพาะที่ถูก grant
+enum Permission {
+  MATCHES
+  BOOKINGS
+  SEASON_PASSES
+  CUSTOMERS
+  WEBSITE
+  REPORTS
+  FINANCE
+  GATE_CHECK
 }
 
 // ลูกค้า (Customer) — แยกออกจาก User admin

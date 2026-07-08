@@ -1,5 +1,5 @@
 import { ArrowDownCircle, ArrowUpCircle, TrendingUp, AlertCircle } from "lucide-react";
-import { verifyAdmin } from "@/lib/dal";
+import { verifyPermission } from "@/lib/dal";
 import { payload } from "@/lib/payload";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,7 +58,7 @@ function startOfYear(d: Date) {
 }
 
 export default async function FinancePage() {
-  await verifyAdmin();
+  await verifyPermission("FINANCE");
   const cms = await payload();
   const now = new Date();
   const monthStart = startOfMonth(now).toISOString();

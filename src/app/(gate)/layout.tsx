@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { verifyAdmin } from "@/lib/dal";
+import { verifyPermission } from "@/lib/dal";
 import "../globals.css";
 
 // Layout แยกสำหรับหน้า /gate-check
@@ -27,7 +27,7 @@ export default async function GateLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await verifyAdmin();
+  await verifyPermission("GATE_CHECK");
   return (
     <html lang="th" className={`${dbHeavent.variable} h-full antialiased`}>
       <body className="min-h-full bg-slate-950 text-slate-100">{children}</body>

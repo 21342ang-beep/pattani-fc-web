@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { verifyPermission } from "@/lib/dal";
 import MatchForm from "../MatchForm";
 import { updateMatch, type MatchFormState } from "@/app/actions/matches";
 
@@ -8,6 +9,7 @@ export const metadata = { title: "แก้ไขแมตช์ — Admin" };
 export const dynamic = "force-dynamic";
 
 export default async function EditMatchPage(props: { params: Promise<{ id: string }> }) {
+  await verifyPermission("MATCHES");
   const { id } = await props.params;
   const match = await prisma.match.findUnique({ where: { id } });
   if (!match) notFound();

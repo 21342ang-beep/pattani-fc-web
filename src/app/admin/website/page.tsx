@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { verifyAdmin } from "@/lib/dal";
+import { verifyPermission } from "@/lib/dal";
 import { payload } from "@/lib/payload";
 
 export const dynamic = "force-dynamic";
@@ -127,7 +127,7 @@ async function getCounts() {
 }
 
 export default async function WebsiteManagementPage() {
-  await verifyAdmin();
+  await verifyPermission("WEBSITE");
   const counts = await getCounts();
 
   const contentCards = CARDS.filter((c) => c.group === "content");

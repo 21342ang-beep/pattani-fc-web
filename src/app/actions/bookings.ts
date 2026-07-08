@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { bookingCreateSchema } from "@/lib/validations";
-import { verifyAdmin } from "@/lib/dal";
+import { verifyPermission } from "@/lib/dal";
 import { readCustomerSession } from "@/lib/customer-session";
 
 export type BookingFormState = {
@@ -90,7 +90,7 @@ export async function updateBookingStatus(
   bookingId: string,
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "REFUNDED"
 ): Promise<{ ok: true } | { error: string }> {
-  await verifyAdmin();
+  await verifyPermission("BOOKINGS");
   try {
     await prisma.booking.update({ where: { id: bookingId }, data: { status } });
     revalidatePath("/admin/bookings");
@@ -105,7 +105,7 @@ export async function updateBookingStatus(
 export async function deleteBooking(
   bookingId: string
 ): Promise<{ ok: true } | { error: string }> {
-  await verifyAdmin();
+  await verifyPermission("BOOKINGS");
   if (typeof bookingId !== "string" || !/^[a-z0-9]+$/i.test(bookingId)) {
     return { error: "รหัสไม่ถูกต้อง" };
   }

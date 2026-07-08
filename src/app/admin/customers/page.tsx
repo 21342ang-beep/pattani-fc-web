@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { verifyAdmin } from "@/lib/dal";
+import { verifyPermission } from "@/lib/dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<{ sort?: string; q?: string }>;
 }) {
-  await verifyAdmin();
+  await verifyPermission("CUSTOMERS");
   const sp = await searchParams;
   const sort: SortKey = sp.sort === "recent" ? "recent" : "spend";
   const q = (sp.q ?? "").trim().slice(0, 100);

@@ -1,7 +1,20 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Permission } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+// permissions ทั้งหมด — ยัดใส่ SUPER_ADMIN ตอน seed แม้ว่า role SUPER_ADMIN
+// จะ bypass permission check อยู่แล้ว (เก็บให้ข้อมูลสอดคล้อง)
+const ALL_PERMISSIONS: Permission[] = [
+  "MATCHES",
+  "BOOKINGS",
+  "SEASON_PASSES",
+  "CUSTOMERS",
+  "WEBSITE",
+  "REPORTS",
+  "FINANCE",
+  "GATE_CHECK",
+];
 
 async function main() {
   const email = process.env.SEED_ADMIN_EMAIL;
@@ -14,12 +27,13 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: email.toLowerCase() },
-    update: {},
+    update: { permissions: ALL_PERMISSIONS },
     create: {
       email: email.toLowerCase(),
       passwordHash,
       name: "Administrator",
       role: "SUPER_ADMIN",
+      permissions: ALL_PERMISSIONS,
     },
   });
   console.log(`✓ Admin พร้อมใช้: ${admin.email}`);

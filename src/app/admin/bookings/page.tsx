@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { verifyPermission } from "@/lib/dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import BookingStatusSelect from "./BookingStatusSelect";
 import DeleteBookingButton from "./DeleteBookingButton";
@@ -13,6 +14,7 @@ const statusColor: Record<string, string> = {
 };
 
 export default async function AdminBookingsPage() {
+  await verifyPermission("BOOKINGS");
   const bookings = await prisma.booking.findMany({
     orderBy: { createdAt: "desc" },
     include: { match: { select: { homeTeam: true, awayTeam: true, kickoffAt: true } } },

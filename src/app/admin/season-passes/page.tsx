@@ -4,6 +4,7 @@ import {
   SEASON_TIERS,
   type SeasonTierId,
 } from "@/lib/season-pass-tiers";
+import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +66,8 @@ const statusColor: Record<string, string> = {
   REFUNDED: "bg-blue-100 text-blue-800",
 };
 
-export default function AdminSeasonPassesPage() {
+export default async function AdminSeasonPassesPage() {
+  await verifyPermission("SEASON_PASSES");
   const tierById = new Map(SEASON_TIERS.map((t) => [t.id, t]));
 
   const summary = {

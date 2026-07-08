@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Shield } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { verifyPermission } from "@/lib/dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import DeleteMatchButton from "./DeleteMatchButton";
 
@@ -16,6 +17,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function AdminMatchesPage() {
+  await verifyPermission("MATCHES");
   const matches = await prisma.match.findMany({
     orderBy: { kickoffAt: "asc" },
     include: {

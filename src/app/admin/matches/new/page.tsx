@@ -1,10 +1,12 @@
 import Link from "next/link";
 import MatchForm from "../MatchForm";
 import { createMatch } from "@/app/actions/matches";
+import { verifyPermission } from "@/lib/dal";
 
 export const metadata = { title: "เพิ่มแมตช์ — Admin" };
 
-export default function NewMatchPage() {
+export default async function NewMatchPage() {
+  await verifyPermission("MATCHES");
   return (
     <div className="max-w-3xl">
       <Link href="/admin/matches" className="text-sm text-slate-500 hover:text-slate-900">

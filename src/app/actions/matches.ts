@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { matchCreateSchema, matchUpdateSchema } from "@/lib/validations";
-import { verifyAdmin } from "@/lib/dal";
+import { verifyPermission } from "@/lib/dal";
 import { saveTeamLogo, deleteTeamLogo, UploadError } from "@/lib/upload";
 
 export type MatchFormState = {
@@ -101,7 +101,7 @@ export async function createMatch(
   _prev: MatchFormState,
   formData: FormData
 ): Promise<MatchFormState> {
-  await verifyAdmin();
+  await verifyPermission("MATCHES");
 
   let parsedForm;
   try {
@@ -137,7 +137,7 @@ export async function updateMatch(
   _prev: MatchFormState,
   formData: FormData
 ): Promise<MatchFormState> {
-  await verifyAdmin();
+  await verifyPermission("MATCHES");
 
   let parsedForm;
   try {
@@ -169,7 +169,7 @@ export async function updateMatch(
 }
 
 export async function deleteMatch(matchId: string): Promise<{ ok: true } | { error: string }> {
-  await verifyAdmin();
+  await verifyPermission("MATCHES");
   try {
     const bookings = await prisma.booking.count({
       where: { matchId, status: { in: ["PENDING", "CONFIRMED"] } },

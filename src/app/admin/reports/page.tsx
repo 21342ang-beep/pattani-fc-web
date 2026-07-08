@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { verifyPermission } from "@/lib/dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "รายงานยอดขาย — Pattani FC Admin" };
 
 export default async function ReportsPage() {
+  await verifyPermission("REPORTS");
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
