@@ -10,7 +10,6 @@ import { readCustomerSession } from "@/lib/customer-session";
 export type BookingFormState = {
   error?: string;
   fieldErrors?: Record<string, string[]>;
-  bookingCode?: string;
 } | undefined;
 
 // สาธารณะ — สร้างการจองได้ทั้ง member และ guest (ไม่ต้องสมัครสมาชิก)
@@ -36,6 +35,7 @@ export async function createBooking(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
+  let bookingCode: string;
   try {
     const booking = await prisma.$transaction(
       async (tx) => {
@@ -79,10 +79,17 @@ export async function createBooking(
     revalidatePath(`/matches/${parsed.data.matchId}`);
     // invalidate unstable_cache queries — ที่นั่งเหลือต้องอัปเดตทันที
     revalidateTag("bookings", { expire: 0 });
-    return { bookingCode: booking.bookingCode };
+    bookingCode = booking.bookingCode;
   } catch (err) {
     return { error: err instanceof Error ? err.message : "เกิดข้อผิดพลาด" };
   }
+
+  // ข้าม intermediate "จองสำเร็จ" — ไป checkout ทันที เพื่อไม่ให้
+  // PENDING booking ค้าง แล้วกันที่นั่งของลูกค้ารายอื่น
+  // (redirect throws NEXT_REDIRECT → ต้องเรียกนอก try/catch)
+  redirect(
+    `/checkout/${bookingCode}?phone=${encodeURIComponent(parsed.data.customerPhone)}`
+  );
 }
 
 // Admin — เปลี่ยนสถานะการจอง

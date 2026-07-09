@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
-import { ArrowRight, Mail, UserPlus, User } from "lucide-react";
+import { Mail, UserPlus, User } from "lucide-react";
 import { createBooking, type BookingFormState } from "@/app/actions/bookings";
 import { formatBaht } from "@/lib/format";
 
@@ -24,38 +24,11 @@ export default function BookingForm({
   zone?: string;
 }) {
   const isGuest = !customerEmail;
-  // เก็บเบอร์ที่กรอกจริง (ใช้ build URL หลังจองสำเร็จ → checkout/tickets gate)
-  const phoneSubmittedRef = useRef<string>(customerPhone);
+  // จองสำเร็จ → server action redirect ไป /checkout ทันที (ไม่มี success state ให้ handle)
   const [state, formAction, pending] = useActionState<BookingFormState, FormData>(
-    async (prev, fd) => {
-      phoneSubmittedRef.current = String(fd.get("customerPhone") ?? customerPhone);
-      return createBooking(prev, fd);
-    },
+    createBooking,
     undefined
   );
-
-  if (state?.bookingCode) {
-    // ใช้เบอร์โทรเป็น universal identifier ในการ gate checkout/tickets
-    const checkoutHref = `/checkout/${state.bookingCode}?phone=${encodeURIComponent(phoneSubmittedRef.current)}`;
-    return (
-      <div className="mt-6 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-6 text-center">
-        <h3 className="text-xl font-bold text-emerald-800">จองสำเร็จ!</h3>
-        <p className="mt-2 text-sm text-emerald-700">รหัสการจองของคุณ:</p>
-        <p className="mt-1 font-mono text-2xl font-bold text-emerald-900">
-          {state.bookingCode}
-        </p>
-        <p className="mt-3 text-xs text-emerald-700">
-          เก็บรหัสนี้ไว้ — ใช้ตรวจสอบสถานะที่หน้า &quot;ตรวจสอบการจอง&quot;
-        </p>
-        <Link
-          href={checkoutHref}
-          className="mt-5 inline-flex items-center gap-2 rounded-full bg-yellow-400 px-6 py-3 text-base font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-105 hover:bg-yellow-300"
-        >
-          ดำเนินการชำระเงิน <ArrowRight className="size-5" />
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <form action={formAction} className="mt-6 space-y-4 rounded-lg border bg-white p-6 shadow-sm">
@@ -145,7 +118,7 @@ export default function BookingForm({
         disabled={pending}
         className="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:bg-slate-400"
       >
-        {pending ? "กำลังจอง..." : "ยืนยันจอง"}
+        {pending ? "กำลังจอง..." : "จองและชำระเงิน"}
       </button>
     </form>
   );
