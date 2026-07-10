@@ -146,8 +146,8 @@ export default function TicketsPage() {
         </div>
       </div>
 
-      {/* 3) บัตรสมาชิกรายปี — ล่างสุด */}
-      <div className="mx-auto max-w-7xl px-4 pb-14 md:pb-20">
+      {/* 3) บัตรสมาชิกรายปี — ล่างสุด (anchor สำหรับ tab "ตั๋วรายปี") */}
+      <div id="season-pass" className="mx-auto max-w-7xl px-4 pb-14 md:pb-20 scroll-mt-32">
         <div className="mb-8 text-center md:mb-10">
           <p className="inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-widest text-yellow-600">
             <CalendarRange className="size-4" />

@@ -26,10 +26,12 @@ const th = defineDict({
     management: "ผู้บริหาร",
     squad: "ผู้เล่นและสตาฟ",
     youth: "ทีมเยาวชน",
-    matches: "โปรแกรมการแข่งขัน",
-    tickets: "จองตั๋วแมตช์/รายปี",
+    matches: "โปรแกรม",
+    tickets: "จองตั๋ว",
+    seasonTickets: "ตั๋วรายปี",
     partners: "สปอนเซอร์",
     shop: "ร้านค้า",
+    contact: "ติดต่อ",
   },
   // Auth buttons
   auth: {
@@ -94,9 +96,11 @@ const en: typeof th = {
     squad: "Players & Staff",
     youth: "Youth Team",
     matches: "Fixtures",
-    tickets: "Match / Season Tickets",
+    tickets: "Match Tickets",
+    seasonTickets: "Season Tickets",
     partners: "Sponsors",
     shop: "Shop",
+    contact: "Contact",
   },
   auth: {
     login: "Sign In",

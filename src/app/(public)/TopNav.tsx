@@ -30,10 +30,6 @@ export default function TopNav({
   const path = usePathname();
   const items: NavItem[] = [
     { href: "/", label: dict.nav.home },
-    { href: "/tickets", label: dict.nav.tickets },
-    { href: "/shop", label: dict.nav.shop },
-    { href: "/news", label: dict.nav.news },
-    { href: "/matches", label: dict.nav.matches },
     {
       label: dict.nav.about,
       children: [
@@ -43,6 +39,12 @@ export default function TopNav({
         { href: "/youth", label: dict.nav.youth },
       ],
     },
+    { href: "/tickets", label: dict.nav.tickets },
+    { href: "/tickets#season-pass", label: dict.nav.seasonTickets },
+    { href: "/matches", label: dict.nav.matches },
+    { href: "/news", label: dict.nav.news },
+    { href: "/shop", label: dict.nav.shop },
+    { href: "/contact", label: dict.nav.contact },
   ];
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
@@ -73,9 +75,6 @@ export default function TopNav({
           </Link>
           <Link href="/faq" className="hover:underline">
             {dict.util.faq}
-          </Link>
-          <Link href="/contact" className="hover:underline">
-            {dict.util.contact}
           </Link>
           <Link
             href="/login"
