@@ -3,8 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { motion, useScroll, useMotionValueEvent } from "framer-motion";
+import {
+  motion,
+  useScroll,
+  useMotionValueEvent,
+  AnimatePresence,
+} from "framer-motion";
 import { useEffect, useState } from "react";
+import { Menu, X, Shield } from "lucide-react";
 import LocaleSwitcher from "./_components/LocaleSwitcher";
 import type { Dict, Locale } from "@/lib/i18n/dict";
 
@@ -49,25 +55,38 @@ export default function TopNav({
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useMotionValueEvent(scrollY, "change", (y) => {
     setScrolled(y > 24);
   });
 
-  // ปิด dropdown เมื่อเปลี่ยนหน้า
+  // ปิด dropdown + mobile drawer เมื่อเปลี่ยนหน้า
   useEffect(() => {
     setOpenMenu(null);
+    setMobileOpen(false);
   }, [path]);
+
+  // Lock body scroll ตอน drawer เปิด (กัน scroll ทะลุไปหลัง overlay)
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
 
   return (
     <header className="sticky top-0 z-40">
+      {/* Utility bar — desktop only (mobile ย้ายไปใน drawer) */}
       <motion.div
         animate={{
           height: scrolled ? 0 : "auto",
           opacity: scrolled ? 0 : 1,
         }}
         transition={{ duration: 0.25, ease: "easeInOut" }}
-        className="overflow-hidden bg-gradient-to-r from-yellow-400 via-yellow-300 to-green-700"
+        className="hidden overflow-hidden bg-gradient-to-r from-yellow-400 via-yellow-300 to-green-700 xl:block"
       >
         <div className="mx-auto flex max-w-7xl items-center justify-end gap-6 px-4 py-2 text-base font-bold text-green-950">
           <Link href="/bookings/check" className="hover:underline">
@@ -81,16 +100,7 @@ export default function TopNav({
             className="inline-flex items-center gap-1 text-sm text-green-900/80 hover:text-green-950 hover:underline"
             title={dict.util.admin}
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="size-3.5"
-              aria-hidden
-            >
-              <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
-            </svg>
+            <Shield className="size-3.5" aria-hidden strokeWidth={2.5} />
             {dict.util.admin}
           </Link>
           <LocaleSwitcher current={locale} />
@@ -112,11 +122,11 @@ export default function TopNav({
           transition={{ duration: 0.25 }}
           className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4"
         >
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
             <motion.div
               animate={{ scale: scrolled ? 0.78 : 1 }}
               transition={{ duration: 0.25 }}
-              className="origin-left"
+              className="origin-left shrink-0"
             >
               <Image
                 src="/logo-pattani-fc.png"
@@ -124,60 +134,76 @@ export default function TopNav({
                 width={56}
                 height={56}
                 priority
+                className="size-11 sm:size-14"
               />
             </motion.div>
             <motion.div
               animate={{ opacity: scrolled ? 0.95 : 1 }}
-              className="flex flex-col leading-tight"
+              className="flex min-w-0 flex-col leading-tight"
             >
-              <span className="text-2xl font-black tracking-wide sm:text-3xl">
+              <span className="truncate text-xl font-black tracking-wide sm:text-3xl">
                 <span className="bg-gradient-to-r from-yellow-300 to-yellow-200 bg-clip-text text-transparent">
                   {dict.brand.name}
                 </span>
-                <span className="ml-2 text-base font-normal text-yellow-100/70 sm:text-lg">
+                <span className="ml-2 hidden text-base font-normal text-yellow-100/70 sm:inline sm:text-lg">
                   {dict.brand.suffix}
                 </span>
               </span>
               <motion.span
                 animate={{ height: scrolled ? 0 : "auto", opacity: scrolled ? 0 : 1 }}
-                className="overflow-hidden text-xs uppercase tracking-widest text-green-200"
+                className="hidden overflow-hidden text-xs uppercase tracking-widest text-green-200 sm:block"
               >
                 {dict.brand.motto}
               </motion.span>
             </motion.div>
           </Link>
 
-          {customer ? (
-            <div className="hidden items-center gap-2 md:flex">
-              <Link
-                href="/member"
-                className="inline-flex items-center gap-2 rounded-full border border-yellow-300/30 bg-white/5 px-4 py-2 text-sm font-semibold text-yellow-100 backdrop-blur-sm transition hover:bg-white/10"
-              >
-                <span className="grid size-7 place-items-center rounded-full bg-yellow-400 text-sm font-black text-green-950">
-                  {customer.name.slice(0, 1).toUpperCase()}
-                </span>
-                <span className="max-w-[10rem] truncate">{customer.name}</span>
-              </Link>
-            </div>
-          ) : (
-            <div className="hidden items-center gap-2 md:flex">
-              <Link
-                href="/member/login"
-                className="rounded-full border border-yellow-300/40 px-5 py-2 text-sm font-semibold text-yellow-100 transition hover:bg-white/10"
-              >
-                {dict.auth.login}
-              </Link>
-              <Link
-                href="/register"
-                className="rounded-full bg-yellow-400 px-5 py-2 text-sm font-bold text-green-950 transition-all hover:scale-105 hover:bg-yellow-300 hover:shadow-lg hover:shadow-yellow-400/30"
-              >
-                {dict.auth.register}
-              </Link>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Auth buttons — desktop only */}
+            {customer ? (
+              <div className="hidden items-center gap-2 xl:flex">
+                <Link
+                  href="/member"
+                  className="inline-flex items-center gap-2 rounded-full border border-yellow-300/30 bg-white/5 px-4 py-2 text-sm font-semibold text-yellow-100 backdrop-blur-sm transition hover:bg-white/10"
+                >
+                  <span className="grid size-7 place-items-center rounded-full bg-yellow-400 text-sm font-black text-green-950">
+                    {customer.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="max-w-[10rem] truncate">{customer.name}</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="hidden items-center gap-2 xl:flex">
+                <Link
+                  href="/member/login"
+                  className="rounded-full border border-yellow-300/40 px-5 py-2 text-sm font-semibold text-yellow-100 transition hover:bg-white/10"
+                >
+                  {dict.auth.login}
+                </Link>
+                <Link
+                  href="/register"
+                  className="rounded-full bg-yellow-400 px-5 py-2 text-sm font-bold text-green-950 transition-all hover:scale-105 hover:bg-yellow-300 hover:shadow-lg hover:shadow-yellow-400/30"
+                >
+                  {dict.auth.register}
+                </Link>
+              </div>
+            )}
+
+            {/* Hamburger — mobile only */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              aria-label="เปิดเมนู"
+              aria-expanded={mobileOpen}
+              className="grid size-11 shrink-0 place-items-center rounded-full border border-yellow-300/30 bg-white/5 text-yellow-100 transition hover:bg-white/10 xl:hidden"
+            >
+              <Menu className="size-6" aria-hidden />
+            </button>
+          </div>
         </motion.div>
 
-        <nav className="border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm">
+        {/* Desktop nav — hidden below md */}
+        <nav className="hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
           <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-visible px-2 py-2.5 text-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {items.map((it) => {
               if ("children" in it) {
@@ -278,6 +304,167 @@ export default function TopNav({
           </div>
         </nav>
       </motion.div>
+
+      {/* Mobile drawer — slide from right */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setMobileOpen(false)}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm xl:hidden"
+              aria-hidden
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 32, stiffness: 320 }}
+              className="fixed inset-y-0 right-0 z-50 flex w-[88%] max-w-sm flex-col bg-green-950 text-yellow-100 shadow-2xl xl:hidden"
+              role="dialog"
+              aria-modal="true"
+              aria-label="เมนูหลัก"
+            >
+              <div className="flex items-center justify-between border-b border-yellow-300/10 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Image
+                    src="/logo-pattani-fc.png"
+                    alt="Pattani FC"
+                    width={36}
+                    height={36}
+                  />
+                  <span className="font-black tracking-wide text-yellow-300">
+                    {dict.brand.name}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(false)}
+                  aria-label="ปิดเมนู"
+                  className="grid size-10 place-items-center rounded-full text-yellow-100 transition hover:bg-white/10"
+                >
+                  <X className="size-6" aria-hidden />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 pb-6 pt-4">
+                {customer ? (
+                  <Link
+                    href="/member"
+                    className="mb-4 flex items-center gap-3 rounded-2xl border border-yellow-300/30 bg-white/5 p-3"
+                  >
+                    <span className="grid size-11 shrink-0 place-items-center rounded-full bg-yellow-400 text-lg font-black text-green-950">
+                      {customer.name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-base font-bold text-yellow-100">
+                        {customer.name}
+                      </p>
+                      <p className="truncate text-xs text-yellow-100/60">
+                        {customer.email}
+                      </p>
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="mb-4 grid grid-cols-2 gap-2">
+                    <Link
+                      href="/member/login"
+                      className="rounded-full border border-yellow-300/40 px-4 py-2.5 text-center text-sm font-semibold text-yellow-100"
+                    >
+                      {dict.auth.login}
+                    </Link>
+                    <Link
+                      href="/register"
+                      className="rounded-full bg-yellow-400 px-4 py-2.5 text-center text-sm font-bold text-green-950"
+                    >
+                      {dict.auth.register}
+                    </Link>
+                  </div>
+                )}
+
+                <nav className="space-y-0.5">
+                  {items.map((it) => {
+                    if ("children" in it) {
+                      return (
+                        <div key={it.label} className="mt-2">
+                          <p className="mb-1 px-3 pt-2 text-[11px] font-bold uppercase tracking-widest text-yellow-300/60">
+                            {it.label}
+                          </p>
+                          {it.children.map((c) => {
+                            const active = isActive(path, c.href);
+                            return (
+                              <Link
+                                key={c.href}
+                                href={c.href}
+                                className={`block rounded-xl px-3 py-2.5 text-base font-semibold transition-colors ${
+                                  active
+                                    ? "bg-yellow-400 text-green-950"
+                                    : "text-yellow-100 hover:bg-white/5"
+                                }`}
+                              >
+                                {c.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+                    const active = isActive(path, it.href);
+                    return (
+                      <Link
+                        key={it.href}
+                        href={it.href}
+                        className={`block rounded-xl px-3 py-3 text-base font-bold transition-colors ${
+                          active
+                            ? "bg-yellow-400 text-green-950"
+                            : "text-yellow-100 hover:bg-white/5"
+                        }`}
+                      >
+                        {it.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+
+                <div className="mt-6 border-t border-yellow-300/10 pt-3">
+                  <p className="mb-1 px-3 pt-1 text-[11px] font-bold uppercase tracking-widest text-yellow-300/60">
+                    บริการ
+                  </p>
+                  <Link
+                    href="/bookings/check"
+                    className="block rounded-xl px-3 py-2.5 text-sm text-yellow-100 hover:bg-white/5"
+                  >
+                    {dict.util.checkBooking}
+                  </Link>
+                  <Link
+                    href="/faq"
+                    className="block rounded-xl px-3 py-2.5 text-sm text-yellow-100 hover:bg-white/5"
+                  >
+                    {dict.util.faq}
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-yellow-100 hover:bg-white/5"
+                  >
+                    <Shield className="size-4" aria-hidden strokeWidth={2.5} />
+                    {dict.util.admin}
+                  </Link>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 border-t border-yellow-300/10 bg-green-950/80 px-4 py-3">
+                <span className="text-xs uppercase tracking-widest text-yellow-300/60">
+                  {dict.locale.label}
+                </span>
+                <LocaleSwitcher current={locale} />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

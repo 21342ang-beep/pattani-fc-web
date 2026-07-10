@@ -9,6 +9,9 @@ import {
   deleteCustomerSession,
 } from "@/lib/customer-session";
 import { rateLimit } from "@/lib/rate-limit";
+import { createOAuthState } from "@/lib/oauth";
+import { buildGoogleAuthUrl, isGoogleConfigured } from "@/lib/oauth-google";
+import { buildLineAuthUrl, isLineConfigured } from "@/lib/oauth-line";
 
 const registerSchema = z.object({
   name: z.string().trim().min(2, "กรอกชื่อ-นามสกุลให้ครบ").max(100),
@@ -55,6 +58,10 @@ export async function registerCustomer(
     };
   }
 
+  // mode = ปุ่มที่ลูกค้ากด: "password" (สมัครด้วยรหัสผ่าน) | "google" | "line"
+  // ทุกโหมด validate ฟอร์มเต็มเหมือนกัน (บัญชี hybrid = มีรหัสผ่านเสมอ)
+  const mode = String(formData.get("mode") ?? "password");
+
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -74,6 +81,36 @@ export async function registerCustomer(
 
   const { name, email, phone, password } = parsed.data;
 
+  // ── โหมดผูก Google / LINE ──
+  // validate ครบแล้ว → hash รหัสผ่าน, ฝากข้อมูลไว้ใน OAuth state (signed cookie),
+  // แล้ว redirect ไป provider. บัญชีจะถูกสร้างตอน callback (ยึดอีเมล verified ของ provider)
+  if (mode === "google" || mode === "line") {
+    const provider = mode === "google" ? "GOOGLE" : "LINE";
+    const configured =
+      provider === "GOOGLE" ? isGoogleConfigured() : isLineConfigured();
+    if (!configured) {
+      return {
+        error:
+          provider === "GOOGLE"
+            ? "ยังไม่ได้เปิดใช้การผูกบัญชี Google กรุณาสมัครด้วยรหัสผ่านก่อน"
+            : "ยังไม่ได้เปิดใช้การผูกบัญชี LINE กรุณาสมัครด้วยรหัสผ่านก่อน",
+      };
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const nonce = await createOAuthState(provider, "register", true, {
+      name,
+      email,
+      phone: phone || null,
+      passwordHash,
+    });
+    const authUrl =
+      provider === "GOOGLE"
+        ? buildGoogleAuthUrl(nonce)
+        : buildLineAuthUrl(nonce, nonce);
+    redirect(authUrl); // absolute/external URL — server action ตอบ 303
+  }
+
+  // ── โหมดสมัครด้วยรหัสผ่าน (email/password) ──
   // กัน race: ตรวจซ้ำก่อน แล้ว create — error code P2002 จะกันได้อีกชั้น
   const existing = await prisma.customer.findUnique({ where: { email } });
   if (existing) {

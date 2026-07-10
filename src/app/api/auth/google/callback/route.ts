@@ -49,6 +49,7 @@ export async function GET(req: Request) {
     name: profile.name,
     intent: stateData.intent,
     pdpaConsent: stateData.pdpaConsent,
+    profile: stateData.profile,
   });
 
   if (!result.ok) {
@@ -56,5 +57,7 @@ export async function GET(req: Request) {
       errorRedirectUrl(stateData.intent, result.code),
     );
   }
-  return NextResponse.redirect(successRedirectUrl());
+  return NextResponse.redirect(
+    successRedirectUrl(result.emailChanged ? "email_from_google" : undefined),
+  );
 }

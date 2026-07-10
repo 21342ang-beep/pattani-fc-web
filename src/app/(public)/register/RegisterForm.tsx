@@ -8,9 +8,13 @@ import {
 } from "@/app/actions/customer-auth";
 import PasswordInput from "@/components/PasswordInput";
 
-// การสมัครมี 3 flow — email/password, Google, Line
-// PDPA checkbox 1 อันคุมทั้งหมด (client-side state) + hidden input ในแต่ละ form
-// ปุ่ม social โชว์ตลอด — ถ้า env ยังไม่ตั้ง จะเด้งกลับพร้อม error msg
+// สมัครแบบ hybrid — flow เดียว:
+//   1) กรอกข้อมูลให้ครบ (ชื่อ/อีเมล/เบอร์/รหัสผ่าน) + ยอมรับ PDPA
+//   2) เลือกวิธีเข้าระบบ:
+//        • "สมัครด้วยรหัสผ่าน" (mode=password) — ใช้อีเมล+รหัสผ่านที่กรอก
+//        • "ผูกกับ Google" (mode=google) / "ผูกกับ LINE" (mode=line) — เพิ่ม social login
+//          บัญชีจะมีทั้งรหัสผ่าน + social; อีเมลจริงยึดตามที่ verified ของ provider
+// ปุ่มทุกอันเป็น submit ของฟอร์มเดียวกัน — ค่า name="mode" บอก action ว่าลูกค้ากดอะไร
 export default function RegisterForm({
   errorMessage,
 }: {
@@ -31,80 +35,14 @@ export default function RegisterForm({
         </p>
       )}
 
-      {/* ─── PDPA + OAuth buttons ─── */}
-      <div>
-        <label className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
-          <input
-            type="checkbox"
-            checked={pdpaChecked}
-            onChange={(e) => setPdpaChecked(e.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-green-700"
-          />
-          <span className="text-slate-700">
-            ฉันยอมรับ{" "}
-            <Link
-              href="/privacy-policy"
-              target="_blank"
-              className="font-semibold text-green-800 hover:underline"
-            >
-              นโยบายความเป็นส่วนตัว (PDPA)
-            </Link>{" "}
-            และให้ Pattani FC เก็บและใช้ข้อมูลตามที่ระบุ
-          </span>
-        </label>
-        {fe.pdpaConsent && (
-          <p className="mt-1 text-xs text-red-600">{fe.pdpaConsent}</p>
-        )}
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <form method="POST" action="/api/auth/google/start">
-            <input type="hidden" name="intent" value="register" />
-            <input
-              type="hidden"
-              name="pdpaConsent"
-              value={pdpaChecked ? "on" : ""}
-            />
-            <SocialButton
-              disabled={!pdpaChecked}
-              label="สมัครด้วย Google"
-              bg="bg-white hover:bg-slate-50"
-              border="border-slate-300"
-              text="text-slate-800"
-              iconSlot={<GoogleIcon />}
-            />
-          </form>
-          <form method="POST" action="/api/auth/line/start">
-            <input type="hidden" name="intent" value="register" />
-            <input
-              type="hidden"
-              name="pdpaConsent"
-              value={pdpaChecked ? "on" : ""}
-            />
-            <SocialButton
-              disabled={!pdpaChecked}
-              label="สมัครด้วย LINE"
-              bg="bg-[#06C755] hover:bg-[#05a848]"
-              border="border-transparent"
-              text="text-white"
-              iconSlot={<LineIcon />}
-            />
-          </form>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs text-slate-500">หรือสมัครด้วยอีเมล</span>
-        <div className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      {/* ─── Email / password form ─── */}
       <form action={formAction} className="space-y-3.5">
         <input
           type="hidden"
           name="pdpaConsent"
           value={pdpaChecked ? "on" : ""}
         />
+
+        {/* ─── ข้อมูลลูกค้า ─── */}
         <Field
           label="ชื่อ-นามสกุล"
           name="name"
@@ -120,6 +58,7 @@ export default function RegisterForm({
           autoComplete="email"
           required
           error={fe.email}
+          hint="ถ้าผูกกับ Google/LINE ระบบจะยึดอีเมลจากบัญชีนั้นเพื่อความปลอดภัย"
         />
         <Field
           label="เบอร์โทร (ไม่บังคับ)"
@@ -144,14 +83,73 @@ export default function RegisterForm({
           error={fe.confirmPassword}
         />
 
+        {/* ─── PDPA ─── */}
+        <div>
+          <label className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={pdpaChecked}
+              onChange={(e) => setPdpaChecked(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-green-700"
+            />
+            <span className="text-slate-700">
+              ฉันยอมรับ{" "}
+              <Link
+                href="/privacy-policy"
+                target="_blank"
+                className="font-semibold text-green-800 hover:underline"
+              >
+                นโยบายความเป็นส่วนตัว (PDPA)
+              </Link>{" "}
+              และให้ Pattani FC เก็บและใช้ข้อมูลตามที่ระบุ
+            </span>
+          </label>
+          {fe.pdpaConsent && (
+            <p className="mt-1 text-xs text-red-600">{fe.pdpaConsent}</p>
+          )}
+        </div>
+
+        {/* ─── สมัครด้วยรหัสผ่าน ─── */}
         <button
           type="submit"
+          name="mode"
+          value="password"
           disabled={pending || !pdpaChecked}
           suppressHydrationWarning
           className="w-full rounded-md bg-green-800 px-4 py-2.5 text-sm font-bold text-yellow-300 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-white"
         >
-          {pending ? "กำลังสมัคร..." : "สมัครสมาชิก"}
+          {pending ? "กำลังดำเนินการ..." : "สมัครสมาชิก"}
         </button>
+
+        {/* ─── ผูกบัญชี social (ไม่บังคับ) ─── */}
+        <div className="flex items-center gap-3 pt-1">
+          <div className="h-px flex-1 bg-slate-200" />
+          <span className="text-xs text-slate-500">
+            หรือผูกกับบัญชี social (ไม่บังคับ)
+          </span>
+          <div className="h-px flex-1 bg-slate-200" />
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <SocialButton
+            mode="google"
+            disabled={pending || !pdpaChecked}
+            label="ผูกกับ Google"
+            bg="bg-white hover:bg-slate-50"
+            border="border-slate-300"
+            text="text-slate-800"
+            iconSlot={<GoogleIcon />}
+          />
+          <SocialButton
+            mode="line"
+            disabled={pending || !pdpaChecked}
+            label="ผูกกับ LINE"
+            bg="bg-[#06C755] hover:bg-[#05a848]"
+            border="border-transparent"
+            text="text-white"
+            iconSlot={<LineIcon />}
+          />
+        </div>
 
         {!pdpaChecked && (
           <p className="text-center text-[11px] text-slate-500">
@@ -164,6 +162,7 @@ export default function RegisterForm({
 }
 
 function SocialButton({
+  mode,
   label,
   disabled,
   bg,
@@ -171,6 +170,7 @@ function SocialButton({
   text,
   iconSlot,
 }: {
+  mode: "google" | "line";
   label: string;
   disabled: boolean;
   bg: string;
@@ -181,6 +181,8 @@ function SocialButton({
   return (
     <button
       type="submit"
+      name="mode"
+      value={mode}
       disabled={disabled}
       className={`flex w-full items-center justify-center gap-2 rounded-md border ${border} ${bg} ${text} px-3 py-2 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50`}
     >

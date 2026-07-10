@@ -16,12 +16,25 @@ const STATE_COOKIE_PREFIX = "oauth_state:";
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 นาที
 
 export type OAuthIntent = "register" | "login";
+
+// ข้อมูลที่ลูกค้ากรอกในฟอร์มสมัคร (flow "กรอกก่อน แล้วผูก social")
+// เก็บไว้ใน state JWT (httpOnly cookie, signed, TTL 10 นาที) จนกว่าจะกลับจาก provider
+// passwordHash = bcrypt แล้ว — ไม่เคยเก็บ plaintext ใน cookie
+// email = อีเมลที่ "กรอก" (อาจถูก override ด้วยอีเมล verified ของ provider ตอน callback)
+export type OAuthPendingProfile = {
+  name: string;
+  email: string;
+  phone: string | null;
+  passwordHash: string;
+};
+
 export type OAuthState = {
   provider: AuthProvider;
   intent: OAuthIntent;
   pdpaConsent: boolean;
   nonce: string;
   expiresAt: number;
+  profile?: OAuthPendingProfile;
 };
 
 export function requireAppUrl(): string {
@@ -74,6 +87,7 @@ export async function createOAuthState(
   provider: AuthProvider,
   intent: OAuthIntent,
   pdpaConsent: boolean,
+  profile?: OAuthPendingProfile,
 ): Promise<string> {
   const nonce = crypto.randomUUID();
   const expiresAt = Date.now() + STATE_TTL_MS;
@@ -83,6 +97,7 @@ export async function createOAuthState(
     pdpaConsent,
     nonce,
     expiresAt,
+    ...(profile ? { profile } : {}),
   });
   const store = await cookies();
   store.set(STATE_COOKIE_PREFIX + provider, token, {
@@ -114,8 +129,11 @@ export async function consumeOAuthState(
 }
 
 // URL ปลายทางเมื่อ login/register สำเร็จ หรือมี error
-export function successRedirectUrl(): URL {
-  return new URL("/member", requireAppUrl());
+// notice = โน้ตให้หน้า /member แสดง banner (เช่น อีเมลถูกยึดตาม provider)
+export function successRedirectUrl(notice?: string): URL {
+  const url = new URL("/member", requireAppUrl());
+  if (notice) url.searchParams.set("notice", notice);
+  return url;
 }
 
 export function errorRedirectUrl(

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { payload } from "@/lib/payload";
-import { getT } from "@/lib/i18n/server";
 import HomeHero from "./_components/HomeHero";
 import StatsRow from "./_components/StatsRow";
 import FeaturedMatches from "./_components/FeaturedMatches";
@@ -13,7 +12,6 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();
-  const { dict } = await getT();
   const [featured, totalMatches, totalOnSale, sponsorsRes] = await Promise.all([
     prisma.match.findMany({
       where: { status: { in: ["SCHEDULED", "ON_SALE"] } },
@@ -53,18 +51,7 @@ export default async function HomePage() {
 
   return (
     <div>
-      {sponsors.length > 0 && (
-        <section className="border-b border-green-100 bg-white py-6">
-          <div className="mx-auto mb-3 max-w-7xl px-4">
-            <p className="text-center text-sm font-bold uppercase tracking-widest text-green-700">
-              Official Partners
-            </p>
-          </div>
-          <SponsorMarquee sponsors={sponsors} />
-        </section>
-      )}
-
-      <HomeHero dict={dict} />
+      <HomeHero />
 
       <div className="mx-auto w-full max-w-7xl space-y-14 px-4 py-14 md:py-20">
         <section>
@@ -118,6 +105,17 @@ export default async function HomePage() {
           <FeaturedMatches matches={featured} />
         </section>
       </div>
+
+      {sponsors.length > 0 && (
+        <section className="border-t border-green-100 bg-white py-8">
+          <div className="mx-auto mb-3 max-w-7xl px-4">
+            <p className="text-center text-sm font-bold uppercase tracking-widest text-green-700">
+              Official Partners
+            </p>
+          </div>
+          <SponsorMarquee sponsors={sponsors} />
+        </section>
+      )}
     </div>
   );
 }

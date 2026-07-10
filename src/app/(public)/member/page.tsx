@@ -39,8 +39,19 @@ function mediaUrl(m: PromotionDoc["cover"]): string | null {
   return null;
 }
 
-export default async function MemberPage() {
+const NOTICE_MESSAGES: Record<string, string> = {
+  email_from_google:
+    "เราใช้อีเมลจากบัญชี Google ที่ยืนยันแล้วเป็นอีเมลบัญชีของคุณ (ต่างจากที่กรอกไว้) เพื่อความปลอดภัย",
+  email_from_line:
+    "เราใช้อีเมลจากบัญชี LINE ที่ยืนยันแล้วเป็นอีเมลบัญชีของคุณ (ต่างจากที่กรอกไว้) เพื่อความปลอดภัย",
+};
+
+export default async function MemberPage(props: {
+  searchParams: Promise<{ notice?: string }>;
+}) {
   const customer = await verifyCustomer();
+  const { notice } = await props.searchParams;
+  const noticeMessage = notice ? NOTICE_MESSAGES[notice] : undefined;
 
   const cms = await payload();
   const { docs } = await cms.find({
@@ -82,6 +93,18 @@ export default async function MemberPage() {
           </form>
         </div>
       </section>
+
+      {noticeMessage && (
+        <div className="mx-auto max-w-7xl px-4 pt-6">
+          <p className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <span aria-hidden>ℹ️</span>
+            <span>
+              {noticeMessage} — อีเมลบัญชีปัจจุบันคือ{" "}
+              <strong>{customer.email}</strong>
+            </span>
+          </p>
+        </div>
+      )}
 
       {/* Quick links */}
       <section className="mx-auto max-w-7xl px-4 py-8">
