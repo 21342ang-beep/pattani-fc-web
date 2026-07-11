@@ -47,12 +47,20 @@ export default buildConfig({
     // environment has migrated.
     try {
       const db = payload.db as unknown as {
-        execute: (args: { raw: string }) => Promise<unknown>;
+        drizzle: unknown;
+        execute: (args: {
+          drizzle: unknown;
+          raw: string;
+        }) => Promise<unknown>;
       };
+      // execute() runs on `db ?? drizzle` internally, so the drizzle handle
+      // must be passed explicitly or it dereferences undefined.
       await db.execute({
+        drizzle: db.drizzle,
         raw: "ALTER TABLE IF EXISTS payload.sponsors DROP COLUMN IF EXISTS logo_url",
       });
       await db.execute({
+        drizzle: db.drizzle,
         raw: "ALTER TABLE IF EXISTS payload.sponsors ADD COLUMN IF NOT EXISTS logo_id integer",
       });
     } catch (err) {
