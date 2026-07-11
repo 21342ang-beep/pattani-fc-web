@@ -1,61 +1,38 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  Crown,
-  Star,
-  Award,
-  Medal,
-  Check,
-  Sparkles,
-  MapPin,
-  Users,
-  CalendarRange,
-} from "lucide-react";
+import { MapPin, Users } from "lucide-react";
 import PageHero from "../_components/PageHero";
-import {
-  SEASON_MATCHES,
-  SEASON_TIERS,
-  type SeasonTier,
-  type SeasonTierId,
-} from "@/lib/season-pass-tiers";
 
-export const metadata = { title: "จองตั๋ว — Pattani FC" };
+export const metadata = { title: "จองตั๋วรายแมตช์ — Pattani FC" };
 
 // โซนที่นั่ง Rainbow Stadium — ราคาต่อใบ (บาท) ตามแผนผังสนามจริง
+// สี (zoneColor) อิงจากสีบล็อกในแผนผังสนาม stadium-zones-v2.jpg
 // AWAY = สำหรับแฟนทีมเยือนเท่านั้น
-type ZoneKind = "premium" | "standard" | "away";
+type ZoneColor = "yellow" | "orange" | "red" | "green" | "blue" | "purple";
 type StadiumZone = {
   code: string;
   label: string;
   priceBaht: number;
   capacity: number;
-  kind: ZoneKind;
+  color: ZoneColor;
   note?: string;
 };
 const STADIUM_ZONES: StadiumZone[] = [
-  { code: "N1", label: "เหนือ · พรีเมียม", priceBaht: 170, capacity: 546, kind: "premium" },
-  { code: "N2", label: "เหนือ", priceBaht: 150, capacity: 840, kind: "premium" },
-  { code: "S", label: "ใต้ · กลางสนาม", priceBaht: 150, capacity: 1496, kind: "premium" },
-  { code: "W", label: "ตะวันตก", priceBaht: 100, capacity: 2065, kind: "standard" },
-  { code: "E", label: "ตะวันออก", priceBaht: 100, capacity: 2987, kind: "standard" },
-  { code: "S1", label: "ใต้-ตะวันตก", priceBaht: 120, capacity: 500, kind: "standard" },
-  { code: "S2", label: "ใต้-ตะวันออก", priceBaht: 120, capacity: 500, kind: "standard" },
-  { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: 1000, kind: "away", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
+  { code: "N1", label: "เหนือ · พรีเมียม", priceBaht: 170, capacity: 546, color: "yellow" },
+  { code: "N2", label: "เหนือ", priceBaht: 150, capacity: 840, color: "orange" },
+  { code: "S", label: "ใต้ · กลางสนาม", priceBaht: 150, capacity: 1496, color: "yellow" },
+  { code: "W", label: "ตะวันตก", priceBaht: 100, capacity: 2065, color: "red" },
+  { code: "E", label: "ตะวันออก", priceBaht: 100, capacity: 2987, color: "red" },
+  { code: "S1", label: "ใต้-ตะวันตก", priceBaht: 120, capacity: 500, color: "green" },
+  { code: "S2", label: "ใต้-ตะวันออก", priceBaht: 120, capacity: 500, color: "blue" },
+  { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: 1000, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
 ];
-
-// icon แยกจากข้อมูลใน lib/season-pass-tiers.ts (lib ต้อง import ได้จากทั้ง server/client)
-const TIER_ICONS: Record<SeasonTierId, React.ReactNode> = {
-  "vvip-elite": <Crown className="size-7" />,
-  "vip-advanced": <Star className="size-7" />,
-  premium: <Award className="size-7" />,
-  gold: <Medal className="size-7" />,
-};
 
 export default function TicketsPage() {
   return (
     <>
       <PageHero
-        title="จองตั๋ว"
+        title="จองตั๋วรายแมตช์"
         subtitle="เลือกโซนที่นั่งของคุณ — แต่ละโซนของ Rainbow Stadium มีบรรยากาศ ราคา และทัศนียภาพต่างกัน"
       />
 
@@ -92,11 +69,9 @@ export default function TicketsPage() {
         </p>
 
         {/* ตารางราคาแยกตามโซน — ต่อจากแผนผัง */}
-        <div className="mb-6 mt-10 flex flex-wrap items-center justify-center gap-3 text-xs">
-          <LegendChip color="yellow" label="พรีเมียม 150–170 บาท" />
-          <LegendChip color="slate" label="ทั่วไป 100–120 บาท" />
-          <LegendChip color="rose" label="ทีมเยือน 200 บาท" />
-        </div>
+        <p className="mb-6 mt-10 text-center text-sm font-medium text-slate-500">
+          สีของแต่ละโซนอ้างอิงจากแผนผังสนามด้านบน — กดที่โซนเพื่อเลือกแมตช์
+        </p>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {STADIUM_ZONES.map((z) => (
             <li key={z.code}>
@@ -145,141 +120,7 @@ export default function TicketsPage() {
           </Link>
         </div>
       </div>
-
-      {/* 3) บัตรสมาชิกรายปี — ล่างสุด (anchor สำหรับ tab "ตั๋วรายปี") */}
-      <div id="season-pass" className="mx-auto max-w-7xl px-4 pb-14 md:pb-20 scroll-mt-32">
-        <div className="mb-8 text-center md:mb-10">
-          <p className="inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-widest text-yellow-600">
-            <CalendarRange className="size-4" />
-            บัตรสมาชิกรายปี
-          </p>
-          <h2 className="mt-1.5 text-4xl font-black text-green-900 md:text-5xl">
-            เลือกแพ็กเกจสมาชิกของคุณ
-          </h2>
-          <p className="mt-2 text-base text-slate-600 md:text-lg">
-            ซื้อครั้งเดียว · ดู {SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล
-          </p>
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {SEASON_TIERS.map((t) => (
-            <TierCard key={t.id} tier={t} />
-          ))}
-        </div>
-
-        <p className="mt-6 text-center text-xs text-slate-500">
-          * บัตรสมาชิกรายปีครอบคลุมเฉพาะแมตช์เหย้าในฤดูกาลปัจจุบัน — ไม่รวมเกมนัดพิเศษ/ทัวร์นาเมนต์นานาชาติ
-        </p>
-      </div>
     </>
-  );
-}
-
-function TierCard({ tier }: { tier: SeasonTier }) {
-  const highlighted = tier.highlight;
-  const priceLabel = tier.priceBaht.toLocaleString("th-TH");
-  const unitLabel = `บาท / ฤดูกาล · ${SEASON_MATCHES} แมตช์`;
-  return (
-    <div
-      className={`relative flex flex-col overflow-hidden rounded-3xl border-2 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl md:p-7 ${
-        highlighted
-          ? "border-yellow-400 bg-gradient-to-b from-green-900 to-green-950 text-yellow-100 shadow-yellow-400/10"
-          : "border-green-100 bg-white"
-      }`}
-    >
-      {tier.ribbon && (
-        <div className="absolute right-0 top-5 rounded-l-full bg-yellow-400 px-4 py-1.5 text-xs font-bold text-green-950 shadow">
-          <span className="inline-flex items-center gap-1">
-            <Sparkles className="size-3.5" /> {tier.ribbon}
-          </span>
-        </div>
-      )}
-
-      <div
-        className={`mb-4 inline-flex size-14 items-center justify-center rounded-2xl ${
-          highlighted
-            ? "bg-yellow-400 text-green-950"
-            : "bg-green-100 text-green-800"
-        }`}
-      >
-        {TIER_ICONS[tier.id]}
-      </div>
-
-      <p
-        className={`text-xs font-bold uppercase tracking-widest ${
-          highlighted ? "text-yellow-300/80" : "text-yellow-600"
-        }`}
-      >
-        {tier.badge}
-      </p>
-      <h3
-        className={`mt-1 text-2xl font-black md:text-3xl ${
-          highlighted ? "text-yellow-300" : "text-green-900"
-        }`}
-      >
-        {tier.name}
-      </h3>
-      <p
-        className={`mt-1 text-sm ${
-          highlighted ? "text-yellow-100/80" : "text-slate-600"
-        }`}
-      >
-        {tier.tagline}
-      </p>
-
-      <div
-        className={`mt-5 border-y py-4 ${
-          highlighted ? "border-yellow-300/20" : "border-green-100"
-        }`}
-      >
-        <div className="flex items-baseline gap-2">
-          <span
-            className={`text-4xl font-black md:text-5xl ${
-              highlighted ? "text-yellow-300" : "text-green-900"
-            }`}
-          >
-            {priceLabel}
-          </span>
-          <span
-            className={`text-sm ${
-              highlighted ? "text-yellow-100/70" : "text-slate-500"
-            }`}
-          >
-            {unitLabel}
-          </span>
-        </div>
-      </div>
-
-      <ul className="mt-5 flex-1 space-y-2.5">
-        {tier.benefits.map((b) => (
-          <li key={b} className="flex items-start gap-2 text-sm md:text-base">
-            <Check
-              className={`mt-1 size-4 shrink-0 ${
-                highlighted ? "text-yellow-300" : "text-green-700"
-              }`}
-            />
-            <span
-              className={
-                highlighted ? "text-yellow-100/95" : "text-slate-700"
-              }
-            >
-              {b}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <Link
-        href={`/season-pass/apply?tier=${tier.id}`}
-        className={`mt-7 inline-flex w-full items-center justify-center rounded-full px-5 py-3 text-base font-bold transition ${
-          highlighted
-            ? "bg-yellow-400 text-green-950 hover:bg-yellow-300"
-            : "bg-green-800 text-yellow-300 hover:bg-green-900"
-        }`}
-      >
-        ซื้อบัตรสมาชิกรายปี
-      </Link>
-    </div>
   );
 }
 
@@ -294,88 +135,96 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
   );
 }
 
+// สไตล์สีของแต่ละโซน — อิงสีบล็อกจากแผนผังสนาม (stadium-zones-v2.jpg)
+const ZONE_COLORS: Record<
+  ZoneColor,
+  { wrap: string; header: string; headerText: string; price: string; pill: string }
+> = {
+  yellow: {
+    wrap: "border-yellow-400 bg-yellow-50/50",
+    header: "bg-yellow-400",
+    headerText: "text-green-950",
+    price: "text-yellow-700",
+    pill: "bg-yellow-400 text-green-950",
+  },
+  orange: {
+    wrap: "border-orange-400 bg-orange-50/50",
+    header: "bg-orange-500",
+    headerText: "text-white",
+    price: "text-orange-700",
+    pill: "bg-orange-500 text-white",
+  },
+  red: {
+    wrap: "border-red-400 bg-red-50/50",
+    header: "bg-red-600",
+    headerText: "text-white",
+    price: "text-red-700",
+    pill: "bg-red-600 text-white",
+  },
+  green: {
+    wrap: "border-green-500 bg-green-50/50",
+    header: "bg-green-600",
+    headerText: "text-white",
+    price: "text-green-700",
+    pill: "bg-green-600 text-white",
+  },
+  blue: {
+    wrap: "border-blue-400 bg-blue-50/50",
+    header: "bg-blue-600",
+    headerText: "text-white",
+    price: "text-blue-700",
+    pill: "bg-blue-600 text-white",
+  },
+  purple: {
+    wrap: "border-fuchsia-400 bg-fuchsia-50/50",
+    header: "bg-fuchsia-600",
+    headerText: "text-white",
+    price: "text-fuchsia-700",
+    pill: "bg-fuchsia-600 text-white",
+  },
+};
+
 function ZoneCard({ zone }: { zone: StadiumZone }) {
-  const styles: Record<
-    ZoneKind,
-    { wrap: string; eyebrow: string; code: string; price: string; pill: string }
-  > = {
-    premium: {
-      wrap: "border-yellow-400/70 bg-gradient-to-b from-yellow-50 to-white",
-      eyebrow: "text-green-900/60",
-      code: "text-green-900",
-      price: "text-yellow-700",
-      pill: "bg-yellow-400 text-green-950",
-    },
-    standard: {
-      wrap: "border-slate-200 bg-white",
-      eyebrow: "text-green-900/60",
-      code: "text-green-900",
-      price: "text-green-800",
-      pill: "bg-green-800 text-yellow-300",
-    },
-    away: {
-      wrap: "border-rose-300 bg-gradient-to-b from-rose-50 to-white",
-      eyebrow: "text-rose-900/60",
-      code: "text-rose-900",
-      price: "text-rose-700",
-      pill: "bg-rose-600 text-white",
-    },
-  };
-  const s = styles[zone.kind];
+  const s = ZONE_COLORS[zone.color];
   return (
     <div
-      className={`flex h-full flex-col rounded-2xl border-2 p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${s.wrap}`}
+      className={`flex h-full flex-col overflow-hidden rounded-2xl border-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${s.wrap}`}
     >
-      <span
-        className={`text-[10px] font-bold uppercase tracking-widest ${s.eyebrow}`}
-      >
-        โซน
-      </span>
-      <span className={`mt-1 text-3xl font-black ${s.code}`}>{zone.code}</span>
-      <span className={`mt-0.5 text-[11px] font-medium ${s.eyebrow}`}>
-        {zone.label}
-      </span>
-      <span className={`mt-2 text-lg font-black ${s.price}`}>
-        {zone.priceBaht.toLocaleString("th-TH")}
-        <span className="ml-1 text-xs font-medium opacity-70">บาท</span>
-      </span>
-      <span className={`mt-1 text-[11px] ${s.eyebrow}`}>
-        {zone.capacity.toLocaleString("th-TH")} ที่นั่ง
-      </span>
-      {zone.note && (
+      {/* หัวการ์ดสี — เด่นตามแผนผังสนาม */}
+      <div className={`px-4 pb-4 pt-3 ${s.header}`}>
         <span
-          className={`mt-2 inline-flex items-center justify-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${s.pill}`}
+          className={`text-sm font-bold uppercase tracking-widest ${s.headerText} opacity-80`}
         >
-          <Users className="size-3" /> {zone.note}
+          โซน
         </span>
-      )}
+        <span
+          className={`mt-0.5 block text-4xl font-black leading-none ${s.headerText}`}
+        >
+          {zone.code}
+        </span>
+      </div>
+
+      {/* เนื้อการ์ด */}
+      <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
+        <span className="text-base font-semibold text-slate-700">
+          {zone.label}
+        </span>
+        <span className={`mt-2 text-2xl font-black ${s.price}`}>
+          {zone.priceBaht.toLocaleString("th-TH")}
+          <span className="ml-1 text-sm font-medium text-slate-500">บาท</span>
+        </span>
+        <span className="mt-1 text-sm font-medium text-slate-500">
+          {zone.capacity.toLocaleString("th-TH")} ที่นั่ง
+        </span>
+        {zone.note && (
+          <span
+            className={`mt-3 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-bold ${s.pill}`}
+          >
+            <Users className="size-3.5" /> {zone.note}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-function LegendChip({
-  color,
-  label,
-}: {
-  color: "yellow" | "slate" | "rose";
-  label: string;
-}) {
-  const map: Record<typeof color, string> = {
-    yellow: "border-yellow-400 bg-yellow-50 text-yellow-900",
-    slate: "border-slate-300 bg-white text-slate-700",
-    rose: "border-rose-300 bg-rose-50 text-rose-800",
-  };
-  const dotMap: Record<typeof color, string> = {
-    yellow: "bg-yellow-400",
-    slate: "bg-green-800",
-    rose: "bg-rose-600",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold ${map[color]}`}
-    >
-      <span className={`size-2 rounded-full ${dotMap[color]}`} />
-      {label}
-    </span>
-  );
-}

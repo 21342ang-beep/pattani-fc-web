@@ -15,7 +15,21 @@ import LocaleSwitcher from "./_components/LocaleSwitcher";
 import type { Dict, Locale } from "@/lib/i18n/dict";
 
 function isActive(path: string, href: string) {
-  return href === "/" ? path === "/" : path.startsWith(href);
+  const base = href.split("#")[0];
+  if (base === "/") return path === "/";
+  return path === base || path.startsWith(base + "/");
+}
+
+// child ที่เจาะจงกว่า (เช่น /tickets/season) ต้องชนะ child ที่กว้างกว่า (/tickets)
+function childIsActive(
+  path: string,
+  href: string,
+  siblings: { href: string }[],
+) {
+  if (!isActive(path, href)) return false;
+  return !siblings.some(
+    (s) => s.href !== href && s.href.startsWith(href + "/") && isActive(path, s.href),
+  );
 }
 
 type NavItem =
@@ -45,8 +59,13 @@ export default function TopNav({
         { href: "/youth", label: dict.nav.youth },
       ],
     },
-    { href: "/tickets", label: dict.nav.tickets },
-    { href: "/tickets#season-pass", label: dict.nav.seasonTickets },
+    {
+      label: dict.nav.tickets,
+      children: [
+        { href: "/tickets", label: dict.nav.ticketsByMatch },
+        { href: "/tickets/season", label: dict.nav.ticketsByYear },
+      ],
+    },
     { href: "/matches", label: dict.nav.matches },
     { href: "/news", label: dict.nav.news },
     { href: "/shop", label: dict.nav.shop },
@@ -260,7 +279,7 @@ export default function TopNav({
                         className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-base shadow-xl backdrop-blur-md"
                       >
                         {it.children.map((c) => {
-                          const childActive = isActive(path, c.href);
+                          const childActive = childIsActive(path, c.href, it.children);
                           return (
                             <Link
                               key={c.href}
@@ -394,7 +413,7 @@ export default function TopNav({
                             {it.label}
                           </p>
                           {it.children.map((c) => {
-                            const active = isActive(path, c.href);
+                            const active = childIsActive(path, c.href, it.children);
                             return (
                               <Link
                                 key={c.href}
