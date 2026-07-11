@@ -9,7 +9,7 @@ export const metadata = { title: "พาร์ทเนอร์ — Pattani FC"
 type SponsorDoc = {
   id: string | number;
   name: string;
-  logoUrl?: string;
+  logo?: { url?: string } | string | null;
   website?: string;
   tier?: string;
 };
@@ -214,6 +214,8 @@ function SponsorTile({
   aspectClass: string;
   highlight?: boolean;
 }) {
+  const logoUrl =
+    typeof sponsor.logo === "object" && sponsor.logo ? sponsor.logo.url : undefined;
   const inner = (
     <div
       className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border bg-white p-4 transition-all hover:-translate-y-1 hover:shadow-xl ${
@@ -228,10 +230,10 @@ function SponsorTile({
         className="absolute -right-6 -top-6 size-12 rotate-45 bg-yellow-400/0 transition group-hover:bg-yellow-400/20"
       />
 
-      {sponsor.logoUrl ? (
+      {logoUrl ? (
         <div className="relative h-full w-full">
           <Image
-            src={sponsor.logoUrl}
+            src={logoUrl}
             alt={sponsor.name}
             fill
             unoptimized

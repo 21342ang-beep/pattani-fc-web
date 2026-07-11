@@ -37,6 +37,30 @@ export default buildConfig({
   // schema and only applies deltas.
   onInit: async (payload) => {
     if (process.env.PAYLOAD_SKIP_INIT_PUSH === "true") return;
+    // One-off self-healing migration: sponsors.logoUrl (text) was replaced by a
+    // logo upload relation (logo_id). Doing the DROP + ADD together makes
+    // drizzle-kit push ask an interactive "is this a rename?" prompt, which
+    // hangs a non-TTY server (prod/PM2) forever. Pre-apply the column change
+    // idempotently so the push below finds no ambiguity and only adds the
+    // FK/index silently. All statements are IF EXISTS / IF NOT EXISTS, so this
+    // is a no-op on a fresh DB and safe to leave in place; remove once every
+    // environment has migrated.
+    try {
+      const db = payload.db as unknown as {
+        execute: (args: { raw: string }) => Promise<unknown>;
+      };
+      await db.execute({
+        raw: "ALTER TABLE IF EXISTS payload.sponsors DROP COLUMN IF EXISTS logo_url",
+      });
+      await db.execute({
+        raw: "ALTER TABLE IF EXISTS payload.sponsors ADD COLUMN IF NOT EXISTS logo_id integer",
+      });
+    } catch (err) {
+      payload.logger.warn({
+        err,
+        msg: "sponsors logo column pre-migration skipped",
+      });
+    }
     try {
       await pushDevSchema(payload.db as never);
       payload.logger.info("✓ Payload schema push (onInit) complete");

@@ -38,7 +38,7 @@ export default async function HomePage() {
   };
   const sponsors = (sponsorsRes.docs as unknown as {
     name: string;
-    logoUrl?: string;
+    logo?: { url?: string } | string | null;
     tier?: string;
   }[])
     .slice()
@@ -47,7 +47,10 @@ export default async function HomePage() {
         (TIER_ORDER[a.tier ?? "supporter"] ?? 99) -
         (TIER_ORDER[b.tier ?? "supporter"] ?? 99)
     )
-    .map((s) => ({ name: s.name, logoUrl: s.logoUrl }));
+    .map((s) => ({
+      name: s.name,
+      logoUrl: typeof s.logo === "object" && s.logo ? s.logo.url : undefined,
+    }));
 
   return (
     <div>

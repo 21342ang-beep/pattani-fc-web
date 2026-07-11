@@ -12,8 +12,21 @@ export const Sponsors: CollectionConfig = {
   },
   fields: [
     { name: "name", type: "text", label: "ชื่อ", required: true },
-    { name: "logoUrl", type: "text", label: "URL โลโก้" },
-    { name: "website", type: "text", label: "เว็บไซต์" },
+    {
+      name: "logo",
+      type: "upload",
+      relationTo: "media",
+      label: "โลโก้",
+      required: false,
+      admin: { description: "แนบไฟล์รูปโลโก้ (ไม่บังคับ — บางสปอนเซอร์ไม่มีก็ได้)" },
+    },
+    {
+      name: "website",
+      type: "text",
+      label: "เว็บไซต์",
+      required: false,
+      admin: { description: "ไม่บังคับ — เว้นว่างได้ถ้าสปอนเซอร์ไม่มีเว็บไซต์" },
+    },
     {
       name: "tier",
       type: "select",
