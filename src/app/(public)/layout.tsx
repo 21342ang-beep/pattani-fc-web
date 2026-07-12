@@ -7,7 +7,7 @@ import { getT } from "@/lib/i18n/server";
 import "../globals.css";
 
 const dbHeavent = localFont({
-  src: "../../fonts/DBHeaventMed.ttf",
+  src: "../../fonts/DBHeavent.ttf",
   variable: "--font-db-heavent",
   display: "swap",
 });

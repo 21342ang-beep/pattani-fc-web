@@ -80,12 +80,12 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
                 <p className="text-lg font-black tracking-wide text-yellow-300">
                   {dict.brand.name}
                 </p>
-                <p className="text-[10px] uppercase tracking-widest text-green-300">
+                <p className="text-xs uppercase tracking-widest text-green-300">
                   {dict.footer.estTagline}
                 </p>
               </div>
             </Link>
-            <p className="mt-4 max-w-sm text-sm text-green-100/70">
+            <p className="mt-4 max-w-sm text-base text-green-100/70">
               {dict.footer.description}
             </p>
             <div className="mt-5 flex gap-3">
@@ -118,15 +118,15 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
 
           {groups.map((g) => (
             <div key={g.title}>
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-yellow-300/80">
+              <p className="mb-3 text-sm font-bold uppercase tracking-widest text-yellow-300/80">
                 {g.title}
               </p>
-              <ul className="space-y-2">
+              <ul className="space-y-2.5">
                 {g.links.map((l) => (
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="text-sm text-green-100/80 transition-colors hover:text-yellow-300"
+                      className="text-base text-green-100/80 transition-colors hover:text-yellow-300"
                     >
                       {l.label}
                     </Link>
@@ -137,25 +137,25 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
           ))}
         </div>
 
-        <div className="mt-10 grid gap-3 border-t border-yellow-300/10 pt-6 text-xs text-green-100/60 md:grid-cols-3">
+        <div className="mt-10 grid gap-3 border-t border-yellow-300/10 pt-6 text-base text-green-100/60 md:grid-cols-3">
           <div className="flex items-center gap-2">
-            <MapPin className="size-3.5" /> {dict.footer.location}
+            <MapPin className="size-5" /> {dict.footer.location}
           </div>
           <a
             href="mailto:pattanifc2009@gmail.com"
             className="flex items-center gap-2 transition hover:text-yellow-300"
           >
-            <Mail className="size-3.5" /> pattanifc2009@gmail.com
+            <Mail className="size-5" /> pattanifc2009@gmail.com
           </a>
           <a
             href="tel:+66731234567"
             className="flex items-center gap-2 transition hover:text-yellow-300"
           >
-            <Phone className="size-3.5" /> {dict.footer.phoneLabel} +66 (0) 73-123-4567
+            <Phone className="size-5" /> {dict.footer.phoneLabel} +66 (0) 73-123-4567
           </a>
         </div>
 
-        <div className="mt-6 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-[11px] text-green-100/50 md:flex-row">
+        <div className="mt-6 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-sm text-green-100/50 md:flex-row">
           <p>
             © {new Date().getFullYear()} Pattani FC. {dict.footer.rights}
           </p>
@@ -166,7 +166,7 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
               className="inline-flex items-center gap-1 text-green-100/40 transition hover:text-yellow-300"
               title={dict.util.admin}
             >
-              <Shield className="size-3" />
+              <Shield className="size-4" />
               {dict.util.admin}
             </Link>
           </div>

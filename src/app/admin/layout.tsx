@@ -4,7 +4,7 @@ import TopBar from "./TopBar";
 import "../globals.css";
 
 const dbHeavent = localFont({
-  src: "../../fonts/DBHeaventMed.ttf",
+  src: "../../fonts/DBHeavent.ttf",
   variable: "--font-db-heavent",
   display: "swap",
 });
