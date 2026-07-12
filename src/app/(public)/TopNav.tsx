@@ -133,15 +133,6 @@ export default function TopNav({
           <Link href="/faq" className="hover:underline">
             {dict.util.faq}
           </Link>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-1 text-sm text-green-900/80 hover:text-green-950 hover:underline"
-            title={dict.util.admin}
-          >
-            <Shield className="size-3.5" aria-hidden strokeWidth={2.5} />
-            {dict.util.admin}
-          </Link>
-          <LocaleSwitcher current={locale} />
         </div>
       </motion.div>
 
@@ -226,6 +217,11 @@ export default function TopNav({
                 </Link>
               </div>
             )}
+
+            {/* ตัวเปลี่ยนภาษา — desktop, ค้างข้างปุ่ม auth ตลอด (ไม่หุบตาม utility bar) */}
+            <div className="hidden xl:block">
+              <LocaleSwitcher current={locale} />
+            </div>
 
             {/* Hamburger — mobile only */}
             <button
@@ -540,7 +536,7 @@ export default function TopNav({
                 <span className="text-xs uppercase tracking-widest text-yellow-300/60">
                   {dict.locale.label}
                 </span>
-                <LocaleSwitcher current={locale} />
+                <LocaleSwitcher current={locale} openUp />
               </div>
             </motion.div>
           </>
