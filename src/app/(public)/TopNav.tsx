@@ -75,6 +75,12 @@ export default function TopNav({
   const [scrolled, setScrolled] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // กลุ่มที่กางอยู่ใน drawer mobile (accordion) — ลด tab รก
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const toggleGroup = (label: string) =>
+    setOpenGroups((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label],
+    );
 
   useMotionValueEvent(scrollY, "change", (y) => {
     setScrolled(y > 24);
@@ -84,6 +90,19 @@ export default function TopNav({
   useEffect(() => {
     setOpenMenu(null);
     setMobileOpen(false);
+  }, [path]);
+
+  // กางกลุ่ม accordion ที่มีหน้า active อยู่ (ให้ผู้ใช้เห็นตำแหน่งปัจจุบัน)
+  useEffect(() => {
+    const activeGroup = items.find(
+      (it) => "children" in it && it.children.some((c) => isActive(path, c.href)),
+    );
+    if (activeGroup) {
+      setOpenGroups((prev) =>
+        prev.includes(activeGroup.label) ? prev : [...prev, activeGroup.label],
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
 
   // Lock body scroll ตอน drawer เปิด (กัน scroll ทะลุไปหลัง overlay)
@@ -407,27 +426,70 @@ export default function TopNav({
                 <nav className="space-y-0.5">
                   {items.map((it) => {
                     if ("children" in it) {
+                      const isOpen = openGroups.includes(it.label);
+                      const groupActive = it.children.some((c) =>
+                        isActive(path, c.href),
+                      );
                       return (
-                        <div key={it.label} className="mt-2">
-                          <p className="mb-1 px-3 pt-2 text-[11px] font-bold uppercase tracking-widest text-yellow-300/60">
-                            {it.label}
-                          </p>
-                          {it.children.map((c) => {
-                            const active = childIsActive(path, c.href, it.children);
-                            return (
-                              <Link
-                                key={c.href}
-                                href={c.href}
-                                className={`block rounded-xl px-3 py-2.5 text-base font-semibold transition-colors ${
-                                  active
-                                    ? "bg-yellow-400 text-green-950"
-                                    : "text-yellow-100 hover:bg-white/5"
-                                }`}
+                        <div key={it.label}>
+                          <button
+                            type="button"
+                            onClick={() => toggleGroup(it.label)}
+                            aria-expanded={isOpen}
+                            className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-base font-bold transition-colors hover:bg-white/5 ${
+                              groupActive ? "text-yellow-300" : "text-yellow-100"
+                            }`}
+                          >
+                            <span>{it.label}</span>
+                            <svg
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                              aria-hidden
+                              className={`size-5 transition-transform ${
+                                isOpen ? "rotate-180" : ""
+                              }`}
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.4a.75.75 0 01-1.08 0l-4.25-4.4a.75.75 0 01.02-1.06z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </button>
+                          <AnimatePresence initial={false}>
+                            {isOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: "easeInOut" }}
+                                className="overflow-hidden"
                               >
-                                {c.label}
-                              </Link>
-                            );
-                          })}
+                                <div className="ml-3 space-y-0.5 border-l border-yellow-300/15 py-1 pl-2">
+                                  {it.children.map((c) => {
+                                    const active = childIsActive(
+                                      path,
+                                      c.href,
+                                      it.children,
+                                    );
+                                    return (
+                                      <Link
+                                        key={c.href}
+                                        href={c.href}
+                                        className={`block rounded-xl px-3 py-2.5 text-base font-semibold transition-colors ${
+                                          active
+                                            ? "bg-yellow-400 text-green-950"
+                                            : "text-yellow-100 hover:bg-white/5"
+                                        }`}
+                                      >
+                                        {c.label}
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       );
                     }
