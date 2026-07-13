@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import {
   downloadWhitelist,
+  scanSeasonPass,
   syncScans,
   type WhitelistEntry,
 } from "@/app/actions/gate-check";
@@ -59,7 +60,7 @@ type ScanState =
   | { kind: "unknown"; code: string }
   | { kind: "invalid"; reason: string };
 
-const CODE_FORMAT = /^[a-z0-9]{8,50}$/i;
+const CODE_FORMAT = /^[a-z0-9-]{8,50}$/i;
 
 // subscribe online/offline ผ่าน useSyncExternalStore → ไม่ต้อง setState ใน useEffect
 function subscribeOnline(cb: () => void) {
@@ -151,6 +152,41 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
         setScanState({ kind: "invalid", reason: "รหัสไม่ถูกต้อง" });
         return;
       }
+      // Season-pass scans are always checked online; unlike match tickets they
+      // must reject a second scan at another gate immediately.
+      if (code.toUpperCase().startsWith("PFC26-") || code.toUpperCase().startsWith("SP-")) {
+        if (!online) {
+          setScanState({ kind: "invalid", reason: "บัตรรายปีต้องสแกนขณะเชื่อมต่ออินเทอร์เน็ต" });
+          return;
+        }
+        const result = await scanSeasonPass({ matchId: activeMatchId, barcode: code });
+        if (!result.ok) {
+          const reasons = {
+            NOT_FOUND: "ไม่พบบัตรรายปีนี้",
+            DUPLICATE: "บัตรนี้ใช้สิทธิ์สำหรับแมตช์นี้ไปแล้ว",
+            EXHAUSTED: "บัตรนี้ใช้สิทธิ์ครบ 15 ครั้งแล้ว",
+            INACTIVE: "บัตรรายปีนี้ยังไม่พร้อมใช้งาน",
+            INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
+          };
+          const state: ScanState = { kind: "invalid", reason: reasons[result.error] };
+          setScanState(state);
+          addRecent(state);
+          void playBeep(false);
+          return;
+        }
+        const entry: WhitelistEntry = {
+          bookingCode: code,
+          customerName: result.customerName,
+          quantity: 1,
+          seatNumbers: [`Season Pass · เหลือ ${result.usesRemaining}/15`],
+          scannedAt: null,
+        };
+        const state: ScanState = { kind: "ok", entry, at: new Date().toISOString() };
+        setScanState(state);
+        addRecent(state);
+        void playBeep(true);
+        return;
+      }
       const entry = lookupMap.get(code);
       if (!entry) {
         setScanState({ kind: "unknown", code });
@@ -197,7 +233,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
       // beep success — ใช้ Web Audio API เพื่อ feedback ไม่ต้องโหลด asset
       void playBeep(true);
     },
-    [activeMatchId, lookupMap, whitelist, addRecent]
+    [activeMatchId, lookupMap, whitelist, addRecent, online]
   );
 
   // ─── ดาวน์โหลด whitelist (online เท่านั้น) ─────────

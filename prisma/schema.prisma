@@ -98,6 +98,7 @@ model Match {
   status        MatchStatus @default(SCHEDULED)
   description   String?
   bookings      Booking[]
+  seasonPassScans SeasonPassScan[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -260,6 +261,7 @@ model SeasonPassOrder {
   paymentMethod    String                    // "card" | "promptpay" | "banking"
   status           SeasonPassOrderStatus     @default(CONFIRMED)
   notes            String?
+  barcode          SeasonPassBarcode?
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
 
@@ -267,6 +269,34 @@ model SeasonPassOrder {
   @@index([customerPhone])
   @@index([customerEmail])
   @@index([customerId])
+}
+
+model SeasonPassBarcode {
+  id            String            @id @default(cuid())
+  barcode       String            @unique
+  tierId        String
+  seasonLabel   String
+  usesRemaining Int               @default(15)
+  orderId       String?           @unique
+  order         SeasonPassOrder?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  assignedAt    DateTime?
+  scans         SeasonPassScan[]
+  createdAt     DateTime          @default(now())
+
+  @@index([tierId, orderId])
+}
+
+model SeasonPassScan {
+  id          String            @id @default(cuid())
+  barcodeId   String
+  barcode     SeasonPassBarcode @relation(fields: [barcodeId], references: [id], onDelete: Cascade)
+  matchId     String
+  match       Match             @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  scannedAt   DateTime          @default(now())
+  scannedBy   String
+
+  @@unique([barcodeId, matchId])
+  @@index([matchId])
 }
 
 enum SeasonPassOrderStatus {

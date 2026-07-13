@@ -1079,16 +1079,12 @@ function DigitalPass({
             {passCode}
           </p>
         </div>
-        <div className="shrink-0 rounded-lg bg-white p-2">
-          <div className="grid size-16 grid-cols-6 grid-rows-6 gap-0">
-            {Array.from({ length: 36 }).map((_, i) => {
-              // เดิม deterministic pattern ต่อ passCode → QR mini mock
-              const on = hashChar(passCode, i) % 2 === 0;
-              return (
-                <span key={i} className={on ? "bg-green-950" : "bg-white"} />
-              );
-            })}
-          </div>
+        <div className="w-44 shrink-0 rounded-lg bg-white p-2">
+          <img
+            src={`/api/season-passes/${encodeURIComponent(passCode)}/barcode`}
+            alt={`บาร์โค้ด ${passCode}`}
+            className="h-auto w-full"
+          />
         </div>
       </div>
 
@@ -1240,10 +1236,4 @@ function detectBrand(digits: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-function hashChar(s: string, i: number): number {
-  let h = i * 31;
-  for (let k = 0; k < s.length; k++) h = (h * 33 + s.charCodeAt(k)) & 0xffffffff;
-  return Math.abs(h);
 }

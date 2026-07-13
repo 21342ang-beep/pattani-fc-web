@@ -201,3 +201,50 @@ export async function syncScans(input: unknown): Promise<SyncScansResult> {
 
   return { ok: true, accepted, conflicts, unknown };
 }
+
+const seasonPassScanSchema = z.object({
+  matchId: z.string().min(1).max(50),
+  barcode: z.string().trim().regex(/^(PFC26-(4000|2500|2000|1500)-\d{4}|SP-[A-Z]+-[A-Z0-9]{8})$/i),
+});
+
+export type ScanSeasonPassResult =
+  | { ok: true; customerName: string; tierId: string; usesRemaining: number }
+  | { ok: false; error: "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "INVALID" };
+
+// Season passes require an online, transactional check: this is what makes a
+// duplicate scan fail immediately even when two gates scan at the same time.
+export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResult> {
+  const user = await verifyPermission("GATE_CHECK");
+  const parsed = seasonPassScanSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "INVALID" };
+
+  const { barcode, matchId } = parsed.data;
+  const pass = await prisma.seasonPassBarcode.findUnique({
+    where: { barcode: barcode.toUpperCase() },
+    include: { order: { select: { status: true, customerName: true } } },
+  });
+  if (!pass) return { ok: false, error: "NOT_FOUND" };
+  const order = pass.order;
+  if (!order || order.status !== "CONFIRMED") return { ok: false, error: "INACTIVE" };
+  if (pass.usesRemaining <= 0) return { ok: false, error: "EXHAUSTED" };
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const consumed = await tx.seasonPassBarcode.updateMany({
+        where: { id: pass.id, usesRemaining: { gt: 0 } },
+        data: { usesRemaining: { decrement: 1 } },
+      });
+      if (consumed.count !== 1) throw new Error("EXHAUSTED");
+      const scan = await tx.seasonPassScan.create({
+        data: { barcodeId: pass.id, matchId, scannedBy: user.id },
+        select: { barcode: { select: { usesRemaining: true } } },
+      });
+      return scan.barcode.usesRemaining;
+    });
+    return { ok: true, customerName: order.customerName, tierId: pass.tierId, usesRemaining: result };
+  } catch (error) {
+    if (error instanceof Error && error.message === "EXHAUSTED") return { ok: false, error: "EXHAUSTED" };
+    // PostgreSQL unique index [barcodeId, matchId] is the final duplicate guard.
+    return { ok: false, error: "DUPLICATE" };
+  }
+}

@@ -120,16 +120,22 @@ export async function createSeasonPassOrder(
 
   const session = await readCustomerSession();
   const email = parsed.data.email || session?.email || null;
-  const passCode = generatePassCode(parsed.data.tierId);
   const shippingFeeBaht =
     parsed.data.deliveryMethod === "SHIPPING"
       ? SEASON_PASS_SHIPPING_FEE_BAHT
       : 0;
 
   try {
-    const order = await prisma.seasonPassOrder.create({
+    const order = await prisma.$transaction(async (tx) => {
+      const barcode = await tx.seasonPassBarcode.findFirst({
+        where: { tierId: parsed.data.tierId, orderId: null },
+        orderBy: { barcode: "asc" },
+        select: { id: true, barcode: true },
+      });
+      if (!barcode) throw new Error("SOLD_OUT");
+      const created = await tx.seasonPassOrder.create({
       data: {
-        passCode,
+        passCode: barcode.barcode,
         tierId: parsed.data.tierId,
         seasonLabel: SEASON_LABEL,
         priceBaht: tier.priceBaht,
@@ -148,28 +154,25 @@ export async function createSeasonPassOrder(
         paymentMethod: parsed.data.paymentMethod,
         status: "CONFIRMED",
       },
+      });
+      const claimed = await tx.seasonPassBarcode.updateMany({
+        where: { id: barcode.id, orderId: null },
+        data: { orderId: created.id, assignedAt: new Date() },
+      });
+      if (claimed.count !== 1) throw new Error("SOLD_OUT");
+      return created;
     });
     revalidatePath("/admin/season-passes");
     return { ok: true, passCode: order.passCode };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "SOLD_OUT") {
+      return { ok: false, error: "บัตรประเภทนี้จำหน่ายหมดแล้ว" };
+    }
     return { ok: false, error: "บันทึกไม่สำเร็จ กรุณาลองใหม่" };
   }
 }
 
 // สร้าง passCode รูปแบบ SP-<TIER>-<8 chars> (ตัวอักษรอ่านง่าย)
-function generatePassCode(tierId: SeasonTierId): string {
-  const prefix = tierId
-    .split("-")
-    .map((s) => s[0]?.toUpperCase() ?? "")
-    .join("");
-  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-  let rand = "";
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  for (const b of bytes) rand += alphabet[b % alphabet.length];
-  return `SP-${prefix}-${rand}`;
-}
-
 // ─── Admin: เปลี่ยนสถานะออเดอร์ ─────────────────────────────
 const statusEnum = z.enum([
   "PENDING",
