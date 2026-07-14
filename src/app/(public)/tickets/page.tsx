@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { MapPin, Users } from "lucide-react";
 import PageHero from "../_components/PageHero";
+import OnSaleMatchBoard from "../_components/OnSaleMatchBoard";
+import { prisma } from "@/lib/prisma";
 
 export const metadata = { title: "จองตั๋วรายแมตช์ — Pattani FC" };
 
@@ -28,7 +30,10 @@ const STADIUM_ZONES: StadiumZone[] = [
   { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: 1000, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
 ];
 
-export default function TicketsPage() {
+export default async function TicketsPage() {
+  const onSaleMatches = await prisma.match.findMany({
+    where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
+  });
   return (
     <>
       <PageHero
@@ -37,6 +42,17 @@ export default function TicketsPage() {
       />
 
       {/* 1) เลือกโซนที่นั่ง + แผนผังสนาม (อยู่บน) */}
+      {onSaleMatches.length > 0 && (
+        <section className="mx-auto max-w-6xl px-4 pt-12 md:pt-16">
+          <div className="mb-4">
+            <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">Book now</p>
+            <h2 className="mt-1 text-3xl font-black text-green-900 md:text-4xl">โปรแกรมที่เปิดจอง</h2>
+            <p className="mt-1 text-slate-600">เลือกแมตช์ที่ต้องการ แล้วจองตั๋วได้ทันที</p>
+          </div>
+          <div className="space-y-4">{onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} />)}</div>
+        </section>
+      )}
+
       <section className="mx-auto max-w-6xl px-4 pt-12 md:pt-16">
         <div className="mb-6 text-center">
           <p className="inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-widest text-yellow-600">
@@ -227,4 +243,3 @@ function ZoneCard({ zone }: { zone: StadiumZone }) {
     </div>
   );
 }
-

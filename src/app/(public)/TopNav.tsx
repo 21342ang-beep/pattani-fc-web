@@ -133,6 +133,9 @@ export default function TopNav({
           <Link href="/faq" className="hover:underline">
             {dict.util.faq}
           </Link>
+          <Link href="/privacy-policy" className="hover:underline">
+            นโยบายส่วนตัว
+          </Link>
         </div>
       </motion.div>
 

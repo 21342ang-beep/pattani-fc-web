@@ -19,6 +19,11 @@ export default function PrivacyPolicyPage() {
         <p className="mt-2 text-sm text-slate-600">
           ปรับปรุงล่าสุด: 8 กรกฎาคม 2569
         </p>
+        <div className="mt-5 rounded-lg border border-green-100 bg-green-50 p-4 text-sm text-green-950">
+          <p className="font-bold">ชื่อนิติบุคคล: ห้างหุ้นส่วนจำกัด สโมสรฟุตบอลปัตตานี เอฟซี</p>
+          <p className="mt-1">ที่อยู่: 140/3 ถนนยะรัง ตำบลจะบังติกอ อำเภอเมืองปัตตานี จังหวัดปัตตานี 94000</p>
+          <p className="mt-1">เบอร์โทรติดต่อ: <a href="tel:0815998925" className="font-semibold hover:underline">0815998925</a></p>
+        </div>
       </div>
 
       <div className="prose prose-slate max-w-none space-y-6 text-slate-800">

@@ -7,17 +7,19 @@ import StatsRow from "./_components/StatsRow";
 import FeaturedMatches from "./_components/FeaturedMatches";
 import BentoQuickLinks from "./_components/BentoQuickLinks";
 import SponsorMarquee from "./_components/SponsorMarquee";
+import OnSaleMatchBoard from "./_components/OnSaleMatchBoard";
 
 export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();
-  const [featured, totalMatches, totalOnSale, sponsorsRes] = await Promise.all([
+  const [featured, onSaleMatches, totalMatches, totalOnSale, sponsorsRes] = await Promise.all([
     prisma.match.findMany({
       where: { status: { in: ["SCHEDULED", "ON_SALE"] } },
       orderBy: { kickoffAt: "asc" },
       take: 4,
     }),
+    prisma.match.findMany({ where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" } }),
     prisma.match.count(),
     prisma.match.count({ where: { status: "ON_SALE" } }),
     cms.find({
@@ -58,12 +60,23 @@ export default async function HomePage() {
 
       <div className="mx-auto w-full max-w-7xl space-y-14 px-4 py-14 md:py-20">
         <section>
+          {false && onSaleMatches.length > 0 && (
+            <div className="mb-10 space-y-4">
+              <SectionHeader eyebrow="Book now" title="โปรแกรมที่เปิดจอง" subtitle="เลือกแมตช์และจองตั๋วได้ทันที" />
+              {onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} />)}
+            </div>
+          )}
           <SectionHeader
             eyebrow="ทางลัด"
             title="ค้นพบสโมสร"
             subtitle="เข้าถึงทุกข้อมูลเกี่ยวกับปัตตานี เอฟซีได้ในที่เดียว"
           />
-          <BentoQuickLinks />
+          {onSaleMatches.length > 0 && (
+            <div className="mb-4 space-y-4">
+              {onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} />)}
+            </div>
+          )}
+          <BentoQuickLinks onSaleMatch={onSaleMatches[0]} />
         </section>
 
         <section>
