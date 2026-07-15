@@ -12,7 +12,7 @@ import {
   Ticket,
   MapPin,
 } from "lucide-react";
-import { formatBaht, formatDateTime } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 
 type Tile = {
   href: string;
@@ -72,7 +72,7 @@ const tiles: Tile[] = [
 
 type OnSaleMatch = {
   id: string; homeTeam: string; awayTeam: string; homeTeamLogo: string | null; awayTeamLogo: string | null;
-  kickoffAt: Date | string | null; venue: string | null; pricePerSeat: number | null;
+  kickoffAt: Date | string | null; venue: string | null;
 };
 
 export default function BentoQuickLinks({ onSaleMatch }: { onSaleMatch?: OnSaleMatch }) {
@@ -108,7 +108,7 @@ export default function BentoQuickLinks({ onSaleMatch }: { onSaleMatch?: OnSaleM
                 <div className="absolute inset-0 bg-gradient-to-br from-green-950 via-green-900 to-emerald-800 text-white">
                   <div className="absolute inset-x-4 top-4 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-emerald-300"><span>Book now</span><span className="rounded-full bg-emerald-400 px-2 py-1 text-green-950">เปิดจอง</span></div>
                   <div className="absolute inset-x-12 top-[42%] flex -translate-y-1/2 items-center justify-between gap-8 text-center text-lg font-bold"><TeamMark large logo={onSaleMatch.homeTeamLogo} name={onSaleMatch.homeTeam} /><span className="text-2xl text-yellow-300">VS</span><TeamMark large logo={onSaleMatch.awayTeamLogo} name={onSaleMatch.awayTeam} /></div>
-                  <div className="absolute inset-x-4 bottom-4 border-t border-white/20 pt-2 text-[10px] text-emerald-100"><p>{onSaleMatch.kickoffAt ? formatDateTime(onSaleMatch.kickoffAt) : "ยังไม่กำหนดวันแข่ง"}</p><p className="mt-0.5 flex items-center gap-1"><MapPin className="size-3 text-yellow-300" />{onSaleMatch.venue ?? "ยังไม่กำหนดสนาม"}</p><div className="mt-2 flex items-center justify-between"><span className="font-black text-yellow-300">{onSaleMatch.pricePerSeat != null ? `${formatBaht(onSaleMatch.pricePerSeat)}/ใบ` : "รอประกาศราคา"}</span><span className="rounded-full bg-yellow-300 px-2.5 py-1 font-bold text-green-950">จองตั๋ว</span></div></div>
+                  <div className="absolute inset-x-4 bottom-4 border-t border-white/20 pt-2 text-[10px] text-emerald-100"><p>{onSaleMatch.kickoffAt ? formatDateTime(onSaleMatch.kickoffAt) : "ยังไม่กำหนดวันแข่ง"}</p><p className="mt-0.5 flex items-center gap-1"><MapPin className="size-3 text-yellow-300" />{onSaleMatch.venue ?? "ยังไม่กำหนดสนาม"}</p><div className="mt-2 flex items-center justify-between"><span className="font-black text-yellow-300">ราคาแยกตามโซน</span><span className="rounded-full bg-yellow-300 px-2.5 py-1 font-bold text-green-950">จองตั๋ว</span></div></div>
                 </div>
               )}
               <div

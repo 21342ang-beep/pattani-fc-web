@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getMatchById, getSoldSeats } from "@/lib/cached-queries";
+import { getMatchById } from "@/lib/cached-queries";
 import { readCustomerSession } from "@/lib/customer-session";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import BookingForm from "./BookingForm";
+import { getStadiumZone, getZoneCapacity, getZonePriceGroup, getZonesForPriceGroup, type StadiumZoneCode } from "@/lib/stadium-zones";
 
 // whitelist โซน — กัน XSS ผ่าน URL
 const ALLOWED_ZONES = [
@@ -20,22 +21,32 @@ export default async function MatchDetailPage(props: {
   const zone = (ALLOWED_ZONES as readonly string[]).includes(zoneRaw ?? "")
     ? zoneRaw
     : undefined;
+  const selectedZone = getStadiumZone(zone);
 
-  const [match, session, soldQty] = await Promise.all([
+  const [match, session, sold] = await Promise.all([
     getMatchById(id),
     readCustomerSession(),
-    getSoldSeats(id),
+    zone && getZonePriceGroup(zone as StadiumZoneCode)
+      ? prisma.booking.aggregate({
+          where: {
+            matchId: id,
+            zone: { in: getZonesForPriceGroup(getZonePriceGroup(zone as StadiumZoneCode)!) },
+            status: { in: ["PENDING", "CONFIRMED"] },
+          },
+          _sum: { quantity: true },
+        })
+      : Promise.resolve({ _sum: { quantity: 0 } }),
   ]);
   if (!match) notFound();
 
-  // ON_SALE จะถูก validate ว่า field ครบเสมอ — null guard เพื่อ type-safety
-  const remaining =
-    match.totalSeats != null ? match.totalSeats - soldQty : 0;
+  const capacity = zone ? getZoneCapacity(match, zone as StadiumZoneCode) : null;
+  const remaining = capacity != null ? capacity - (sold._sum.quantity ?? 0) : 0;
   const canBook =
     match.status === "ON_SALE" &&
     remaining > 0 &&
-    match.pricePerSeat != null &&
-    match.kickoffAt != null;
+    selectedZone != null &&
+    match.kickoffAt != null &&
+    capacity != null;
 
   // โหลด customer (name/phone default ใน form) — ถ้ามี session
   const customer = session
@@ -78,17 +89,17 @@ export default async function MatchDetailPage(props: {
           <div className="flex gap-2">
             <dt className="w-20 text-slate-500">ราคา</dt>
             <dd>
-              {match.pricePerSeat != null ? (
-                `${formatBaht(match.pricePerSeat)} / ใบ`
+              {selectedZone ? (
+                `${formatBaht(selectedZone.priceSatang)} / ใบ`
               ) : (
-                <span className="text-slate-400">รอประกาศ</span>
+                <span className="text-slate-400">เลือกโซนเพื่อดูราคา</span>
               )}
             </dd>
           </div>
           <div className="flex gap-2">
             <dt className="w-20 text-slate-500">เหลือ</dt>
             <dd>
-              {match.totalSeats != null
+              {capacity != null
                 ? `${remaining.toLocaleString("th-TH")} ที่นั่ง`
                 : "ยังไม่กำหนด"}
             </dd>
@@ -99,14 +110,18 @@ export default async function MatchDetailPage(props: {
         )}
       </article>
 
-      {!canBook ? (
+      {!selectedZone ? (
+        <div className="mt-6 rounded-lg border bg-amber-50 p-4 text-sm text-amber-800">
+          กรุณาเลือกโซนที่นั่งก่อนจอง <Link href="/tickets" className="font-semibold underline">เลือกโซน</Link>
+        </div>
+      ) : !canBook ? (
         <div className="mt-6 rounded-lg border bg-amber-50 p-4 text-sm text-amber-800">
           ขณะนี้ยังไม่เปิดจอง หรือที่นั่งเต็มแล้ว
         </div>
       ) : (
         <BookingForm
           matchId={match.id}
-          pricePerSeat={match.pricePerSeat!}
+          pricePerSeat={selectedZone!.priceSatang}
           maxQuantity={Math.min(10, remaining)}
           customerEmail={session?.email ?? null}
           customerName={customer?.name ?? session?.name ?? ""}

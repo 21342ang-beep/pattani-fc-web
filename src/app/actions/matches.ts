@@ -56,7 +56,6 @@ async function resolveLogoPath(
 }
 
 async function parseFormToMatchInput(formData: FormData) {
-  const priceBaht = numOrNull(formData.get("pricePerSeatBaht"));
   const home = await resolveLogoPath(
     formData,
     "homeTeamLogoFile",
@@ -76,7 +75,12 @@ async function parseFormToMatchInput(formData: FormData) {
     venue: emptyToNull(formData.get("venue")),
     kickoffAt: emptyToNull(formData.get("kickoffAt")),
     totalSeats: numOrNull(formData.get("totalSeats")),
-    pricePerSeat: priceBaht == null ? null : Math.round(priceBaht * 100),
+    zone170Seats: numOrNull(formData.get("zone170Seats")),
+    zone150Seats: numOrNull(formData.get("zone150Seats")),
+    zone120Seats: numOrNull(formData.get("zone120Seats")),
+    zone100Seats: numOrNull(formData.get("zone100Seats")),
+    // ราคาเป็นของโซน ไม่ใช่ของแมตช์ และล้างค่าเก่าจากข้อมูลเดิมด้วย
+    pricePerSeat: null,
     description: (formData.get("description") as string) || undefined,
     status: (formData.get("status") as string) || undefined,
   };

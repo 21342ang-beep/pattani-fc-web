@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
+import Link from "next/link";
 import BookingStatusSelect from "./BookingStatusSelect";
 import DeleteBookingButton from "./DeleteBookingButton";
 
@@ -13,13 +14,27 @@ const statusColor: Record<string, string> = {
   REFUNDED: "bg-blue-100 text-blue-800",
 };
 
-export default async function AdminBookingsPage() {
+export default async function AdminBookingsPage(props: { searchParams: Promise<{ price?: string }> }) {
   await verifyPermission("BOOKINGS");
-  const bookings = await prisma.booking.findMany({
+  const { price: rawPrice } = await props.searchParams;
+  const selectedPrice = rawPrice && /^\d+$/.test(rawPrice) ? Number(rawPrice) : null;
+  const allBookings = await prisma.booking.findMany({
     orderBy: { createdAt: "desc" },
     include: { match: { select: { homeTeam: true, awayTeam: true, kickoffAt: true } } },
     take: 100,
   });
+  const priceGroups = new Map<number, { bookings: number; tickets: number }>();
+  for (const booking of allBookings) {
+    const price = booking.quantity > 0 ? booking.totalAmount / booking.quantity : null;
+    if (price == null || !Number.isInteger(price)) continue;
+    const current = priceGroups.get(price) ?? { bookings: 0, tickets: 0 };
+    current.bookings += 1;
+    current.tickets += booking.quantity;
+    priceGroups.set(price, current);
+  }
+  const bookings = selectedPrice == null
+    ? allBookings
+    : allBookings.filter((booking) => booking.quantity > 0 && booking.totalAmount / booking.quantity === selectedPrice);
 
   return (
     <div>
@@ -32,6 +47,23 @@ export default async function AdminBookingsPage() {
           ⬇ ส่งออก CSV
         </a>
       </div>
+      {priceGroups.size > 0 && (
+        <div className="mb-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-green-900">ประเภทการจองตามราคา</h2>
+            {selectedPrice != null && <Link href="/admin/bookings" className="text-sm font-medium text-green-800 hover:underline">แสดงทั้งหมด</Link>}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[...priceGroups.entries()].sort(([a], [b]) => a - b).map(([price, summary]) => (
+              <Link key={price} href={`/admin/bookings?price=${price}`} className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${selectedPrice === price ? "border-yellow-400 bg-yellow-50" : "border-green-100 bg-white"}`}>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-500">ราคาต่อใบ</p>
+                <p className="mt-1 text-2xl font-black text-green-900">{formatBaht(price)}</p>
+                <p className="mt-2 text-sm text-slate-600">{summary.bookings} รายการ · {summary.tickets} ใบ</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b bg-slate-50 text-xs uppercase">

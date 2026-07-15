@@ -77,6 +77,16 @@ export default async function AdminDashboard() {
               stat={stats[sec.permission]}
             />
           ))}
+          {hasPermission(user, "FINANCE") && (
+            <SectionCard
+              href="/admin/account"
+              icon="🏦"
+              label="บัญชี"
+              description="ทางลัดตรวจยอดเงินในระบบและยอดเงินบน Xendit"
+              stat="ระบบ · Xendit"
+              emphasized
+            />
+          )}
           {user.role === "SUPER_ADMIN" && (
             <SectionCard
               href="/admin/users"

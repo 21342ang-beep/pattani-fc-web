@@ -20,7 +20,12 @@ const matchBaseSchema = z.object({
   venue: z.string().trim().min(1).max(200).nullish(),
   kickoffAt: z.coerce.date().nullish(),
   totalSeats: z.number().int().positive().max(200000).nullish(),
-  pricePerSeat: z.number().int().nonnegative().max(100_000_00).nullish(), // สตางค์
+  zone170Seats: z.number().int().nonnegative().max(200000).nullish(),
+  zone150Seats: z.number().int().nonnegative().max(200000).nullish(),
+  zone120Seats: z.number().int().nonnegative().max(200000).nullish(),
+  zone100Seats: z.number().int().nonnegative().max(200000).nullish(),
+  // เก็บไว้ชั่วคราวเพื่อรองรับ schema เดิม แต่ไม่รับราคาในระดับแมตช์อีกต่อไป
+  pricePerSeat: z.null().optional(),
   description: z.string().trim().max(2000).optional(),
   status: z.enum(["SCHEDULED", "ON_SALE", "SOLD_OUT", "CANCELLED", "FINISHED"]).optional(),
 });
@@ -30,7 +35,6 @@ type MatchShape = {
   venue?: string | null;
   kickoffAt?: Date | null;
   totalSeats?: number | null;
-  pricePerSeat?: number | null;
   status?: string;
 };
 function requireFullDataForOnSale(d: MatchShape, ctx: z.RefinementCtx) {
@@ -39,7 +43,6 @@ function requireFullDataForOnSale(d: MatchShape, ctx: z.RefinementCtx) {
   if (!d.venue) missing.push("สนาม");
   if (!d.kickoffAt) missing.push("วันเวลาแข่ง");
   if (d.totalSeats == null) missing.push("จำนวนที่นั่ง");
-  if (d.pricePerSeat == null) missing.push("ราคา");
   if (missing.length > 0) {
     ctx.addIssue({
       code: "custom",
@@ -59,6 +62,7 @@ export const matchUpdateSchema = matchBaseSchema
 
 export const bookingCreateSchema = z.object({
   matchId: z.string().min(1),
+  zone: z.enum(["N1", "N2", "S", "S1", "S2", "W", "E", "AWAY"]),
   customerName: z.string().trim().min(1).max(100),
   // optional — guest booking ไม่มีอีเมล, member ใช้ session email (ใส่จาก server)
   customerEmail: z.string().trim().toLowerCase().email().max(200).nullish(),

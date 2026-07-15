@@ -94,6 +94,10 @@ model Match {
   venue         String?
   kickoffAt     DateTime?
   totalSeats    Int?
+  zone170Seats  Int?
+  zone150Seats  Int?
+  zone120Seats  Int?
+  zone100Seats  Int?
   pricePerSeat  Int?        // ราคาเป็นสตางค์ (เลี่ยง floating point)
   status        MatchStatus @default(SCHEDULED)
   description   String?
@@ -126,6 +130,7 @@ model Booking {
   customerEmail   String?       // guest = null, member = session email
   customerPhone   String
   quantity        Int
+  zone            String?
   totalAmount     Int           // ราคารวม (สตางค์)
   status          BookingStatus @default(PENDING)
   paymentMethod   String?       // "PROMPTPAY" | "MOBILE_BANKING" | "CREDIT_CARD"
@@ -140,6 +145,7 @@ model Booking {
   updatedAt       DateTime      @updatedAt
 
   @@index([matchId])
+  @@index([matchId, zone])
   @@index([status])
   @@index([customerEmail])
   @@index([customerPhone])

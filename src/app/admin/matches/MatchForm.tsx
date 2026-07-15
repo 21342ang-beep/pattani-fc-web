@@ -12,7 +12,10 @@ type Match = {
   venue: string | null;
   kickoffAt: Date | string | null;
   totalSeats: number | null;
-  pricePerSeat: number | null;
+  zone170Seats: number | null;
+  zone150Seats: number | null;
+  zone120Seats: number | null;
+  zone100Seats: number | null;
   status: string;
   description: string | null;
 };
@@ -68,7 +71,7 @@ export default function MatchForm({
         defaultValue={initial?.venue ?? ""}
         hint="เว้นว่างได้ถ้ายังไม่ทราบ"
       />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field
           label="วันเวลาแข่ง"
           name="kickoffAt"
@@ -83,15 +86,19 @@ export default function MatchForm({
           defaultValue={initial?.totalSeats?.toString() ?? ""}
           hint="เว้นว่างได้"
         />
-        <Field
-          label="ราคา (บาท)"
-          name="pricePerSeatBaht"
-          type="number"
-          defaultValue={
-            initial?.pricePerSeat != null ? (initial.pricePerSeat / 100).toString() : ""
-          }
-          hint="เว้นว่างได้"
-        />
+      </div>
+      <p className="rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-900">
+        ราคาตั๋วกําหนดตามโซนที่ผู้ซื้อเลือก ระบบจะใช้ราคาโซนนั้นโดยอัตโนมัติ
+      </p>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <h2 className="text-sm font-bold text-slate-900">จำนวนที่นั่งเปิดขายแยกตามราคา</h2>
+        <p className="mt-1 text-xs text-slate-600">เว้นว่างไว้หากยังไม่เปิดขายกลุ่มราคานั้น</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="โซน 170 บาท" name="zone170Seats" type="number" defaultValue={initial?.zone170Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
+          <Field label="โซน 150 บาท" name="zone150Seats" type="number" defaultValue={initial?.zone150Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
+          <Field label="โซน 120 บาท" name="zone120Seats" type="number" defaultValue={initial?.zone120Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
+          <Field label="โซน 100 บาท" name="zone100Seats" type="number" defaultValue={initial?.zone100Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
+        </div>
       </div>
 
       <div>

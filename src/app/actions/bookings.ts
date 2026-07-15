@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { bookingCreateSchema } from "@/lib/validations";
 import { verifyPermission } from "@/lib/dal";
 import { readCustomerSession } from "@/lib/customer-session";
+import { getStadiumZone, getZoneCapacity, getZonePriceGroup, getZonesForPriceGroup } from "@/lib/stadium-zones";
 
 export type BookingFormState = {
   error?: string;
@@ -25,6 +26,7 @@ export async function createBooking(
 
   const parsed = bookingCreateSchema.safeParse({
     matchId: formData.get("matchId"),
+    zone: formData.get("zone"),
     customerName: formData.get("customerName"),
     customerEmail: session?.email ?? null, // ← session-only, ไม่อ่านจาก form
     customerPhone: formData.get("customerPhone"),
@@ -44,15 +46,26 @@ export async function createBooking(
         if (match.status !== "ON_SALE") throw new Error("แมตช์นี้ยังไม่เปิดจอง หรือปิดการจองแล้ว");
         // defense-in-depth — แมตช์ ON_SALE ควรมีข้อมูลครบเสมอ (validate ตอน save)
         // ถ้ามาถึงตรงนี้แล้ว field ขาด แสดงว่ามีข้อมูลผิดปกติ — refuse booking
-        if (match.totalSeats == null || match.pricePerSeat == null) {
+        const zone = getStadiumZone(parsed.data.zone);
+        if (!zone) {
           throw new Error("ข้อมูลแมตช์ยังไม่สมบูรณ์ ไม่สามารถจองได้");
         }
 
+        const capacity = getZoneCapacity(match, parsed.data.zone);
+        const priceGroup = getZonePriceGroup(parsed.data.zone);
+        if (capacity == null || priceGroup == null) {
+          throw new Error("โซนนี้ยังไม่เปิดขายสำหรับแมตช์นี้");
+        }
+
         const sold = await tx.booking.aggregate({
-          where: { matchId: match.id, status: { in: ["PENDING", "CONFIRMED"] } },
+          where: {
+            matchId: match.id,
+            zone: { in: getZonesForPriceGroup(priceGroup) },
+            status: { in: ["PENDING", "CONFIRMED"] },
+          },
           _sum: { quantity: true },
         });
-        const remaining = match.totalSeats - (sold._sum.quantity ?? 0);
+        const remaining = capacity - (sold._sum.quantity ?? 0);
         if (parsed.data.quantity > remaining) {
           throw new Error(`ที่นั่งเหลือ ${remaining} ที่ ไม่พอ`);
         }
@@ -66,7 +79,8 @@ export async function createBooking(
             customerEmail: parsed.data.customerEmail ?? null,
             customerPhone: parsed.data.customerPhone,
             quantity: parsed.data.quantity,
-            totalAmount: match.pricePerSeat * parsed.data.quantity,
+            zone: parsed.data.zone,
+            totalAmount: zone.priceSatang * parsed.data.quantity,
             notes: parsed.data.notes,
           },
         });

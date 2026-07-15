@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Calendar, MapPin, Shield, Ticket } from "lucide-react";
 import { getMatchesByFilter } from "@/lib/cached-queries";
-import { formatBaht, formatDateTime } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 
 const ALLOWED_FILTERS = ["all", "on_sale", "upcoming"] as const;
 type Filter = (typeof ALLOWED_FILTERS)[number];
@@ -103,7 +103,7 @@ export default async function MatchesListPage(props: {
                 <p className="mt-2 text-center text-sm text-slate-600">{m.venue ?? "ยังไม่กำหนดสนาม"}</p>
                 <div className="mt-auto pt-4">
                   <div className="mb-2 text-sm font-medium">
-                    {m.pricePerSeat != null ? `${formatBaht(m.pricePerSeat)}/ใบ` : "ราคารอประกาศ"}
+                    ราคาแยกตามโซน
                   </div>
                   <Link
                     href={`/matches/${m.id}${zoneQS}`}
@@ -156,10 +156,10 @@ function OnSaleMainboard({
           </p>
           <p className="mt-5 text-sm text-emerald-100">เริ่มต้น</p>
           <p className="text-2xl font-black text-yellow-300">
-            {match.pricePerSeat != null ? `${formatBaht(match.pricePerSeat)}/ใบ` : "รอประกาศราคา"}
+            ราคาแยกตามโซน
           </p>
           <Link
-            href={`/matches/${match.id}${zoneQS}`}
+            href={zoneQS ? `/matches/${match.id}${zoneQS}` : "/tickets"}
             className="mt-5 block rounded-lg bg-yellow-300 px-5 py-3 text-center text-sm font-bold text-green-950 transition hover:bg-yellow-200"
           >
             จองตั๋วตอนนี้
