@@ -7,6 +7,7 @@ import {
   type SeasonTierId,
 } from "@/lib/season-pass-tiers";
 import { formatDateTime } from "@/lib/format";
+import Link from "next/link";
 import SeasonPassStatusSelect from "./SeasonPassStatusSelect";
 import DeleteSeasonPassButton from "./DeleteSeasonPassButton";
 
@@ -20,8 +21,14 @@ const statusColor: Record<string, string> = {
   REFUNDED: "bg-blue-100 text-blue-800",
 };
 
-export default async function AdminSeasonPassesPage() {
+export default async function AdminSeasonPassesPage(props: {
+  searchParams: Promise<{ tier?: string }>;
+}) {
   await verifyPermission("SEASON_PASSES");
+  const { tier: rawTier } = await props.searchParams;
+  const selectedTier = SEASON_TIERS.some((tier) => tier.id === rawTier)
+    ? (rawTier as SeasonTierId)
+    : null;
 
   const orders = await prisma.seasonPassOrder.findMany({
     orderBy: { createdAt: "desc" },
@@ -29,6 +36,13 @@ export default async function AdminSeasonPassesPage() {
   });
 
   const tierById = new Map(SEASON_TIERS.map((t) => [t.id, t]));
+  const ordersByTier = new Map<SeasonTierId, typeof orders>();
+  for (const tier of SEASON_TIERS) ordersByTier.set(tier.id, []);
+  for (const order of orders) {
+    const tierOrders = ordersByTier.get(order.tierId as SeasonTierId);
+    if (tierOrders) tierOrders.push(order);
+  }
+  const displayedOrders = selectedTier ? ordersByTier.get(selectedTier) ?? [] : orders;
 
   const summary = {
     total: orders.length,
@@ -75,6 +89,36 @@ export default async function AdminSeasonPassesPage() {
         />
       </div>
 
+      <section className="mb-6">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-green-900">แยกข้อมูลการซื้อตามแพ็กเกจ</h2>
+          {selectedTier && (
+            <Link href="/admin/season-passes" className="text-sm font-medium text-green-800 hover:underline">
+              แสดงทั้งหมด
+            </Link>
+          )}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {SEASON_TIERS.map((tier) => {
+            const tierOrders = ordersByTier.get(tier.id) ?? [];
+            const confirmed = tierOrders.filter((order) => order.status === "CONFIRMED");
+            const revenue = confirmed.reduce((sum, order) => sum + order.priceBaht + order.shippingFeeBaht, 0);
+            return (
+              <Link
+                key={tier.id}
+                href={`/admin/season-passes?tier=${tier.id}`}
+                className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${selectedTier === tier.id ? "border-yellow-400 bg-yellow-50" : "border-green-100 bg-white"}`}
+              >
+                <p className="text-xs font-bold uppercase tracking-widest text-yellow-700">แพ็กเกจ ฿{tier.priceBaht.toLocaleString("th-TH")}</p>
+                <p className="mt-1 text-sm font-bold text-green-900">{tier.badge}</p>
+                <p className="mt-3 text-2xl font-black text-green-900">{tierOrders.length.toLocaleString("th-TH")} <span className="text-sm font-medium">รายการ</span></p>
+                <p className="mt-1 text-xs text-slate-600">ยืนยันแล้ว {confirmed.length} รายการ · ฿{revenue.toLocaleString("th-TH")}</p>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
       {/* ตารางบัตร */}
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="w-full text-sm">
@@ -91,7 +135,7 @@ export default async function AdminSeasonPassesPage() {
             </tr>
           </thead>
           <tbody>
-            {orders.length === 0 ? (
+            {displayedOrders.length === 0 ? (
               <tr>
                 <td colSpan={8} className="p-8 text-center text-slate-500">
                   ยังไม่มีคนซื้อบัตรรายปี — เมื่อลูกค้าสมัครที่{" "}
@@ -102,7 +146,7 @@ export default async function AdminSeasonPassesPage() {
                 </td>
               </tr>
             ) : (
-              orders.map((o) => {
+              displayedOrders.map((o) => {
                 const tier = tierById.get(o.tierId as SeasonTierId);
                 const isMember = !!o.customerId;
                 const total = o.priceBaht + o.shippingFeeBaht;

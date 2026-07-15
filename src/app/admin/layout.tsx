@@ -1,6 +1,7 @@
 import localFont from "next/font/local";
 import { getAdminUser } from "@/lib/dal";
 import TopBar from "./TopBar";
+import BackToDashboard from "./BackToDashboard";
 import "../globals.css";
 
 const dbHeavent = localFont({
@@ -23,6 +24,7 @@ export default async function AdminLayout({
       <body className="min-h-full bg-slate-50 text-slate-900">
         <TopBar role={user.role} email={user.email} />
         <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-8">
+          <BackToDashboard />
           {children}
         </main>
       </body>
