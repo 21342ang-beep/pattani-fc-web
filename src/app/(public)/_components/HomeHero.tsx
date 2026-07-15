@@ -5,6 +5,21 @@ type MainboardMedia = {
   mimeType?: string | null;
 } | null;
 
+function localMediaPath(url?: string | null) {
+  if (!url) return undefined;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname.startsWith("/payload-api/")) {
+      return `${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    // URLs that are already paths can be used as-is.
+  }
+
+  return url;
+}
+
 export default function HomeHero({
   type,
   image,
@@ -14,9 +29,9 @@ export default function HomeHero({
   image?: MainboardMedia;
   video?: MainboardMedia;
 }) {
-  const videoUrl = type === "video" ? video?.url ?? undefined : undefined;
+  const videoUrl = type === "video" ? localMediaPath(video?.url) : undefined;
   const showVideo = Boolean(videoUrl);
-  const imageUrl = image?.url || "/home-hero-bg-team-collage.png";
+  const imageUrl = localMediaPath(image?.url) || "/home-hero-bg-team-collage.png";
 
   return (
     <section className="relative isolate overflow-hidden bg-green-950">
