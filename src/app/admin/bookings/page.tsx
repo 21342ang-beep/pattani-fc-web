@@ -81,7 +81,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
           <tbody>
             {bookings.map((b) => (
               <tr key={b.id} className="border-b last:border-0">
-                <td className="px-3 py-2 font-mono text-xs">{b.bookingCode.slice(0, 8)}</td>
+                <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">{b.bookingCode}</td>
                 <td className="px-3 py-2">
                   <div className="font-medium">{b.customerName}</div>
                   <div className="text-xs text-slate-500">{b.customerEmail}</div>
