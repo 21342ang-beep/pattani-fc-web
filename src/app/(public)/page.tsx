@@ -13,7 +13,7 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();
-  const [featured, onSaleMatches, totalMatches, totalOnSale, sponsorsRes] = await Promise.all([
+  const [featured, onSaleMatches, totalMatches, totalOnSale, sponsorsRes, homePage] = await Promise.all([
     prisma.match.findMany({
       where: { status: { in: ["SCHEDULED", "ON_SALE"] } },
       orderBy: { kickoffAt: "asc" },
@@ -29,6 +29,7 @@ export default async function HomePage() {
       sort: "createdAt",
       overrideAccess: true,
     }),
+    cms.findGlobal({ slug: "home-page", overrideAccess: true }),
   ]);
 
   // จัดลำดับ: title → main → partner → supporter (Main sponsor นำหน้าใน marquee)
@@ -56,7 +57,19 @@ export default async function HomePage() {
 
   return (
     <div>
-      <HomeHero />
+      <HomeHero
+        type={homePage.mainboardType as "image" | "video" | undefined}
+        image={
+          typeof homePage.mainboardImage === "object" && homePage.mainboardImage
+            ? homePage.mainboardImage
+            : null
+        }
+        video={
+          typeof homePage.mainboardVideo === "object" && homePage.mainboardVideo
+            ? homePage.mainboardVideo
+            : null
+        }
+      />
 
       <div className="mx-auto w-full max-w-7xl space-y-14 px-4 py-14 md:py-20">
         <section>

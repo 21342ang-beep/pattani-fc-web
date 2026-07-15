@@ -17,7 +17,7 @@ export const Media: CollectionConfig = {
   },
   upload: {
     staticDir: path.resolve(dirname, "../../../public/uploads/media"),
-    mimeTypes: ["image/*"],
+    mimeTypes: ["image/*", "video/mp4", "video/webm"],
     imageSizes: [
       { name: "thumb", width: 320, height: 320, position: "centre" },
       { name: "card", width: 640, height: 640, position: "centre" },

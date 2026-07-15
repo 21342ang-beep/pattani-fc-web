@@ -1,19 +1,47 @@
 import Image from "next/image";
 
-// Mainboard = รูป collage ทีมเต็มใบ (ขนาดจริง 1584×672)
-// ใช้ width/height จริง + w-full h-auto → บอร์ดสูงตามสัดส่วนของรูป ไม่ครอป ไม่บิด
-export default function HomeHero() {
+type MainboardMedia = {
+  url?: string | null;
+  mimeType?: string | null;
+} | null;
+
+export default function HomeHero({
+  type,
+  image,
+  video,
+}: {
+  type?: "image" | "video";
+  image?: MainboardMedia;
+  video?: MainboardMedia;
+}) {
+  const videoUrl = type === "video" ? video?.url ?? undefined : undefined;
+  const showVideo = Boolean(videoUrl);
+  const imageUrl = image?.url || "/home-hero-bg-team-collage.png";
+
   return (
     <section className="relative isolate overflow-hidden bg-green-950">
-      <Image
-        src="/home-hero-bg-team-collage.png"
-        alt=""
-        width={1584}
-        height={672}
-        priority
-        sizes="100vw"
-        className="pointer-events-none mx-auto h-auto w-full"
-      />
+      {showVideo ? (
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          className="pointer-events-none mx-auto aspect-[1584/672] w-full object-cover"
+        >
+          <source src={videoUrl} type={video?.mimeType || undefined} />
+        </video>
+      ) : (
+        <Image
+          src={imageUrl}
+          alt=""
+          width={1584}
+          height={672}
+          priority
+          sizes="100vw"
+          className="pointer-events-none mx-auto h-auto w-full"
+        />
+      )}
     </section>
   );
 }

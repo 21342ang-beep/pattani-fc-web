@@ -17,6 +17,7 @@ import { Promotions } from "./payload/collections/Promotions";
 import { AccountCategories } from "./payload/collections/AccountCategories";
 import { Revenues } from "./payload/collections/Revenues";
 import { Expenses } from "./payload/collections/Expenses";
+import { HomePage } from "./payload/globals/HomePage";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -102,6 +103,7 @@ export default buildConfig({
     Revenues,
     Expenses,
   ],
+  globals: [HomePage],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET,
   typescript: {

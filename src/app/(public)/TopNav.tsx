@@ -116,8 +116,68 @@ export default function TopNav({
     };
   }, [mobileOpen]);
 
+  const renderDesktopItem = (it: NavItem) => {
+    if ("children" in it) {
+      const active = it.children.some((child) => isActive(path, child.href));
+      const isOpen = openMenu === it.label;
+      return (
+        <div key={it.label} className="relative">
+          <button
+            type="button"
+            onClick={() => setOpenMenu(isOpen ? null : it.label)}
+            aria-expanded={isOpen}
+            aria-haspopup="menu"
+            className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2.5 text-base font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${
+              active || isOpen ? "text-green-950" : "text-white hover:text-white"
+            }`}
+          >
+            {(active || isOpen) && (
+              <motion.span
+                layoutId="nav-pill"
+                className="absolute inset-0 rounded-full bg-yellow-400"
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              />
+            )}
+            <span className="relative">{it.label}</span>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden className={`relative size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}>
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.4a.75.75 0 01-1.08 0l-4.25-4.4a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+            </svg>
+          </button>
+          {isOpen && (
+            <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-base shadow-xl backdrop-blur-md">
+              {it.children.map((child) => {
+                const childActive = childIsActive(path, child.href, it.children);
+                return <Link key={child.href} href={child.href} role="menuitem" className={`block whitespace-nowrap px-5 py-2.5 font-semibold transition-colors ${childActive ? "bg-yellow-400 text-green-950" : "text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
+    const active = isActive(path, it.href);
+    return (
+      <Link key={it.href} href={it.href} className={`relative whitespace-nowrap rounded-full px-3 py-2.5 text-base font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${active ? "text-green-950" : "text-white hover:text-white"}`}>
+        {active && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-yellow-400" transition={{ type: "spring", stiffness: 400, damping: 30 }} />}
+        <span className="relative">{it.label}</span>
+      </Link>
+    );
+  };
+
   return (
     <header className="sticky top-0 z-40">
+      <Link
+        href="/"
+        aria-label="Pattani FC"
+        className="absolute left-1/2 top-0 z-50 hidden size-44 -translate-x-1/2 items-center justify-center transition-transform hover:scale-105 xl:flex"
+      >
+        <Image
+          src="/logo-pattani-fc.png"
+          alt=""
+          width={176}
+          height={176}
+          className="size-full object-contain drop-shadow-lg"
+        />
+      </Link>
       {/* Utility bar — desktop only (mobile ย้ายไปใน drawer) */}
       <motion.div
         animate={{
@@ -242,101 +302,14 @@ export default function TopNav({
 
         {/* Desktop nav — hidden below md */}
         <nav className="hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
-          <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-visible px-2 py-2.5 text-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {items.map((it) => {
-              if ("children" in it) {
-                const active = it.children.some((c) => isActive(path, c.href));
-                const isOpen = openMenu === it.label;
-                return (
-                  <div
-                    key={it.label}
-                    className="relative"
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenMenu(isOpen ? null : it.label)
-                      }
-                      aria-expanded={isOpen}
-                      aria-haspopup="menu"
-                      className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-full px-6 py-2.5 font-bold tracking-wide transition-colors ${
-                        active || isOpen ? "text-green-950" : "text-white hover:text-white"
-                      }`}
-                    >
-                      {(active || isOpen) && (
-                        <motion.span
-                          layoutId="nav-pill"
-                          className="absolute inset-0 rounded-full bg-yellow-400"
-                          transition={{
-                            type: "spring",
-                            stiffness: 400,
-                            damping: 30,
-                          }}
-                        />
-                      )}
-                      <span className="relative">{it.label}</span>
-                      <svg
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        aria-hidden
-                        className={`relative size-4 transition-transform ${
-                          isOpen ? "rotate-180" : ""
-                        }`}
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.4a.75.75 0 01-1.08 0l-4.25-4.4a.75.75 0 01.02-1.06z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </button>
-                    {isOpen && (
-                      <div
-                        role="menu"
-                        className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-base shadow-xl backdrop-blur-md"
-                      >
-                        {it.children.map((c) => {
-                          const childActive = childIsActive(path, c.href, it.children);
-                          return (
-                            <Link
-                              key={c.href}
-                              href={c.href}
-                              role="menuitem"
-                              className={`block whitespace-nowrap px-5 py-2.5 font-semibold transition-colors ${
-                                childActive
-                                  ? "bg-yellow-400 text-green-950"
-                                  : "text-yellow-100 hover:bg-green-900"
-                              }`}
-                            >
-                              {c.label}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-              const active = isActive(path, it.href);
-              return (
-                <Link
-                  key={it.href}
-                  href={it.href}
-                  className={`relative whitespace-nowrap rounded-full px-6 py-2.5 font-bold tracking-wide transition-colors ${
-                    active ? "text-green-950" : "text-white hover:text-white"
-                  }`}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="nav-pill"
-                      className="absolute inset-0 rounded-full bg-yellow-400"
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative">{it.label}</span>
-                </Link>
-              );
-            })}
+          <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_11rem_minmax(0,1fr)] items-center px-2 py-2.5">
+            <div className="flex items-center justify-end gap-2 pr-4">
+              {items.slice(0, 4).map(renderDesktopItem)}
+            </div>
+            <div aria-hidden />
+            <div className="flex items-center justify-start gap-2 pl-4">
+              {items.slice(4).map(renderDesktopItem)}
+            </div>
           </div>
         </nav>
       </motion.div>
