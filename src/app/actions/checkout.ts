@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { allocateSeats } from "@/lib/seats";
 
 // ระบบรองรับ PromptPay QR เท่านั้น → fix ที่ server ไม่รับ method จาก client
 // กันการปลอม "ฉันจ่ายด้วยบัตร" จาก form ที่ client ปลอมได้
@@ -77,14 +76,14 @@ export async function confirmPayment(
           throw new Error("สถานะการจองไม่อนุญาตให้ชำระเงิน");
         }
 
-        const seats = await allocateSeats(b.matchId, b.quantity);
         await tx.booking.update({
           where: { id: b.id },
           data: {
             status: "CONFIRMED",
             paymentMethod: PAYMENT_METHOD,
             paidAt: new Date(),
-            seatNumbers: seats,
+            // ยังไม่มีผังจัดสรรที่นั่ง จึงไม่สุ่มเลขที่นั่งให้ลูกค้า
+            seatNumbers: [],
           },
         });
       },

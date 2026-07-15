@@ -7,9 +7,9 @@ type Props = {
   booking: {
     bookingCode: string;
     customerName: string;
-    seatNumbers: string[];
     quantity: number;
-    totalAmount: string;
+    zone: string | null;
+    unitPrice: string;
     paymentMethod: string;
     paidAt: string;
     match: {
@@ -19,23 +19,10 @@ type Props = {
       awayTeamLogo: string | null;
       venue: string;
       kickoffAt: string;
-      pricePerSeat: string | null;
     };
   };
   barcodeSvg: string;
 };
-
-// แยก zone-prefix / seat / row จาก "A-101" → ZONE A, ROW —, SEAT 101
-// ถ้า format ไม่ตรง คืนค่า raw เป็น seat
-function parseSeat(seat: string): { zone: string | null; row: string | null; seat: string } {
-  // รองรับ "A-12-101" (3 part = ZONE-ROW-SEAT)
-  const m3 = /^([A-Za-z0-9]+)[-_/]([A-Za-z0-9]+)[-_/]([A-Za-z0-9]+)$/.exec(seat);
-  if (m3) return { zone: m3[1], row: m3[2], seat: m3[3] };
-  // 2 part = ZONE-SEAT
-  const m2 = /^([A-Za-z0-9]+)[-_/]([A-Za-z0-9]+)$/.exec(seat);
-  if (m2) return { zone: m2[1], row: null, seat: m2[2] };
-  return { zone: null, row: null, seat };
-}
 
 function formatKickoffParts(s: string): { date: string; time: string } {
   if (!s || s === "—") return { date: "—", time: "—" };
@@ -65,18 +52,15 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 export default function TicketCard({ booking, barcodeSvg }: Props) {
-  const seats = booking.seatNumbers.length > 0 ? booking.seatNumbers : ["—"];
-  const primary = parseSeat(seats[0]);
   const { date, time } = formatKickoffParts(booking.match.kickoffAt);
-  const extraCount = seats.length - 1;
   const home = resolveLogo(booking.match.homeTeamLogo, booking.match.homeTeam);
   const away = resolveLogo(booking.match.awayTeamLogo, booking.match.awayTeam);
-  const priceLine =
-    booking.match.pricePerSeat ?? booking.totalAmount.replace("฿", "").trim();
+  const ticketReference = `${booking.zone ?? "GENERAL"} · ${booking.unitPrice}`;
+  const barcodeReference = `${booking.zone ?? "GENERAL"}-${booking.unitPrice.replace(/\D/g, "")}-${booking.bookingCode.slice(-8).toUpperCase()}`;
 
   return (
     <div className="bg-slate-100 py-8 print:bg-white print:py-0 md:py-12">
-      <div className="mx-auto max-w-xl px-4 print:max-w-none print:px-0">
+      <div className="mx-auto max-w-2xl px-4 print:max-w-none print:px-0">
         {/* Action bar */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
           <div>
@@ -107,10 +91,10 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
         {/* Ticket */}
         <article
           aria-label="E-Ticket Pattani FC"
-          className="relative grid grid-cols-1 overflow-hidden rounded-xl bg-[#0a1e15] shadow-2xl shadow-black/40 ring-1 ring-black/40 md:grid-cols-[1fr_140px] print:rounded-none print:shadow-none print:ring-0"
+          className="relative grid grid-cols-1 overflow-hidden rounded-xl bg-[#0a1e15] shadow-2xl shadow-black/40 ring-1 ring-black/40 md:grid-cols-[1fr_220px] print:rounded-none print:shadow-none print:ring-0"
         >
           {/* ===== MAIN PANEL ===== */}
-          <main className="relative overflow-hidden px-4 py-3.5 text-white md:px-5 md:py-4">
+          <main className="relative overflow-hidden px-5 py-5 text-white md:px-8 md:py-7">
             {/* Stadium glow background */}
             <div
               aria-hidden
@@ -137,22 +121,22 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
 
             <div className="relative flex h-full flex-col">
               {/* Header tag */}
-              <p className="flex items-center justify-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.35em] text-white/70">
+              <p className="flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.35em] text-white/70">
                 <span className="h-px w-4 bg-white/40" />
                 ✦ Football Match ✦
                 <span className="h-px w-4 bg-white/40" />
               </p>
 
               {/* Title */}
-              <h2 className="mt-0.5 text-center text-2xl font-black uppercase leading-none tracking-tight text-white">
+              <h2 className="mt-1 text-center text-4xl font-black uppercase leading-none tracking-tight text-white">
                 Match Day
               </h2>
-              <p className="text-center text-[10px] font-bold uppercase tracking-[0.22em] text-yellow-400">
+              <p className="mt-1 text-center text-xs font-bold uppercase tracking-[0.22em] text-yellow-400">
                 The Battle Begins
               </p>
 
               {/* Crests + VS */}
-              <div className="mt-2 flex items-center justify-center gap-2">
+              <div className="mt-5 flex items-center justify-center gap-5">
                 <TeamCrest
                   name={booking.match.homeTeam}
                   logo={home.src}
@@ -161,10 +145,10 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
                 />
                 <div className="flex flex-col items-center">
                   <Zap
-                    className="size-6 fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.6)]"
+                    className="size-9 fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.6)]"
                     strokeWidth={1.5}
                   />
-                  <span className="text-[8px] font-black uppercase tracking-widest text-white/70">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/70">
                     VS
                   </span>
                 </div>
@@ -177,17 +161,17 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
               </div>
 
               {/* Match info */}
-              <div className="mt-2 text-center">
-                <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-white">
+              <div className="mt-5 text-center">
+                <p className="text-base font-bold uppercase tracking-[0.15em] text-white">
                   {date}
                 </p>
-                <p className="text-[10px] text-white/70">
+                <p className="mt-1 text-sm text-white/70">
                   Kick off {time || "—"} · {booking.match.venue}
                 </p>
               </div>
 
               {/* meta bottom */}
-              <div className="mt-auto pt-1.5 text-[9px] text-white/60">
+              <div className="mt-auto pt-4 text-xs text-white/60">
                 <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                   <span>
                     <span className="text-white/40">ผู้ซื้อ </span>
@@ -208,46 +192,38 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
           <Perforation />
 
           {/* ===== RIGHT STUB ===== */}
-          <aside className="relative flex flex-col gap-1.5 overflow-hidden bg-[#0a1e15] px-2.5 py-3 text-white">
+          <aside className="relative flex flex-col gap-3 overflow-hidden bg-[#0a1e15] px-4 py-5 text-white">
             <div
               aria-hidden
               className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:radial-gradient(circle_at_1px_1px,#fff_1px,transparent_0)] [background-size:10px_10px]"
             />
-            <div className="relative flex flex-col gap-1.5">
-              <p className="text-center text-[8px] font-bold uppercase tracking-[0.3em] text-yellow-400">
+            <div className="relative flex flex-col gap-3">
+              <p className="text-center text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-400">
                 Match Day
               </p>
 
               <div className="text-center leading-tight">
-                <p className="text-[10px] font-black uppercase text-white">
+                <p className="text-sm font-black uppercase text-white">
                   {booking.match.homeTeam}
                 </p>
-                <p className="my-0 text-[8px] font-bold text-white/60">vs</p>
-                <p className="text-[10px] font-black uppercase text-white">
+                <p className="my-1 text-[10px] font-bold text-white/60">vs</p>
+                <p className="text-sm font-black uppercase text-white">
                   {booking.match.awayTeam}
                 </p>
               </div>
 
-              <div className="border-y border-white/10 py-1 text-[9px]">
+              <div className="border-y border-white/10 py-2 text-[11px]">
                 <StubRow label="Date" value={date} />
                 <StubRow label="Kick off" value={time || "—"} />
                 <StubRow label="Stadium" value={booking.match.venue} />
-                <StubRow label="Zone" value={primary.zone ?? "—"} />
-                {primary.row && <StubRow label="Row" value={primary.row} />}
-                <StubRow
-                  label="Seat"
-                  value={
-                    extraCount > 0 ? `${primary.seat} +${extraCount}` : primary.seat
-                  }
-                />
               </div>
 
               <div className="text-center">
-                <p className="text-[8px] font-bold uppercase tracking-widest text-white/60">
-                  Price
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                  Ticket type
                 </p>
-                <p className="text-sm font-black leading-none text-yellow-400">
-                  {priceLine}
+                <p className="mt-1 text-2xl font-black leading-none text-yellow-400">
+                  {ticketReference}
                 </p>
                 <p className="text-[8px] text-white/40">
                   {METHOD_LABEL[booking.paymentMethod] ?? booking.paymentMethod}
@@ -256,11 +232,14 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
             </div>
 
             {/* barcode */}
-            <div className="relative mt-auto rounded-md bg-white p-1">
+            <div className="relative mt-auto rounded-lg bg-white p-2">
               <div
                 className="[&_svg]:h-auto [&_svg]:w-full"
                 dangerouslySetInnerHTML={{ __html: barcodeSvg }}
               />
+              <p className="mt-1 text-center font-mono text-[10px] font-bold tracking-[0.16em] text-green-950">
+                {barcodeReference}
+              </p>
             </div>
           </aside>
         </article>
@@ -291,29 +270,29 @@ function TeamCrest({
   return (
     <div className="flex flex-col items-center">
       <div
-        className={`relative flex size-14 items-center justify-center rounded-full bg-gradient-to-b ${ringCls} ring-2 backdrop-blur-sm`}
+        className={`relative flex size-[4.5rem] items-center justify-center rounded-full bg-gradient-to-b ${ringCls} ring-2 backdrop-blur-sm`}
       >
         {logo && !useFallback ? (
-          <div className="relative size-11">
+          <div className="relative size-14">
             <Image
               src={logo}
               alt={name}
               fill
               unoptimized
-              sizes="44px"
+              sizes="56px"
               className="object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
             />
           </div>
         ) : (
           <Shield
-            className={`size-7 ${
+            className={`size-9 ${
               tone === "home" ? "text-yellow-400" : "text-blue-300"
             } drop-shadow-md`}
             strokeWidth={1.5}
           />
         )}
       </div>
-      <p className="mt-1 max-w-[5.5rem] truncate text-center text-[9px] font-bold uppercase tracking-widest text-white">
+      <p className="mt-2 max-w-28 truncate text-center text-xs font-bold uppercase tracking-widest text-white">
         {name}
       </p>
     </div>
@@ -333,10 +312,10 @@ function Perforation() {
 function StubRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-1.5 py-0.5">
-      <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-400/80">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-yellow-400/80">
         {label}
       </span>
-      <span className="truncate text-right text-[11px] font-bold text-white">
+      <span className="truncate text-right text-sm font-bold text-white">
         {value}
       </span>
     </div>

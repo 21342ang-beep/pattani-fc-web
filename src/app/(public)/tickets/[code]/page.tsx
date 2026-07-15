@@ -31,6 +31,7 @@ export default async function TicketPage({
       customerName: true,
       customerPhone: true,
       quantity: true,
+      zone: true,
       totalAmount: true,
       status: true,
       seatNumbers: true,
@@ -44,7 +45,6 @@ export default async function TicketPage({
           awayTeamLogo: true,
           venue: true,
           kickoffAt: true,
-          pricePerSeat: true,
         },
       },
     },
@@ -79,13 +79,13 @@ export default async function TicketPage({
   const barcodeSvg = bwipjs.toSVG({
     bcid: "code128",
     text: booking.bookingCode,
-    scale: 3,
-    height: 14,
+    scale: 4,
+    height: 18,
     includetext: true,
     textxalign: "center",
-    textsize: 10,
-    paddingwidth: 8,
-    paddingheight: 4,
+    textsize: 14,
+    paddingwidth: 12,
+    paddingheight: 6,
     barcolor: "052e1b",
     textcolor: "052e1b",
   });
@@ -95,9 +95,9 @@ export default async function TicketPage({
       booking={{
         bookingCode: booking.bookingCode,
         customerName: booking.customerName,
-        seatNumbers: booking.seatNumbers,
         quantity: booking.quantity,
-        totalAmount: formatBaht(booking.totalAmount),
+        zone: booking.zone,
+        unitPrice: formatBaht(booking.totalAmount / booking.quantity),
         paymentMethod: booking.paymentMethod ?? "",
         paidAt: booking.paidAt?.toISOString() ?? "",
         match: {
@@ -109,9 +109,6 @@ export default async function TicketPage({
           kickoffAt: booking.match.kickoffAt
             ? formatDateTime(booking.match.kickoffAt)
             : "—",
-          pricePerSeat: booking.match.pricePerSeat
-            ? formatBaht(booking.match.pricePerSeat)
-            : null,
         },
       }}
       barcodeSvg={barcodeSvg}
