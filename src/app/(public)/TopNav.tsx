@@ -67,6 +67,7 @@ export default function TopNav({
       ],
     },
     { href: "/matches", label: dict.nav.matches },
+    { href: "/bookings/search", label: "ค้นหา" },
     { href: "/news", label: dict.nav.news },
     { href: "/shop", label: dict.nav.shop },
     { href: "/contact", label: dict.nav.contact },
