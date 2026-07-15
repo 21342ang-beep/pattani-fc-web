@@ -250,8 +250,6 @@ export default function TopNav({
                   <div
                     key={it.label}
                     className="relative"
-                    onMouseEnter={() => setOpenMenu(it.label)}
-                    onMouseLeave={() => setOpenMenu(null)}
                   >
                     <button
                       type="button"
@@ -261,10 +259,10 @@ export default function TopNav({
                       aria-expanded={isOpen}
                       aria-haspopup="menu"
                       className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-full px-6 py-2.5 font-bold tracking-wide transition-colors ${
-                        active ? "text-green-950" : "text-white hover:text-white"
+                        active || isOpen ? "text-green-950" : "text-white hover:text-white"
                       }`}
                     >
-                      {active && (
+                      {(active || isOpen) && (
                         <motion.span
                           layoutId="nav-pill"
                           className="absolute inset-0 rounded-full bg-yellow-400"
