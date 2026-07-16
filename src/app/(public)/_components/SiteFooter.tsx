@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Mail, MapPin, Phone, Shield } from "lucide-react";
 import type { Dict } from "@/lib/i18n/dict";
+import { payload } from "@/lib/payload";
+import SponsorFooter from "./SponsorFooter";
 
 // ไอคอน social — ใช้ภาพ raster ปรับแต่งจาก /public ตามที่ user เลือก
 // ทั้งหมดเป็นไฟล์ local — ไม่มี external request, ปลอดภัยจาก SSRF/hotlink
@@ -58,15 +60,37 @@ function buildGroups(dict: Dict) {
   ];
 }
 
-export default function SiteFooter({ dict }: { dict: Dict }) {
+export default async function SiteFooter({ dict }: { dict: Dict }) {
+  const cms = await payload();
+  const { docs } = await cms.find({
+    collection: "sponsors",
+    where: { active: { equals: true } },
+    limit: 50,
+    sort: "createdAt",
+    overrideAccess: true,
+  });
+  const sponsors = (docs as unknown as {
+    id: string | number;
+    name: string;
+    logo?: { url?: string } | string | null;
+  }[]).map((sponsor) => ({
+    id: String(sponsor.id),
+    name: sponsor.name,
+    logoUrl:
+      typeof sponsor.logo === "object" && sponsor.logo
+        ? sponsor.logo.url
+        : undefined,
+  }));
   const groups = buildGroups(dict);
   return (
-    <footer className="relative overflow-hidden bg-green-950 text-yellow-100">
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.03] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:48px_48px]"
-      />
-      <div className="relative mx-auto max-w-7xl px-4 pt-14 pb-6">
+    <footer className="bg-green-950 text-yellow-100">
+      <SponsorFooter sponsors={sponsors} />
+      <div className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.03] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:48px_48px]"
+        />
+        <div className="relative mx-auto max-w-7xl px-4 pt-14 pb-6">
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
             <Link href="/" className="inline-flex items-center gap-3">
@@ -170,6 +194,7 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
               {dict.util.admin}
             </Link>
           </div>
+        </div>
         </div>
       </div>
     </footer>

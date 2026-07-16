@@ -6,14 +6,13 @@ import HomeHero from "./_components/HomeHero";
 import StatsRow from "./_components/StatsRow";
 import FeaturedMatches from "./_components/FeaturedMatches";
 import BentoQuickLinks from "./_components/BentoQuickLinks";
-import SponsorMarquee from "./_components/SponsorMarquee";
 import OnSaleMatchBoard from "./_components/OnSaleMatchBoard";
 
 export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();
-  const [featured, onSaleMatches, totalMatches, totalOnSale, sponsorsRes, homePage] = await Promise.all([
+  const [featured, onSaleMatches, totalMatches, totalOnSale, homePage] = await Promise.all([
     prisma.match.findMany({
       where: { status: { in: ["SCHEDULED", "ON_SALE"] } },
       orderBy: { kickoffAt: "asc" },
@@ -22,38 +21,8 @@ export default async function HomePage() {
     prisma.match.findMany({ where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" } }),
     prisma.match.count(),
     prisma.match.count({ where: { status: "ON_SALE" } }),
-    cms.find({
-      collection: "sponsors",
-      where: { active: { equals: true } },
-      limit: 50,
-      sort: "createdAt",
-      overrideAccess: true,
-    }),
     cms.findGlobal({ slug: "home-page", overrideAccess: true }),
   ]);
-
-  // จัดลำดับ: title → main → partner → supporter (Main sponsor นำหน้าใน marquee)
-  const TIER_ORDER: Record<string, number> = {
-    title: 0,
-    main: 1,
-    partner: 2,
-    supporter: 3,
-  };
-  const sponsors = (sponsorsRes.docs as unknown as {
-    name: string;
-    logo?: { url?: string } | string | null;
-    tier?: string;
-  }[])
-    .slice()
-    .sort(
-      (a, b) =>
-        (TIER_ORDER[a.tier ?? "supporter"] ?? 99) -
-        (TIER_ORDER[b.tier ?? "supporter"] ?? 99)
-    )
-    .map((s) => ({
-      name: s.name,
-      logoUrl: typeof s.logo === "object" && s.logo ? s.logo.url : undefined,
-    }));
 
   return (
     <div>
@@ -135,16 +104,6 @@ export default async function HomePage() {
         </section>
       </div>
 
-      {sponsors.length > 0 && (
-        <section className="border-t border-green-100 bg-white py-8">
-          <div className="mx-auto mb-3 max-w-7xl px-4">
-            <p className="text-center text-sm font-bold uppercase tracking-widest text-green-700">
-              Official Partners
-            </p>
-          </div>
-          <SponsorMarquee sponsors={sponsors} />
-        </section>
-      )}
     </div>
   );
 }
