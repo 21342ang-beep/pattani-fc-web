@@ -44,7 +44,7 @@ export default function SponsorFooter({ sponsors }: { sponsors: Sponsor[] }) {
                 onClick={() => setSelectedSponsor(sponsor.id)}
                 aria-pressed={selected}
                 aria-label={`เลือก ${sponsor.name}`}
-                className={`group flex aspect-[2.1/1] items-center justify-center px-2.5 transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300 ${
+                className={`group flex aspect-[2.1/1] items-center justify-center px-1.5 transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300 ${
                   selected
                     ? "drop-shadow-[0_0_10px_rgba(253,224,71,0.35)]"
                     : ""
@@ -56,7 +56,7 @@ export default function SponsorFooter({ sponsors }: { sponsors: Sponsor[] }) {
                     src={sponsor.logoUrl}
                     alt={sponsor.name}
                     loading="lazy"
-                    className={`max-h-[70%] max-w-full object-contain transition duration-200 ${
+                    className={`max-h-[92%] max-w-full object-contain transition duration-200 ${
                       selected
                         ? "scale-105 grayscale-0 opacity-100"
                         : "grayscale opacity-65 group-hover:scale-105 group-hover:grayscale-0 group-hover:opacity-100 group-focus-visible:grayscale-0 group-focus-visible:opacity-100"
@@ -64,7 +64,7 @@ export default function SponsorFooter({ sponsors }: { sponsors: Sponsor[] }) {
                   />
                 ) : (
                   <span
-                    className={`text-center text-xs font-bold uppercase tracking-wide transition ${
+                    className={`text-center text-sm font-bold uppercase tracking-wide transition ${
                       selected
                         ? "text-yellow-200"
                         : "text-yellow-100/60 group-hover:text-yellow-100"
