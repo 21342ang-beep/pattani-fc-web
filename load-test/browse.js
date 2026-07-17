@@ -50,8 +50,8 @@ export default function () {
     }
 
     if (Math.random() < 0.2) {
-      res = http.get(`${BASE}/bookings/check`);
-      check(res, { 'bookings check 200': (r) => r.status === 200 });
+      res = http.get(`${BASE}/bookings/search`);
+      check(res, { 'bookings search 200': (r) => r.status === 200 });
     }
   });
 }

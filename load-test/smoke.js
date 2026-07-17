@@ -13,7 +13,7 @@ export const options = {
 const BASE = __ENV.BASE_URL || 'https://pattanifc.co';
 
 export default function () {
-  const paths = ['/', '/matches', '/tickets', '/bookings/check', '/faq'];
+  const paths = ['/', '/matches', '/tickets', '/bookings/search', '/faq'];
   for (const p of paths) {
     const res = http.get(`${BASE}${p}`);
     check(res, {

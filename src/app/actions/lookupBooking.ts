@@ -2,14 +2,14 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getAdminUser, hasPermission } from "@/lib/dal";
 import { rateLimit } from "@/lib/rate-limit";
 
-// ตรวจสอบจองด้วย bookingCode เพียงอย่างเดียว
+// ตรวจสอบจองด้วย bookingCode เพียงอย่างเดียว — เฉพาะหลังบ้าน (สิทธิ์ BOOKINGS)
 // ความปลอดภัย:
 // - bookingCode เป็น cuid (≥24 ตัวอักษร [a-z0-9]) → entropy ~120 บิต → brute force ไม่ได้
 // - rate limit 20 ครั้ง / นาที / IP → กัน enumeration script
 // - DTO เปิดเผยแค่ชื่อ + รายละเอียดแมตช์ + สถานะ (ไม่มี email/phone) → ลด PII exposure
-// - คนที่รู้ code ดูข้อมูลได้ → ต้องเก็บ code ให้ปลอดภัย (เหมือนตั๋วบอร์ดดิ้งพาส)
 const lookupSchema = z.object({
   bookingCode: z
     .string()
@@ -43,6 +43,12 @@ export async function lookupBooking(
   _prev: LookupState,
   formData: FormData
 ): Promise<LookupState> {
+  // getAdminUser redirect ไป /login เองถ้าไม่มี session
+  const user = await getAdminUser();
+  if (!hasPermission(user, "BOOKINGS")) {
+    return { error: "ไม่มีสิทธิ์ตรวจสอบการจอง" };
+  }
+
   // rate limit ก่อน parse → ตัด traffic abuse ที่ถนน
   const rl = await rateLimit("lookup-booking", {
     max: 20,

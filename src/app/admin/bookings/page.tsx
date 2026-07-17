@@ -43,12 +43,20 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-green-900">การจอง</h1>
-        <a
-          href="/api/admin/bookings/export"
-          className="rounded-md border border-green-200 bg-white px-3 py-1.5 text-sm font-medium text-green-900 hover:bg-green-50"
-        >
-          ⬇ ส่งออก CSV
-        </a>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/bookings/check"
+            className="rounded-md border border-green-200 bg-white px-3 py-1.5 text-sm font-medium text-green-900 hover:bg-green-50"
+          >
+            🔍 ตรวจสอบการจอง
+          </Link>
+          <a
+            href="/api/admin/bookings/export"
+            className="rounded-md border border-green-200 bg-white px-3 py-1.5 text-sm font-medium text-green-900 hover:bg-green-50"
+          >
+            ⬇ ส่งออก CSV
+          </a>
+        </div>
       </div>
       <form method="get" className="mb-6 flex flex-wrap items-end gap-2 rounded-xl border border-green-100 bg-white p-4 shadow-sm">
         {selectedPrice != null && <input type="hidden" name="price" value={selectedPrice} />}

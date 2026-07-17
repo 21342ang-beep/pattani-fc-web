@@ -122,7 +122,7 @@ export default async function MemberPage(props: {
             desc="ดูตารางแมตช์และจองที่นั่ง"
           />
           <QuickCard
-            href="/bookings/check"
+            href="/bookings/search"
             icon="🔍"
             title="ตรวจสอบการจอง"
             desc="ดูประวัติการจองและสถานะ"

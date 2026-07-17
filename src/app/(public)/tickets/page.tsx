@@ -129,7 +129,7 @@ export default async function TicketsPage() {
             ดูโปรแกรมการแข่งขัน
           </Link>
           <Link
-            href="/bookings/check"
+            href="/bookings/search"
             className="rounded-full border border-green-200 bg-white px-6 py-3 text-base font-medium text-green-900 transition hover:bg-green-50"
           >
             ตรวจสอบการจอง

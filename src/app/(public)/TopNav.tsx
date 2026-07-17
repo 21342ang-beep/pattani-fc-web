@@ -67,7 +67,7 @@ export default function TopNav({
       ],
     },
     { href: "/matches", label: dict.nav.matches },
-    { href: "/bookings/search", label: "ค้นหา" },
+    { href: "/bookings/search", label: dict.nav.checkBooking },
     { href: "/news", label: dict.nav.news },
     { href: "/shop", label: dict.nav.shop },
     { href: "/contact", label: dict.nav.contact },
@@ -165,19 +165,6 @@ export default function TopNav({
 
   return (
     <header className="sticky top-0 z-40">
-      <Link
-        href="/"
-        aria-label="Pattani FC"
-        className="absolute left-1/2 top-0 z-50 hidden size-44 -translate-x-1/2 items-center justify-center transition-transform hover:scale-105 xl:flex"
-      >
-        <Image
-          src="/logo-pattani-fc.png"
-          alt=""
-          width={176}
-          height={176}
-          className="size-full object-contain drop-shadow-lg"
-        />
-      </Link>
       {/* Utility bar — desktop only (mobile ย้ายไปใน drawer) */}
       <motion.div
         animate={{
@@ -188,9 +175,6 @@ export default function TopNav({
         className="hidden overflow-hidden bg-gradient-to-r from-yellow-400 via-yellow-300 to-green-700 xl:block"
       >
         <div className="mx-auto flex max-w-7xl items-center justify-end gap-6 px-4 py-2 text-base font-bold text-green-950">
-          <Link href="/bookings/check" className="hover:underline">
-            {dict.util.checkBooking}
-          </Link>
           <Link href="/faq" className="hover:underline">
             {dict.util.faq}
           </Link>
@@ -208,18 +192,41 @@ export default function TopNav({
           backdropFilter: scrolled ? "blur(16px) saturate(180%)" : "blur(0px)",
         }}
         transition={{ duration: 0.25 }}
-        className="text-yellow-100 shadow-lg shadow-green-950/20"
+        className="relative text-yellow-100 shadow-lg shadow-green-950/20"
       >
+        {/* โลโก้กลาง — ลูกของกล่องแถบแบรนด์+เมนู จึงอยู่ในช่วงสองแถบนี้เสมอ
+            ย่อตอน scroll เพราะแถบแบรนด์เตี้ยลง (motto หุบ) */}
+        <motion.div
+          style={{ x: "-50%", y: "-50%" }}
+          animate={{ scale: scrolled ? 0.82 : 1 }}
+          transition={{ duration: 0.25, ease: "easeInOut" }}
+          className="absolute left-1/2 top-1/2 z-50 hidden xl:block"
+        >
+          <Link
+            href="/"
+            aria-label="Pattani FC"
+            className="flex size-32 items-center justify-center transition-transform hover:scale-105"
+          >
+            <Image
+              src="/logo-pattani-fc.png"
+              alt=""
+              width={128}
+              height={128}
+              className="size-full object-contain drop-shadow-lg"
+            />
+          </Link>
+        </motion.div>
         <motion.div
           animate={{ paddingTop: scrolled ? 8 : 12, paddingBottom: scrolled ? 8 : 12 }}
           transition={{ duration: 0.25 }}
           className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4"
         >
           <Link href="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
+            {/* โลโก้ซ้าย — เฉพาะจอเล็ก; จอใหญ่ใช้โลโก้กลางแทน */}
             <motion.div
               animate={{ scale: scrolled ? 0.78 : 1 }}
               transition={{ duration: 0.25 }}
-              className="origin-left shrink-0"
+              className="origin-left shrink-0 xl:hidden"
             >
               <Image
                 src="/logo-pattani-fc.png"
@@ -302,7 +309,7 @@ export default function TopNav({
 
         {/* Desktop nav — hidden below md */}
         <nav className="hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
-          <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_11rem_minmax(0,1fr)] items-center px-2 py-2.5">
+          <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)] items-center px-2 py-2.5">
             <div className="flex items-center justify-end gap-2 pr-4">
               {items.slice(0, 4).map(renderDesktopItem)}
             </div>
@@ -398,12 +405,6 @@ export default function TopNav({
                   <p className="mb-1 px-3 pt-1 text-[11px] font-bold uppercase tracking-widest text-yellow-300/60">
                     บริการ
                   </p>
-                  <Link
-                    href="/bookings/check"
-                    className="block rounded-xl px-3 py-2.5 text-sm text-yellow-100 hover:bg-white/5"
-                  >
-                    {dict.util.checkBooking}
-                  </Link>
                   <Link
                     href="/faq"
                     className="block rounded-xl px-3 py-2.5 text-sm text-yellow-100 hover:bg-white/5"

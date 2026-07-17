@@ -51,7 +51,7 @@ function buildGroups(dict: Dict) {
     {
       title: dict.footer.serviceTitle,
       links: [
-        { href: "/bookings/check", label: dict.util.checkBooking },
+        { href: "/bookings/search", label: dict.nav.checkBooking },
         { href: "/faq", label: dict.util.faq },
         { href: "/contact", label: dict.util.contact },
         { href: "/partners", label: dict.nav.partners },

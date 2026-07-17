@@ -12,7 +12,6 @@ const defineDict = <T extends Record<string, Record<string, string>>>(d: T) => d
 const th = defineDict({
   // TopNav utility bar
   util: {
-    checkBooking: "ตรวจสอบการจอง",
     faq: "กฎกติกา",
     contact: "ติดต่อเรา",
     admin: "ผู้ดูแลระบบ",
@@ -20,6 +19,7 @@ const th = defineDict({
   // Main nav
   nav: {
     home: "หน้าแรก",
+    checkBooking: "ตรวจสอบการจอง",
     about: "เกี่ยวกับสโมสร",
     club: "สโมสร",
     news: "ข่าว",
@@ -84,13 +84,13 @@ const th = defineDict({
 
 const en: typeof th = {
   util: {
-    checkBooking: "Check Booking",
     faq: "Rules",
     contact: "Contact Us",
     admin: "Admin",
   },
   nav: {
     home: "Home",
+    checkBooking: "Check Booking",
     about: "About the Club",
     club: "Club",
     news: "News",
