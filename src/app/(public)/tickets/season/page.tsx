@@ -48,8 +48,8 @@ export default function SeasonTicketsPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {SEASON_TIERS.map((t) => (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {SEASON_TIERS.filter((t) => t.id !== "vvip-elite").map((t) => (
             <TierCard key={t.id} tier={t} />
           ))}
         </div>

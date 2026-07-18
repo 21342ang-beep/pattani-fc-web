@@ -98,8 +98,8 @@ export default async function AdminSeasonPassesPage(props: {
             </Link>
           )}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {SEASON_TIERS.map((tier) => {
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {SEASON_TIERS.filter((tier) => tier.id !== "vvip-elite").map((tier) => {
             const tierOrders = ordersByTier.get(tier.id) ?? [];
             const confirmed = tierOrders.filter((order) => order.status === "CONFIRMED");
             const revenue = confirmed.reduce((sum, order) => sum + order.priceBaht + order.shippingFeeBaht, 0);
@@ -259,8 +259,8 @@ export default async function AdminSeasonPassesPage(props: {
         <h2 className="mb-3 text-lg font-bold text-green-900">
           ประเภทบัตรที่เปิดขาย
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {SEASON_TIERS.map((t) => (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {SEASON_TIERS.filter((t) => t.id !== "vvip-elite").map((t) => (
             <div
               key={t.id}
               className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"

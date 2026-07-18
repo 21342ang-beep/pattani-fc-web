@@ -40,6 +40,17 @@ export const HomePage: GlobalConfig = {
               },
             },
             {
+              name: "mainboardSlides",
+              type: "upload",
+              relationTo: "media",
+              hasMany: true,
+              label: "ภาพสไลด์ Mainboard",
+              admin: {
+                description: "แนบได้หลายภาพ ภาพจะเลื่อนอัตโนมัติทุก 3 วินาที และผู้ชมกดเลื่อนซ้าย-ขวาได้",
+                condition: (_, siblingData) => siblingData.mainboardType !== "video",
+              },
+            },
+            {
               name: "mainboardVideo",
               type: "upload",
               relationTo: "media",

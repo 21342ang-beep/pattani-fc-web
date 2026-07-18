@@ -5,7 +5,7 @@ import BackToDashboard from "./BackToDashboard";
 import "../globals.css";
 
 const dbHeavent = localFont({
-  src: "../../fonts/DBHeavent.ttf",
+  src: "../../fonts/DBHeaventCond.ttf",
   variable: "--font-db-heavent",
   display: "swap",
 });

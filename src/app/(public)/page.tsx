@@ -25,13 +25,21 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div>
+    <div className="bg-white">
       <HomeHero
         type={homePage.mainboardType as "image" | "video" | undefined}
         image={
           typeof homePage.mainboardImage === "object" && homePage.mainboardImage
             ? homePage.mainboardImage
             : null
+        }
+        images={
+          Array.isArray(homePage.mainboardSlides)
+            ? homePage.mainboardSlides.filter(
+                (media): media is { url?: string | null; mimeType?: string | null } =>
+                  typeof media === "object" && media !== null,
+              )
+            : []
         }
         video={
           typeof homePage.mainboardVideo === "object" && homePage.mainboardVideo
@@ -40,7 +48,7 @@ export default async function HomePage() {
         }
       />
 
-      <div className="mx-auto w-full max-w-7xl space-y-14 px-4 py-14 md:py-20">
+      <div className="mx-auto w-full max-w-5xl space-y-14 px-5 py-14 md:px-8 md:py-20">
         <section>
           {false && onSaleMatches.length > 0 && (
             <div className="mb-10 space-y-4">

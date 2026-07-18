@@ -39,6 +39,10 @@ enum Permission {
   REPORTS
   FINANCE
   GATE_CHECK
+  ACCOUNT
+  MEMBER_DATA
+  MATCH_RESULTS
+  BARCODE_MANAGEMENT
 }
 
 // ลูกค้า (Customer) — แยกออกจาก User admin
@@ -99,6 +103,9 @@ model Match {
   zone120Seats  Int?
   zone100Seats  Int?
   pricePerSeat  Int?        // ราคาเป็นสตางค์ (เลี่ยง floating point)
+  competitionType CompetitionType @default(LEAGUE)
+  homeScore     Int?
+  awayScore     Int?
   status        MatchStatus @default(SCHEDULED)
   description   String?
   bookings      Booking[]
@@ -108,6 +115,11 @@ model Match {
 
   @@index([kickoffAt])
   @@index([status])
+}
+
+enum CompetitionType {
+  LEAGUE
+  CUP
 }
 
 enum MatchStatus {
@@ -282,6 +294,7 @@ model SeasonPassBarcode {
   barcode       String            @unique
   tierId        String
   seasonLabel   String
+  isGenerated   Boolean           @default(false)
   usesRemaining Int               @default(15)
   orderId       String?           @unique
   order         SeasonPassOrder?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
@@ -290,6 +303,7 @@ model SeasonPassBarcode {
   createdAt     DateTime          @default(now())
 
   @@index([tierId, orderId])
+  @@index([tierId, isGenerated, orderId])
 }
 
 model SeasonPassScan {

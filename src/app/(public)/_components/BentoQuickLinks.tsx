@@ -7,7 +7,6 @@ import {
   Calendar,
   Newspaper,
   Users,
-  ShoppingBag,
   Trophy,
   Ticket,
   MapPin,
@@ -51,13 +50,6 @@ const tiles: Tile[] = [
     label: "จองตั๋ว",
     desc: "เลือกโซน · ดูราคา",
     Icon: Ticket,
-    tone: "muted",
-  },
-  {
-    href: "/shop",
-    label: "ร้านค้า",
-    desc: "สินค้าทางการ",
-    Icon: ShoppingBag,
     tone: "muted",
   },
   {

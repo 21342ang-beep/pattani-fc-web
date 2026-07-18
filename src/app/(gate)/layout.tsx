@@ -10,7 +10,7 @@ import "../globals.css";
 //   เพราะแต่ละ route group มี layout ของตัวเอง
 
 const dbHeavent = localFont({
-  src: "../../fonts/DBHeavent.ttf",
+  src: "../../fonts/DBHeaventCond.ttf",
   variable: "--font-db-heavent",
   display: "swap",
 });

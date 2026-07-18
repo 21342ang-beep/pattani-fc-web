@@ -1,0 +1,5 @@
+-- สิทธิ์เฉพาะสำหรับการ์ดพิเศษในหน้าแดชบอร์ดผู้ดูแลระบบ
+ALTER TYPE "Permission" ADD VALUE IF NOT EXISTS 'ACCOUNT';
+ALTER TYPE "Permission" ADD VALUE IF NOT EXISTS 'MEMBER_DATA';
+ALTER TYPE "Permission" ADD VALUE IF NOT EXISTS 'MATCH_RESULTS';
+ALTER TYPE "Permission" ADD VALUE IF NOT EXISTS 'BARCODE_MANAGEMENT';

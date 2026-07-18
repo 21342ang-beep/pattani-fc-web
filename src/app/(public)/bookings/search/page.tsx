@@ -1,4 +1,4 @@
-import BookingSearchForm from "./BookingSearchForm";
+import BookingSearchTabs from "./BookingSearchTabs";
 
 export const metadata = { title: "ตรวจสอบการจอง — Pattani FC" };
 
@@ -10,7 +10,7 @@ export default function BookingSearchPage() {
         <h1 className="mt-1 text-3xl font-black text-green-900">ตรวจสอบการจอง</h1>
         <p className="mt-2 text-slate-600">ลืมบันทึกบาร์โค้ด? กรอกชื่อผู้จอง หรือเบอร์โทรศัพท์ที่ใช้จอง เพื่อเรียกดู E-ticket ของคุณ</p>
       </header>
-      <BookingSearchForm />
+      <BookingSearchTabs />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifyAdmin } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
-import { ADMIN_SECTIONS } from "@/lib/admin-sections";
+import { ADMIN_PERMISSION_LABELS } from "@/lib/admin-permissions";
 import CreateUserForm from "./CreateUserForm";
 import DeleteUserButton from "./DeleteUserButton";
 
@@ -25,10 +25,6 @@ export default async function UsersPage() {
     },
     orderBy: { createdAt: "asc" },
   });
-
-  const permLabel = Object.fromEntries(
-    ADMIN_SECTIONS.map((s) => [s.permission, s.label]),
-  );
 
   return (
     <div className="space-y-6">
@@ -103,7 +99,7 @@ export default async function UsersPage() {
                               key={p}
                               className="rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700"
                             >
-                              {permLabel[p] ?? p}
+                              {ADMIN_PERMISSION_LABELS[p] ?? p}
                             </span>
                           ))}
                         </div>

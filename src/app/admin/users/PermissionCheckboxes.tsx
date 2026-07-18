@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Permission } from "@prisma/client";
-import { ADMIN_SECTIONS } from "@/lib/admin-sections";
+import { ADMIN_PERMISSION_CARDS } from "@/lib/admin-permissions";
 
 // Checkbox grid สำหรับเลือก permission — ใช้ทั้งในฟอร์มสร้างและแก้ไข
 export default function PermissionCheckboxes({
@@ -25,7 +25,7 @@ export default function PermissionCheckboxes({
     });
   };
 
-  const allOn = ADMIN_SECTIONS.every((s) => checked.has(s.permission));
+  const allOn = ADMIN_PERMISSION_CARDS.every((s) => checked.has(s.permission));
   const noneOn = checked.size === 0;
 
   return (
@@ -35,7 +35,7 @@ export default function PermissionCheckboxes({
           type="button"
           disabled={disabled || allOn}
           onClick={() =>
-            setChecked(new Set(ADMIN_SECTIONS.map((s) => s.permission)))
+            setChecked(new Set(ADMIN_PERMISSION_CARDS.map((s) => s.permission)))
           }
           className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-700 hover:bg-slate-50 disabled:opacity-40"
         >
@@ -51,7 +51,7 @@ export default function PermissionCheckboxes({
         </button>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        {ADMIN_SECTIONS.map((sec) => {
+        {ADMIN_PERMISSION_CARDS.map((sec) => {
           const isChecked = checked.has(sec.permission);
           return (
             <label

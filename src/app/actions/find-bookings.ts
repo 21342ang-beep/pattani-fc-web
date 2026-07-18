@@ -104,3 +104,71 @@ export async function findBookingsByCustomer(
 
   return { results, phone: customerPhone };
 }
+
+export type SeasonPassSearchResult = {
+  passCode: string;
+  status: string;
+  tierId: string;
+  priceBaht: number;
+  createdAt: string;
+};
+
+export type SeasonPassSearchState =
+  | { error?: string; results?: undefined }
+  | { error?: undefined; results: SeasonPassSearchResult[] }
+  | undefined;
+
+export async function findSeasonPassesByCustomer(
+  _prev: SeasonPassSearchState,
+  formData: FormData,
+): Promise<SeasonPassSearchState> {
+  const limit = await rateLimit("find-season-passes", { max: 10, windowMs: 60_000 });
+  if (!limit.ok) {
+    return { error: `ค้นหาบ่อยเกินไป กรุณารอ ${limit.retryAfterSec} วินาที` };
+  }
+
+  const parsed = searchSchema.safeParse({
+    customerName: optionalField(formData.get("customerName")),
+    customerPhone: optionalField(formData.get("customerPhone")),
+  });
+  if (!parsed.success) {
+    return { error: "กรุณากรอกชื่อผู้สมัคร หรือเบอร์โทรศัพท์ที่ใช้สมัครอย่างน้อยหนึ่งช่อง" };
+  }
+
+  const { customerName, customerPhone } = parsed.data;
+  const where: Prisma.SeasonPassOrderWhereInput = {};
+  if (customerName) {
+    where.customerName = { contains: customerName, mode: "insensitive" };
+  }
+  if (customerPhone) {
+    const rows = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "SeasonPassOrder"
+      WHERE regexp_replace("customerPhone", '\\D', '', 'g') = ${normalizePhone(customerPhone)}
+    `;
+    if (rows.length === 0) return { results: [] };
+    where.id = { in: rows.map((row) => row.id) };
+  }
+
+  const orders = await prisma.seasonPassOrder.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: {
+      passCode: true,
+      status: true,
+      tierId: true,
+      priceBaht: true,
+      createdAt: true,
+    },
+  });
+
+  return {
+    results: orders.map((order) => ({
+      passCode: order.passCode,
+      status: order.status,
+      tierId: order.tierId,
+      priceBaht: order.priceBaht,
+      createdAt: order.createdAt.toISOString(),
+    })),
+  };
+}

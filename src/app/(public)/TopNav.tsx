@@ -14,8 +14,12 @@ import { Menu, X, Shield } from "lucide-react";
 import LocaleSwitcher from "./_components/LocaleSwitcher";
 import type { Dict, Locale } from "@/lib/i18n/dict";
 
+function hrefPath(href: string) {
+  return href.split(/[?#]/)[0];
+}
+
 function isActive(path: string, href: string) {
-  const base = href.split("#")[0];
+  const base = hrefPath(href);
   if (base === "/") return path === "/";
   return path === base || path.startsWith(base + "/");
 }
@@ -27,8 +31,12 @@ function childIsActive(
   siblings: { href: string }[],
 ) {
   if (!isActive(path, href)) return false;
+  const base = hrefPath(href);
   return !siblings.some(
-    (s) => s.href !== href && s.href.startsWith(href + "/") && isActive(path, s.href),
+    (s) => {
+      const siblingBase = hrefPath(s.href);
+      return siblingBase !== base && siblingBase.startsWith(base + "/") && isActive(path, s.href);
+    },
   );
 }
 
@@ -62,14 +70,20 @@ export default function TopNav({
     {
       label: dict.nav.tickets,
       children: [
-        { href: "/tickets", label: dict.nav.ticketsByMatch },
+        { href: "/tickets#zones", label: dict.nav.ticketsByMatch },
         { href: "/tickets/season", label: dict.nav.ticketsByYear },
       ],
     },
-    { href: "/matches", label: dict.nav.matches },
+    {
+      label: dict.nav.matches,
+      children: [
+        { href: "/matches?competition=league", label: "บอลลีก" },
+        { href: "/matches?competition=cup", label: "บอลถ้วย" },
+      ],
+    },
+    { href: "/results", label: dict.nav.results },
     { href: "/bookings/search", label: dict.nav.checkBooking },
     { href: "/news", label: dict.nav.news },
-    { href: "/shop", label: dict.nav.shop },
     { href: "/contact", label: dict.nav.contact },
   ];
   const { scrollY } = useScroll();
@@ -78,6 +92,10 @@ export default function TopNav({
   const [mobileOpen, setMobileOpen] = useState(false);
   // กลุ่มที่กางอยู่ใน drawer mobile (accordion) — ลด tab รก
   const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const closeNavigation = () => {
+    setOpenMenu(null);
+    setMobileOpen(false);
+  };
   const toggleGroup = (label: string) =>
     setOpenGroups((prev) =>
       prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label],
@@ -121,7 +139,12 @@ export default function TopNav({
       const active = it.children.some((child) => isActive(path, child.href));
       const isOpen = openMenu === it.label;
       return (
-        <div key={it.label} className="relative">
+        <div
+          key={it.label}
+          className="relative"
+          onMouseEnter={() => setOpenMenu(it.label)}
+          onMouseLeave={() => setOpenMenu(null)}
+        >
           <button
             type="button"
             onClick={() => setOpenMenu(isOpen ? null : it.label)}
@@ -147,7 +170,7 @@ export default function TopNav({
             <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-base shadow-xl backdrop-blur-md">
               {it.children.map((child) => {
                 const childActive = childIsActive(path, child.href, it.children);
-                return <Link key={child.href} href={child.href} role="menuitem" className={`block whitespace-nowrap px-5 py-2.5 font-semibold transition-colors ${childActive ? "bg-yellow-400 text-green-950" : "text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
+                return <Link key={child.href} href={child.href} role="menuitem" onClick={closeNavigation} className={`block whitespace-nowrap px-5 py-2.5 font-semibold transition-colors ${childActive ? "bg-yellow-400 text-green-950" : "text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
               })}
             </div>
           )}
@@ -156,7 +179,7 @@ export default function TopNav({
     }
     const active = isActive(path, it.href);
     return (
-      <Link key={it.href} href={it.href} className={`relative whitespace-nowrap rounded-full px-3 py-2.5 text-base font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${active ? "text-green-950" : "text-white hover:text-white"}`}>
+      <Link key={it.href} href={it.href} onClick={closeNavigation} className={`relative whitespace-nowrap rounded-full px-3 py-2.5 text-base font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${active ? "text-green-950" : "text-white hover:text-white"}`}>
         {active && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-yellow-400" transition={{ type: "spring", stiffness: 400, damping: 30 }} />}
         <span className="relative">{it.label}</span>
       </Link>
@@ -479,6 +502,7 @@ export default function TopNav({
                                       <Link
                                         key={c.href}
                                         href={c.href}
+                                        onClick={closeNavigation}
                                         className={`block rounded-xl px-3 py-2.5 text-base font-semibold transition-colors ${
                                           active
                                             ? "bg-yellow-400 text-green-950"
@@ -501,6 +525,7 @@ export default function TopNav({
                       <Link
                         key={it.href}
                         href={it.href}
+                        onClick={closeNavigation}
                         className={`block rounded-xl px-3 py-3 text-base font-bold transition-colors ${
                           active
                             ? "bg-yellow-400 text-green-950"

@@ -45,7 +45,6 @@ function buildGroups(dict: Dict) {
         { href: "/matches", label: dict.nav.matches },
         { href: "/tickets", label: dict.nav.tickets },
         { href: "/news", label: dict.nav.news },
-        { href: "/shop", label: dict.nav.shop },
       ],
     },
     {

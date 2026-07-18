@@ -1,0 +1,3 @@
+ALTER TABLE "Match"
+ADD COLUMN "homeScore" INTEGER,
+ADD COLUMN "awayScore" INTEGER;

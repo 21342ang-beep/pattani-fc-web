@@ -5,7 +5,7 @@ import { verifyPermission } from "@/lib/dal";
 export const metadata = { title: "บัญชี — Pattani FC Admin" };
 
 export default async function AccountPage() {
-  await verifyPermission("FINANCE");
+  await verifyPermission("ACCOUNT");
 
   return (
     <div>

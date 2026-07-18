@@ -128,7 +128,11 @@ export async function createSeasonPassOrder(
   try {
     const order = await prisma.$transaction(async (tx) => {
       const barcode = await tx.seasonPassBarcode.findFirst({
-        where: { tierId: parsed.data.tierId, orderId: null },
+        where: {
+          tierId: parsed.data.tierId,
+          orderId: null,
+          isGenerated: true,
+        },
         orderBy: { barcode: "asc" },
         select: { id: true, barcode: true },
       });
@@ -156,7 +160,7 @@ export async function createSeasonPassOrder(
       },
       });
       const claimed = await tx.seasonPassBarcode.updateMany({
-        where: { id: barcode.id, orderId: null },
+        where: { id: barcode.id, orderId: null, isGenerated: true },
         data: { orderId: created.id, assignedAt: new Date() },
       });
       if (claimed.count !== 1) throw new Error("SOLD_OUT");

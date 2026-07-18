@@ -81,6 +81,7 @@ async function parseFormToMatchInput(formData: FormData) {
     zone100Seats: numOrNull(formData.get("zone100Seats")),
     // ราคาเป็นของโซน ไม่ใช่ของแมตช์ และล้างค่าเก่าจากข้อมูลเดิมด้วย
     pricePerSeat: null,
+    competitionType: (formData.get("competitionType") as string) || undefined,
     description: (formData.get("description") as string) || undefined,
     status: (formData.get("status") as string) || undefined,
   };

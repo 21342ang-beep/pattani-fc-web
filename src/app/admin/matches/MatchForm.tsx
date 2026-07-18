@@ -16,6 +16,7 @@ type Match = {
   zone150Seats: number | null;
   zone120Seats: number | null;
   zone100Seats: number | null;
+  competitionType: string;
   status: string;
   description: string | null;
 };
@@ -24,10 +25,12 @@ export default function MatchForm({
   action,
   initial,
   submitLabel,
+  defaultCompetitionType,
 }: {
   action: (prev: MatchFormState, fd: FormData) => Promise<MatchFormState>;
   initial?: Match;
   submitLabel: string;
+  defaultCompetitionType?: "LEAGUE" | "CUP";
 }) {
   const [state, formAction, pending] = useActionState<MatchFormState, FormData>(action, undefined);
   const initialKickoff = initial?.kickoffAt
@@ -71,6 +74,17 @@ export default function MatchForm({
         defaultValue={initial?.venue ?? ""}
         hint="เว้นว่างได้ถ้ายังไม่ทราบ"
       />
+      <div>
+        <label className="block text-sm font-medium">ประเภทการแข่งขัน</label>
+        <select
+          name="competitionType"
+          defaultValue={initial?.competitionType ?? defaultCompetitionType ?? "LEAGUE"}
+          className="mt-1 w-full rounded-md border px-3 py-2"
+        >
+          <option value="LEAGUE">บอลลีก</option>
+          <option value="CUP">บอลถ้วย</option>
+        </select>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           label="วันเวลาแข่ง"

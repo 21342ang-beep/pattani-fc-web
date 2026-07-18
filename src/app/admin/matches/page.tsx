@@ -16,10 +16,45 @@ const statusLabel: Record<string, string> = {
   CANCELLED: "ยกเลิก",
   FINISHED: "จบแล้ว",
 };
+const competitionLabel: Record<string, string> = {
+  LEAGUE: "บอลลีก",
+  CUP: "บอลถ้วย",
+};
 
-export default async function AdminMatchesPage() {
+export default async function AdminMatchesPage(props: {
+  searchParams: Promise<{ competition?: string }>;
+}) {
   await verifyPermission("MATCHES");
+  const { competition: rawCompetition } = await props.searchParams;
+  const competition = rawCompetition === "CUP" || rawCompetition === "LEAGUE"
+    ? rawCompetition
+    : undefined;
+
+  if (!competition) {
+    return (
+      <div>
+        <h1 className="text-xl font-bold">จัดการแมตช์</h1>
+        <p className="mt-1 text-sm text-slate-600">เลือกประเภทการแข่งขันที่ต้องการจัดการ</p>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <MatchManagementCard
+            href="/admin/matches?competition=LEAGUE"
+            title="จัดการแมตช์บอลลีก"
+            description="เพิ่ม แก้ไข และดูรายการแมตช์ฟุตบอลลีก"
+            className="border-emerald-200 bg-emerald-50 hover:border-emerald-400"
+          />
+          <MatchManagementCard
+            href="/admin/matches?competition=CUP"
+            title="จัดการแมตช์บอลถ้วย"
+            description="เพิ่ม แก้ไข และดูรายการแมตช์ฟุตบอลถ้วย"
+            className="border-amber-200 bg-amber-50 hover:border-amber-400"
+          />
+        </div>
+      </div>
+    );
+  }
+
   const matches = await prisma.match.findMany({
+    where: competition ? { competitionType: competition } : undefined,
     orderBy: { kickoffAt: "asc" },
     include: {
       bookings: {
@@ -31,14 +66,19 @@ export default async function AdminMatchesPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold">จัดการแมตช์</h1>
-        <Link
-          href="/admin/matches/new"
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-        >
-          + เพิ่มแมตช์
-        </Link>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Link href="/admin/matches" className="text-sm text-slate-500 hover:text-slate-900">← เลือกประเภทการแข่งขัน</Link>
+          <h1 className="mt-1 text-xl font-bold">จัดการแมตช์{competitionLabel[competition]}</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/admin/matches/new?competition=${competition}`}
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            + เพิ่มแมตช์
+          </Link>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
@@ -46,6 +86,7 @@ export default async function AdminMatchesPage() {
           <thead className="border-b bg-slate-50 text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">แมตช์</th>
+              <th className="px-3 py-2 text-left">ประเภท</th>
               <th className="px-3 py-2 text-left">เวลา</th>
               <th className="px-3 py-2 text-left">สถานะ</th>
               <th className="px-3 py-2 text-right">โซน 170/จอง</th>
@@ -65,6 +106,11 @@ export default async function AdminMatchesPage() {
                     <TeamBadge logo={m.awayTeamLogo} name={m.awayTeam} />
                   </div>
                   <div className="mt-0.5 text-xs text-slate-500">{m.venue ?? "— ยังไม่กำหนดสนาม"}</div>
+                </td>
+                <td className="px-3 py-2">
+                  <span className="rounded bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                    {competitionLabel[m.competitionType] ?? m.competitionType}
+                  </span>
                 </td>
                 <td className="px-3 py-2 text-xs">
                   {m.kickoffAt ? formatDateTime(m.kickoffAt) : <span className="text-slate-400">— ยังไม่กำหนด</span>}
@@ -93,7 +139,7 @@ export default async function AdminMatchesPage() {
             ))}
             {matches.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-6 text-center text-slate-500">
+                <td colSpan={9} className="p-6 text-center text-slate-500">
                   ยังไม่มีแมตช์ — เริ่มเพิ่มได้เลย
                 </td>
               </tr>
@@ -102,6 +148,26 @@ export default async function AdminMatchesPage() {
         </table>
       </div>
     </div>
+  );
+}
+
+function MatchManagementCard({
+  href,
+  title,
+  description,
+  className,
+}: {
+  href: string;
+  title: string;
+  description: string;
+  className: string;
+}) {
+  return (
+    <Link href={href} className={`rounded-xl border p-6 shadow-sm transition ${className}`}>
+      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+      <p className="mt-2 text-sm text-slate-600">{description}</p>
+      <span className="mt-5 inline-block text-sm font-semibold text-slate-800">เข้าสู่การจัดการ →</span>
+    </Link>
   );
 }
 

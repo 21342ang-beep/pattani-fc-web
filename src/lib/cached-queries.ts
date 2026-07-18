@@ -5,14 +5,17 @@ import { prisma } from "@/lib/prisma";
 // Cache key แยกตาม filter — matches list เปลี่ยนไม่บ่อย (ข้อมูล match)
 // invalidate ผ่าน revalidateTag("matches") จาก admin action ตอนแก้ match/booking
 export const getMatchesByFilter = unstable_cache(
-  async (filter: "all" | "on_sale" | "upcoming") => {
+  async (filter: "all" | "on_sale" | "upcoming", competitionType?: "LEAGUE" | "CUP") => {
     const where: Prisma.MatchWhereInput =
       filter === "on_sale"
         ? { status: "ON_SALE" }
         : filter === "upcoming"
         ? { status: { in: ["SCHEDULED", "ON_SALE"] } }
         : { status: { notIn: ["CANCELLED"] } };
-    return prisma.match.findMany({ where, orderBy: { kickoffAt: "asc" } });
+    return prisma.match.findMany({
+      where: competitionType ? { ...where, competitionType } : where,
+      orderBy: { kickoffAt: "asc" },
+    });
   },
   ["matches-list"],
   { revalidate: 60, tags: ["matches"] }

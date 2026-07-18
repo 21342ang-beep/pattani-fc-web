@@ -32,8 +32,17 @@ export default async function AdminDashboard() {
     REPORTS: `ยอดยืนยัน ${formatBaht(revenue._sum.totalAmount ?? 0)}`,
   };
 
-  const visibleSections = ADMIN_SECTIONS.filter((s) =>
-    hasPermission(user, s.permission),
+  const canManageBarcodes = hasPermission(user, "BARCODE_MANAGEMENT");
+  const canReportMatchResults = hasPermission(user, "MATCH_RESULTS");
+  const canViewMemberData = hasPermission(user, "MEMBER_DATA");
+  const canViewAccount = hasPermission(user, "ACCOUNT");
+  const hasSpecialDashboardCard =
+    canManageBarcodes ||
+    canReportMatchResults ||
+    canViewMemberData ||
+    canViewAccount;
+  const visibleSections = ADMIN_SECTIONS.filter(
+    (s) => s.permission !== "GATE_CHECK" && hasPermission(user, s.permission),
   );
 
   return (
@@ -61,7 +70,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* การ์ดแต่ละหมวด */}
-      {visibleSections.length === 0 ? (
+      {visibleSections.length === 0 && !hasSpecialDashboardCard ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
           บัญชีของคุณยังไม่ได้รับสิทธิ์เข้าหมวดใดเลย — กรุณาติดต่อผู้ดูแลระบบ (SUPER_ADMIN) เพื่อขอสิทธิ์
         </div>
@@ -77,7 +86,37 @@ export default async function AdminDashboard() {
               stat={stats[sec.permission]}
             />
           ))}
-          {hasPermission(user, "FINANCE") && (
+          {canManageBarcodes && (
+            <SectionCard
+              href="/admin/barcodes"
+              icon="▥"
+              label="จัดการบาร์โค้ด"
+              description="รันบาร์โค้ดสำหรับเข้างาน และสร้างบาร์โค้ดใหม่"
+              stat="รัน · สร้างบาร์โค้ด"
+              emphasized
+            />
+          )}
+          {canReportMatchResults && (
+            <SectionCard
+              href="/admin/results"
+              icon="⚽"
+              label="รายงานผลการแข่งขัน"
+              description="บันทึกสกอร์การแข่งขันและเผยแพร่ผลให้แฟนบอลดูบนเว็บไซต์"
+              stat="บันทึกผลการแข่งขัน"
+              emphasized
+            />
+          )}
+          {canViewMemberData && (
+            <SectionCard
+              href="/admin/members"
+              icon="👤"
+              label="ข้อมูลผู้ใช้งาน"
+              description="ดูข้อมูลผู้ที่สมัครสมาชิกกับสโมสร รวมถึงอีเมล เบอร์โทร และวันที่สมัคร"
+              stat={`${customerCount.toLocaleString("th-TH")} บัญชีสมาชิก`}
+              emphasized
+            />
+          )}
+          {canViewAccount && (
             <SectionCard
               href="/admin/account"
               icon="🏦"

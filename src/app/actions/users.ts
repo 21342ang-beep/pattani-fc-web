@@ -4,10 +4,10 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { Permission, Role } from "@prisma/client";
+import type { Permission } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyAdmin } from "@/lib/dal";
-import { ALL_PERMISSIONS } from "@/lib/admin-sections";
+import { ALL_PERMISSIONS } from "@/lib/admin-permissions";
 
 // Server actions สำหรับหน้า /admin/users
 // ทุก action ต้องเป็น SUPER_ADMIN เท่านั้น

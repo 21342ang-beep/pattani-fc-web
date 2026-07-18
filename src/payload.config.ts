@@ -79,6 +79,9 @@ export default buildConfig({
   },
   admin: {
     user: Users.slug,
+    components: {
+      afterLogin: ["@/payload/components/CmsPasswordToggle"],
+    },
     meta: {
       titleSuffix: " · Pattani FC CMS",
     },

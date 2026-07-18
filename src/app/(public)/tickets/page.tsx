@@ -88,7 +88,7 @@ export default async function TicketsPage() {
         <p className="mb-6 mt-10 text-center text-sm font-medium text-slate-500">
           สีของแต่ละโซนอ้างอิงจากแผนผังสนามด้านบน — กดที่โซนเพื่อเลือกแมตช์
         </p>
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <ul id="zones" className="grid scroll-mt-24 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {STADIUM_ZONES.map((z) => (
             <li key={z.code}>
               <Link

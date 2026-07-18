@@ -6,6 +6,8 @@ import { formatDateTime } from "@/lib/format";
 
 const ALLOWED_FILTERS = ["all", "on_sale", "upcoming"] as const;
 type Filter = (typeof ALLOWED_FILTERS)[number];
+const ALLOWED_COMPETITIONS = ["all", "league", "cup"] as const;
+type CompetitionFilter = (typeof ALLOWED_COMPETITIONS)[number];
 
 // whitelist โซน — กัน XSS ผ่าน URL ตอน thread ต่อไปยัง match detail
 const ALLOWED_ZONES = [
@@ -13,9 +15,9 @@ const ALLOWED_ZONES = [
 ] as const;
 
 export default async function MatchesListPage(props: {
-  searchParams: Promise<{ filter?: string; zone?: string }>;
+  searchParams: Promise<{ filter?: string; zone?: string; competition?: string }>;
 }) {
-  const { filter: raw, zone: zoneRaw } = await props.searchParams;
+  const { filter: raw, zone: zoneRaw, competition: competitionRaw } = await props.searchParams;
   const filter: Filter = (ALLOWED_FILTERS as readonly string[]).includes(raw ?? "")
     ? (raw as Filter)
     : "all";
@@ -23,10 +25,14 @@ export default async function MatchesListPage(props: {
     ? zoneRaw
     : undefined;
   const zoneQS = zone ? `?zone=${zone}` : "";
+  const competition: CompetitionFilter = (ALLOWED_COMPETITIONS as readonly string[]).includes(competitionRaw ?? "")
+    ? (competitionRaw as CompetitionFilter)
+    : "all";
+  const competitionType = competition === "all" ? undefined : competition === "league" ? "LEAGUE" : "CUP";
 
   const [matches, onSaleMatches] = await Promise.all([
-    getMatchesByFilter(filter),
-    getMatchesByFilter("on_sale"),
+    getMatchesByFilter(filter, competitionType),
+    getMatchesByFilter("on_sale", competitionType),
   ]);
   const listMatches =
     filter === "all" || filter === "upcoming"
@@ -71,10 +77,20 @@ export default async function MatchesListPage(props: {
         </section>
       )}
 
-      <nav className="flex gap-2">
-        <FilterTab href="/matches" active={filter === "all"} label="ทั้งหมด" />
-        <FilterTab href="/matches?filter=on_sale" active={filter === "on_sale"} label="เปิดจอง" />
-        <FilterTab href="/matches?filter=upcoming" active={filter === "upcoming"} label="กำลังจะมาถึง" />
+      <nav className="flex flex-wrap items-center gap-2">
+        <FilterTab href={competition === "all" ? "/matches" : `/matches?competition=${competition}`} active={filter === "all"} label="โปรแกรมการแข่งขัน" />
+        <FilterTab href={`/matches?filter=on_sale${competition === "all" ? "" : `&competition=${competition}`}`} active={filter === "on_sale"} label="เปิดจอง" />
+        <FilterTab href={`/matches?filter=upcoming${competition === "all" ? "" : `&competition=${competition}`}`} active={filter === "upcoming"} label="กำลังจะมาถึง" />
+        <form action="/matches" className="ml-auto flex items-center gap-2">
+          {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
+          <label htmlFor="competition" className="sr-only">ประเภทการแข่งขัน</label>
+          <select id="competition" name="competition" defaultValue={competition} className="rounded-md border bg-white px-3 py-1.5 text-sm text-slate-700">
+            <option value="all">ทั้งหมด</option>
+            <option value="league">บอลลีก</option>
+            <option value="cup">บอลถ้วย</option>
+          </select>
+          <button type="submit" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">แสดง</button>
+        </form>
       </nav>
 
       {listMatches.length === 0 && onSaleMatches.length === 0 ? (

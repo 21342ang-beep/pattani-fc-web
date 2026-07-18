@@ -1,7 +1,9 @@
 "use client";
 
+import { toPng } from "html-to-image";
 import Image from "next/image";
 import { Printer, Download, Shield, Zap } from "lucide-react";
+import { useRef, useState } from "react";
 
 type Props = {
   booking: {
@@ -52,17 +54,59 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 export default function TicketCard({ booking, barcodeSvg }: Props) {
+  const ticketRef = useRef<HTMLElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
   const { date, time } = formatKickoffParts(booking.match.kickoffAt);
   const home = resolveLogo(booking.match.homeTeamLogo, booking.match.homeTeam);
   const away = resolveLogo(booking.match.awayTeamLogo, booking.match.awayTeam);
   const ticketReference = `${booking.zone ?? "GENERAL"} · ${booking.unitPrice}`;
   const barcodeReference = `${booking.zone ?? "GENERAL"}-${booking.unitPrice.replace(/\D/g, "")}-${booking.bookingCode.slice(-8).toUpperCase()}`;
 
+  async function saveTicket() {
+    if (!ticketRef.current || isSaving) return;
+    setIsSaving(true);
+    setSaveMessage("");
+    try {
+      const dataUrl = await toPng(ticketRef.current, {
+        backgroundColor: "#0a1e15",
+        cacheBust: true,
+        pixelRatio: 2,
+      });
+      const imageBlob = await fetch(dataUrl).then((response) => response.blob());
+      const filename = `pattanifc-eticket-${booking.bookingCode}.png`;
+      const imageFile = new File([imageBlob], filename, { type: "image/png" });
+      const canShareImage = navigator.canShare?.({ files: [imageFile] });
+
+      if (canShareImage) {
+        await navigator.share({
+          title: "Pattani FC E-ticket",
+          text: "บันทึก E-ticket ของคุณ",
+          files: [imageFile],
+        });
+        setSaveMessage("เลือก “บันทึกรูปภาพ” เพื่อเก็บ E-ticket ลงใน Gallery");
+        return;
+      }
+
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = filename;
+      link.click();
+      setSaveMessage("บันทึก E-ticket แล้ว");
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setSaveMessage("ไม่สามารถบันทึก E-ticket ได้ กรุณาลองใหม่");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
-    <div className="bg-slate-100 py-8 print:bg-white print:py-0 md:py-12">
-      <div className="mx-auto max-w-2xl px-4 print:max-w-none print:px-0">
+    <div className="min-h-[100svh] bg-slate-100 py-0 print:min-h-0 print:bg-white print:py-0 sm:py-8 md:py-12">
+      <div className="mx-auto max-w-2xl px-0 print:max-w-none print:px-0 sm:px-4">
         {/* Action bar */}
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-4 pt-4 print:hidden sm:mb-5 sm:px-0 sm:pt-0">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-yellow-600">
               ชำระเงินสำเร็จ
@@ -72,6 +116,14 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
             </h1>
           </div>
           <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={saveTicket}
+              disabled={isSaving}
+              className="inline-flex items-center gap-1.5 rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-green-950 transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70"
+            >
+              <Download className="size-3.5" /> {isSaving ? "กำลังบันทึก..." : "บันทึก E-ticket"}
+            </button>
             <button
               onClick={() => window.print()}
               className="inline-flex items-center gap-1.5 rounded-full bg-green-800 px-4 py-2 text-xs font-semibold text-yellow-300 transition hover:bg-green-900"
@@ -83,15 +135,17 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
               download={`pattanifc-${booking.bookingCode}.svg`}
               className="inline-flex items-center gap-1.5 rounded-full border border-green-300 bg-white px-4 py-2 text-xs font-semibold text-green-800 transition hover:bg-green-50"
             >
-              <Download className="size-3.5" /> ดาวน์โหลด Barcode
+              <Download className="size-3.5" /> บันทึก Barcode
             </a>
           </div>
         </div>
+        {saveMessage && <p aria-live="polite" className="mb-3 px-4 text-center text-xs text-slate-600 print:hidden sm:px-0">{saveMessage}</p>}
 
         {/* Ticket */}
         <article
+          ref={ticketRef}
           aria-label="E-Ticket Pattani FC"
-          className="relative grid grid-cols-1 overflow-hidden rounded-xl bg-[#0a1e15] shadow-2xl shadow-black/40 ring-1 ring-black/40 md:grid-cols-[1fr_220px] print:rounded-none print:shadow-none print:ring-0"
+          className="relative grid min-h-[calc(100svh-6.5rem)] grid-cols-1 overflow-hidden rounded-none bg-[#0a1e15] shadow-2xl shadow-black/40 ring-1 ring-black/40 sm:min-h-0 sm:rounded-xl md:grid-cols-[1fr_220px] print:min-h-0 print:rounded-none print:shadow-none print:ring-0"
         >
           {/* ===== MAIN PANEL ===== */}
           <main className="relative overflow-hidden px-5 py-5 text-white md:px-8 md:py-7">
@@ -198,20 +252,6 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
               className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:radial-gradient(circle_at_1px_1px,#fff_1px,transparent_0)] [background-size:10px_10px]"
             />
             <div className="relative flex flex-col gap-3">
-              <p className="text-center text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-400">
-                Match Day
-              </p>
-
-              <div className="text-center leading-tight">
-                <p className="text-sm font-black uppercase text-white">
-                  {booking.match.homeTeam}
-                </p>
-                <p className="my-1 text-[10px] font-bold text-white/60">vs</p>
-                <p className="text-sm font-black uppercase text-white">
-                  {booking.match.awayTeam}
-                </p>
-              </div>
-
               <div className="border-y border-white/10 py-2 text-[11px]">
                 <StubRow label="Date" value={date} />
                 <StubRow label="Kick off" value={time || "—"} />

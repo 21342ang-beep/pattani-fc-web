@@ -110,12 +110,6 @@ export default async function MemberPage(props: {
       <section className="mx-auto max-w-7xl px-4 py-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <QuickCard
-            href="/shop"
-            icon="🛍️"
-            title="ช้อปสินค้าทางการ"
-            desc="เสื้อแข่ง ของที่ระลึก และอุปกรณ์เชียร์"
-          />
-          <QuickCard
             href="/matches"
             icon="🎟️"
             title="จองตั๋วเข้าชม"
