@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { payload } from "@/lib/payload";
 import HomeHero from "./_components/HomeHero";
 import StatsRow from "./_components/StatsRow";
 import FeaturedMatches from "./_components/FeaturedMatches";
-import BentoQuickLinks from "./_components/BentoQuickLinks";
 import OnSaleMatchBoard from "./_components/OnSaleMatchBoard";
 
 export const revalidate = 60;
@@ -55,7 +54,7 @@ export default async function HomePage() {
 
       <div className="mx-auto w-full max-w-5xl space-y-14 px-5 py-14 md:px-8 md:py-20">
         <section>
-          {false && onSaleMatches.length > 0 && (
+          {onSaleMatches.length > 0 && (
             <div className="mb-10 space-y-4">
               <SectionHeader eyebrow="Book now" title="โปรแกรมที่เปิดจอง" subtitle="เลือกแมตช์และจองตั๋วได้ทันที" />
               {onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} />)}
@@ -66,12 +65,6 @@ export default async function HomePage() {
             title="ค้นพบสโมสร"
             subtitle="เข้าถึงทุกข้อมูลเกี่ยวกับปัตตานี เอฟซีได้ในที่เดียว"
           />
-          {onSaleMatches.length > 0 && (
-            <div className="mb-4 space-y-4">
-              {onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} />)}
-            </div>
-          )}
-          <BentoQuickLinks onSaleMatch={onSaleMatches[0]} />
         </section>
 
         <section>
@@ -113,6 +106,16 @@ export default async function HomePage() {
             </Link>
           </div>
           <FeaturedMatches matches={featured} />
+          <Link
+            href="/squad"
+            className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-green-100 bg-green-950 px-5 py-4 text-yellow-100 transition hover:-translate-y-0.5 hover:bg-green-900 hover:shadow-lg"
+          >
+            <span className="flex items-center gap-3">
+              <span className="grid size-11 place-items-center rounded-xl bg-yellow-300 text-green-950"><Users className="size-6" /></span>
+              <span><span className="block text-lg font-bold">ผู้เล่น</span><span className="text-sm text-yellow-100/70">นักเตะชุดใหญ่</span></span>
+            </span>
+            <ArrowRight className="size-5" />
+          </Link>
         </section>
       </div>
 

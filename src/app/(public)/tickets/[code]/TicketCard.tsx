@@ -1,7 +1,6 @@
 "use client";
 
 import { toPng } from "html-to-image";
-import Image from "next/image";
 import { Printer, Download, Shield, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -68,6 +67,15 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
     setIsSaving(true);
     setSaveMessage("");
     try {
+      const ticketImages = Array.from(ticketRef.current.querySelectorAll("img"));
+      await Promise.all(
+        ticketImages.map((image) =>
+          image.complete ? image.decode?.().catch(() => undefined) : new Promise<void>((resolve) => {
+            image.addEventListener("load", () => resolve(), { once: true });
+            image.addEventListener("error", () => resolve(), { once: true });
+          }),
+        ),
+      );
       const dataUrl = await toPng(ticketRef.current, {
         backgroundColor: "#0a1e15",
         cacheBust: true,
@@ -122,7 +130,7 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
               disabled={isSaving}
               className="inline-flex items-center gap-1.5 rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-green-950 transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70"
             >
-              <Download className="size-3.5" /> {isSaving ? "กำลังบันทึก..." : "บันทึก E-ticket"}
+              <Download className="size-3.5" /> {isSaving ? "กำลังบันทึก..." : <><span className="sm:hidden">บันทึก E-ticket</span><span className="hidden sm:inline">บันทึกตั๋ว</span></>}
             </button>
             <button
               onClick={() => window.print()}
@@ -130,13 +138,6 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
             >
               <Printer className="size-3.5" /> พิมพ์ตั๋ว
             </button>
-            <a
-              href={`data:image/svg+xml;utf8,${encodeURIComponent(barcodeSvg)}`}
-              download={`pattanifc-${booking.bookingCode}.svg`}
-              className="inline-flex items-center gap-1.5 rounded-full border border-green-300 bg-white px-4 py-2 text-xs font-semibold text-green-800 transition hover:bg-green-50"
-            >
-              <Download className="size-3.5" /> บันทึก Barcode
-            </a>
           </div>
         </div>
         {saveMessage && <p aria-live="polite" className="mb-3 px-4 text-center text-xs text-slate-600 print:hidden sm:px-0">{saveMessage}</p>}
@@ -255,7 +256,16 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
               <div className="border-y border-white/10 py-2 text-[11px]">
                 <StubRow label="Date" value={date} />
                 <StubRow label="Kick off" value={time || "—"} />
-                <StubRow label="Stadium" value={booking.match.venue} />
+              </div>
+
+              <div className="rounded-lg bg-white p-2">
+                <div
+                  className="[&_svg]:h-auto [&_svg]:w-full"
+                  dangerouslySetInnerHTML={{ __html: barcodeSvg }}
+                />
+                <p className="mt-1 text-center font-mono text-[10px] font-bold tracking-[0.16em] text-green-950">
+                  {barcodeReference}
+                </p>
               </div>
 
               <div className="text-center">
@@ -269,17 +279,10 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
                   {METHOD_LABEL[booking.paymentMethod] ?? booking.paymentMethod}
                 </p>
               </div>
-            </div>
 
-            {/* barcode */}
-            <div className="relative mt-auto rounded-lg bg-white p-2">
-              <div
-                className="[&_svg]:h-auto [&_svg]:w-full"
-                dangerouslySetInnerHTML={{ __html: barcodeSvg }}
-              />
-              <p className="mt-1 text-center font-mono text-[10px] font-bold tracking-[0.16em] text-green-950">
-                {barcodeReference}
-              </p>
+              <div className="border-y border-white/10 py-2 text-[11px]">
+                <StubRow label="Stadium" value={booking.match.venue} />
+              </div>
             </div>
           </aside>
         </article>
@@ -314,14 +317,8 @@ function TeamCrest({
       >
         {logo && !useFallback ? (
           <div className="relative size-14">
-            <Image
-              src={logo}
-              alt={name}
-              fill
-              unoptimized
-              sizes="56px"
-              className="object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
-            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logo} alt={name} className="size-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" />
           </div>
         ) : (
           <Shield
