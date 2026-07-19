@@ -32,6 +32,7 @@ export function getZoneCapacity(
     zone150Seats: number | null;
     zone120Seats: number | null;
     zone100Seats: number | null;
+    zoneAwaySeats: number | null;
   },
   code: StadiumZoneCode
 ) {
@@ -40,6 +41,7 @@ export function getZoneCapacity(
   if (group === 150) return match.zone150Seats;
   if (group === 120) return match.zone120Seats;
   if (group === 100) return match.zone100Seats;
+  if (code === "AWAY") return match.zoneAwaySeats;
   return null;
 }
 

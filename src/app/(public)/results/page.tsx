@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
-import { buildStandings } from "@/lib/standings";
+import { buildStandings, LEAGUE_STANDING_TEAMS } from "@/lib/standings";
 import StandingsTable from "./StandingsTable";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +13,22 @@ export default async function ResultsPage({
 }) {
   const { competition } = await searchParams;
   const competitionType = competition === "CUP" ? "CUP" : "LEAGUE";
-  const matches = await prisma.match.findMany({
-    where: { status: "FINISHED", homeScore: { not: null }, awayScore: { not: null }, competitionType },
-    orderBy: { kickoffAt: "desc" },
-  });
-  const standings = buildStandings(matches);
+  const [matches, savedLeagueTeams] = await Promise.all([
+    prisma.match.findMany({
+      where: { status: "FINISHED", homeScore: { not: null }, awayScore: { not: null }, competitionType },
+      orderBy: { kickoffAt: "desc" },
+    }),
+    competitionType === "LEAGUE"
+      ? prisma.leagueTeam.findMany({ orderBy: { sortOrder: "asc" } })
+      : Promise.resolve([]),
+  ]);
+  const leagueTeams = savedLeagueTeams.length > 0
+    ? savedLeagueTeams.map((team) => ({ team: team.name, logo: team.logo }))
+    : LEAGUE_STANDING_TEAMS;
+  const standings = buildStandings(
+    matches,
+    competitionType === "LEAGUE" ? leagueTeams : [],
+  );
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">

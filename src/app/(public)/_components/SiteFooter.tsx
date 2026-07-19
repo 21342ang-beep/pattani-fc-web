@@ -5,6 +5,10 @@ import type { Dict } from "@/lib/i18n/dict";
 import { payload } from "@/lib/payload";
 import SponsorFooter from "./SponsorFooter";
 
+// ซ่อนส่วนท้ายเว็บชั่วคราว โดยเก็บโครงสร้างและข้อมูลเดิมทั้งหมดไว้ในไฟล์นี้
+// เปลี่ยนเป็น true เมื่อต้องการนำ Footer กลับมาใช้งาน
+const SHOW_SITE_FOOTER = false;
+
 // ไอคอน social — ใช้ภาพ raster ปรับแต่งจาก /public ตามที่ user เลือก
 // ทั้งหมดเป็นไฟล์ local — ไม่มี external request, ปลอดภัยจาก SSRF/hotlink
 function SocialIcon({
@@ -80,6 +84,10 @@ export default async function SiteFooter({ dict }: { dict: Dict }) {
         ? sponsor.logo.url
         : undefined,
   }));
+  if (!SHOW_SITE_FOOTER) {
+    return <SponsorFooter sponsors={sponsors} />;
+  }
+
   const groups = buildGroups(dict);
   return (
     <footer className="bg-green-950 text-yellow-100">

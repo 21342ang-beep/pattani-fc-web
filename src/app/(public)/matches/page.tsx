@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Calendar, MapPin, Shield, Ticket } from "lucide-react";
 import { getMatchesByFilter } from "@/lib/cached-queries";
 import { formatDateTime } from "@/lib/format";
@@ -34,6 +35,11 @@ export default async function MatchesListPage(props: {
     getMatchesByFilter(filter, competitionType),
     getMatchesByFilter("on_sale", competitionType),
   ]);
+  // เลือกโซนแล้วมีแมตช์ที่เปิดขายเพียงรายการเดียว → ข้ามหน้ากดจอง
+  // และไปยังฟอร์มกรอกข้อมูลของแมตช์นั้นทันที
+  if (zone && onSaleMatches.length === 1) {
+    redirect(`/matches/${onSaleMatches[0].id}?zone=${zone}`);
+  }
   const listMatches =
     filter === "all" || filter === "upcoming"
       ? matches.filter((match) => match.status !== "ON_SALE")

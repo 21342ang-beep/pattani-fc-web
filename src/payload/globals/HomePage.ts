@@ -18,46 +18,37 @@ export const HomePage: GlobalConfig = {
         {
           label: "Mainboard หน้าแรก",
           fields: [
+            // เก็บ field เดิมไว้เพื่อไม่ให้ Payload ลบข้อมูลที่เคยอัปโหลด
+            // แต่ซ่อนออกจาก CMS แล้ว โดยให้ใช้งาน mainboardSlides เพียงช่องเดียว
             {
               name: "mainboardType",
               type: "select",
-              label: "ประเภทสื่อ",
-              defaultValue: "image",
-              required: true,
               options: [
                 { label: "รูปภาพ", value: "image" },
                 { label: "วิดีโอ", value: "video" },
               ],
+              admin: { hidden: true },
             },
             {
               name: "mainboardImage",
               type: "upload",
               relationTo: "media",
-              label: "รูปภาพ Mainboard",
-              admin: {
-                description: "แนะนำภาพแนวนอนอัตราส่วนใกล้เคียง 1584 × 672 พิกเซล",
-                condition: (_, siblingData) => siblingData.mainboardType !== "video",
-              },
+              admin: { hidden: true },
+            },
+            {
+              name: "mainboardVideo",
+              type: "upload",
+              relationTo: "media",
+              admin: { hidden: true },
             },
             {
               name: "mainboardSlides",
               type: "upload",
               relationTo: "media",
               hasMany: true,
-              label: "ภาพสไลด์ Mainboard",
+              label: "สไลด์ Mainboard",
               admin: {
-                description: "แนบได้หลายภาพ ภาพจะเลื่อนอัตโนมัติทุก 3 วินาที และผู้ชมกดเลื่อนซ้าย-ขวาได้",
-                condition: (_, siblingData) => siblingData.mainboardType !== "video",
-              },
-            },
-            {
-              name: "mainboardVideo",
-              type: "upload",
-              relationTo: "media",
-              label: "วิดีโอ Mainboard",
-              admin: {
-                description: "รองรับไฟล์ MP4 หรือ WebM และจะแสดงแบบเล่นวนอัตโนมัติโดยไม่มีเสียง",
-                condition: (_, siblingData) => siblingData.mainboardType === "video",
+                description: "แนบได้หลายไฟล์ ทั้งรูปภาพและวิดีโอ MP4/WebM ตามลำดับที่ต้องการแสดง สไลด์จะเลื่อนอัตโนมัติทุก 3 วินาที และผู้ชมกดเลื่อนซ้าย-ขวาได้",
               },
             },
           ],

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type Slide = { url: string; alt?: string | null };
+type Slide = { url: string; mimeType?: string | null };
 
 export default function HomeHeroCarousel({ slides }: { slides: Slide[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -24,15 +24,29 @@ export default function HomeHeroCarousel({ slides }: { slides: Slide[] }) {
   return (
     <div className="relative mx-auto aspect-[1584/672] w-full overflow-hidden">
       {slides.map((slide, index) => (
-        <Image
-          key={slide.url}
-          src={slide.url}
-          alt={slide.alt ?? "ภาพประชาสัมพันธ์ Pattani FC"}
-          fill
-          priority={index === 0}
-          sizes="100vw"
-          className={`object-cover transition-opacity duration-700 ${index === activeIndex ? "opacity-100" : "opacity-0"}`}
-        />
+        slide.mimeType?.startsWith("video/") ? (
+          <video
+            key={slide.url}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload={index === activeIndex ? "auto" : "metadata"}
+            className={`absolute inset-0 size-full object-cover transition-opacity duration-700 ${index === activeIndex ? "opacity-100" : "opacity-0"}`}
+          >
+            <source src={slide.url} type={slide.mimeType} />
+          </video>
+        ) : (
+          <Image
+            key={slide.url}
+            src={slide.url}
+            alt="ภาพประชาสัมพันธ์ Pattani FC"
+            fill
+            priority={index === 0}
+            sizes="100vw"
+            className={`object-cover transition-opacity duration-700 ${index === activeIndex ? "opacity-100" : "opacity-0"}`}
+          />
+        )
       ))}
 
       {total > 1 && (

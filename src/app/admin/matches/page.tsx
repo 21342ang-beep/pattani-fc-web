@@ -93,6 +93,7 @@ export default async function AdminMatchesPage(props: {
               <th className="px-3 py-2 text-right">โซน 150/จอง</th>
               <th className="px-3 py-2 text-right">โซน 120/จอง</th>
               <th className="px-3 py-2 text-right">โซน 100/จอง</th>
+              <th className="px-3 py-2 text-right">โซนทีมเยือน/จอง</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -124,6 +125,7 @@ export default async function AdminMatchesPage(props: {
                 <ZoneBookingCell capacity={m.zone150Seats} bookings={m.bookings} price={150} />
                 <ZoneBookingCell capacity={m.zone120Seats} bookings={m.bookings} price={120} />
                 <ZoneBookingCell capacity={m.zone100Seats} bookings={m.bookings} price={100} />
+                <ZoneBookingCell capacity={m.zoneAwaySeats} bookings={m.bookings} zoneCode="AWAY" />
                 <td className="px-3 py-2 text-right">
                   <div className="flex justify-end gap-2">
                     <Link
@@ -139,7 +141,7 @@ export default async function AdminMatchesPage(props: {
             ))}
             {matches.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-6 text-center text-slate-500">
+                <td colSpan={10} className="p-6 text-center text-slate-500">
                   ยังไม่มีแมตช์ — เริ่มเพิ่มได้เลย
                 </td>
               </tr>
@@ -175,12 +177,15 @@ function ZoneBookingCell({
   capacity,
   bookings,
   price,
+  zoneCode,
 }: {
   capacity: number | null;
   bookings: { zone: string | null; quantity: number }[];
-  price: 170 | 150 | 120 | 100;
+  price?: 170 | 150 | 120 | 100;
+  zoneCode?: "AWAY";
 }) {
   const booked = bookings.reduce((sum, booking) => {
+    if (zoneCode) return booking.zone === zoneCode ? sum + booking.quantity : sum;
     const zone = getStadiumZone(booking.zone);
     return zone && zone.priceSatang / 100 === price ? sum + booking.quantity : sum;
   }, 0);

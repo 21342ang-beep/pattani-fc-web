@@ -102,6 +102,7 @@ model Match {
   zone150Seats  Int?
   zone120Seats  Int?
   zone100Seats  Int?
+  zoneAwaySeats Int?
   pricePerSeat  Int?        // ราคาเป็นสตางค์ (เลี่ยง floating point)
   competitionType CompetitionType @default(LEAGUE)
   homeScore     Int?
@@ -115,6 +116,15 @@ model Match {
 
   @@index([kickoffAt])
   @@index([status])
+}
+
+model LeagueTeam {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  logo      String?
+  sortOrder Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum CompetitionType {

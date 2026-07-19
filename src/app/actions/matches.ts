@@ -79,6 +79,7 @@ async function parseFormToMatchInput(formData: FormData) {
     zone150Seats: numOrNull(formData.get("zone150Seats")),
     zone120Seats: numOrNull(formData.get("zone120Seats")),
     zone100Seats: numOrNull(formData.get("zone100Seats")),
+    zoneAwaySeats: numOrNull(formData.get("zoneAwaySeats")),
     // ราคาเป็นของโซน ไม่ใช่ของแมตช์ และล้างค่าเก่าจากข้อมูลเดิมด้วย
     pricePerSeat: null,
     competitionType: (formData.get("competitionType") as string) || undefined,

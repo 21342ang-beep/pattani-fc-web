@@ -12,39 +12,44 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();
-  const [featured, onSaleMatches, totalMatches, totalOnSale, homePage] = await Promise.all([
+  const [featured, onSaleMatches, bookingSummary, homePage] = await Promise.all([
     prisma.match.findMany({
       where: { status: { in: ["SCHEDULED", "ON_SALE"] } },
       orderBy: { kickoffAt: "asc" },
       take: 4,
     }),
     prisma.match.findMany({ where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" } }),
-    prisma.match.count(),
-    prisma.match.count({ where: { status: "ON_SALE" } }),
+    prisma.booking.aggregate({
+      where: {
+        status: { in: ["PENDING", "CONFIRMED"] },
+        match: { status: "ON_SALE" },
+      },
+      _sum: { quantity: true },
+    }),
     cms.findGlobal({ slug: "home-page", overrideAccess: true }),
   ]);
+  const totalBooked = bookingSummary._sum.quantity ?? 0;
+  const totalAvailable = onSaleMatches.reduce((sum, match) => {
+    const zoneCapacity =
+      (match.zone170Seats ?? 0) +
+      (match.zone150Seats ?? 0) +
+      (match.zone120Seats ?? 0) +
+      (match.zone100Seats ?? 0) +
+      (match.zoneAwaySeats ?? 0);
+    return sum + (match.totalSeats ?? zoneCapacity);
+  }, 0);
+  const totalRemaining = Math.max(0, totalAvailable - totalBooked);
 
   return (
     <div className="bg-white">
       <HomeHero
-        type={homePage.mainboardType as "image" | "video" | undefined}
-        image={
-          typeof homePage.mainboardImage === "object" && homePage.mainboardImage
-            ? homePage.mainboardImage
-            : null
-        }
-        images={
+        slides={
           Array.isArray(homePage.mainboardSlides)
             ? homePage.mainboardSlides.filter(
                 (media): media is { url?: string | null; mimeType?: string | null } =>
                   typeof media === "object" && media !== null,
               )
             : []
-        }
-        video={
-          typeof homePage.mainboardVideo === "object" && homePage.mainboardVideo
-            ? homePage.mainboardVideo
-            : null
         }
       />
 
@@ -71,19 +76,18 @@ export default async function HomePage() {
 
         <section>
           <SectionHeader
-            eyebrow="ตัวเลขในระบบ"
-            title="ภาพรวมปัจจุบัน"
-            subtitle="ข้อมูลแบบเรียลไทม์จากระบบจองตั๋ว"
+            eyebrow="ระบบจองตั๋ว"
+            title="ภาพรวมการจอง"
+            subtitle="ยอดรวมของแมตช์ที่เปิดจอง"
           />
           <StatsRow
             stats={[
-              { label: "แมตช์ทั้งหมด", value: totalMatches.toString() },
               {
-                label: "กำลังเปิดจอง",
-                value: totalOnSale.toString(),
+                label: "จำนวนการจอง",
+                value: totalBooked.toLocaleString("th-TH"),
                 highlight: true,
               },
-              { label: "ราคา", value: "เริ่ม 250฿" },
+              { label: "คงเหลือ", value: totalRemaining.toLocaleString("th-TH") },
             ]}
           />
         </section>

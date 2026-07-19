@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   motion,
   useScroll,
@@ -27,15 +27,23 @@ function isActive(path: string, href: string) {
 // child ที่เจาะจงกว่า (เช่น /tickets/season) ต้องชนะ child ที่กว้างกว่า (/tickets)
 function childIsActive(
   path: string,
+  searchParams: Pick<URLSearchParams, "get">,
   href: string,
   siblings: { href: string }[],
-) {
+): boolean {
   if (!isActive(path, href)) return false;
+  const query = href.split("?")[1];
+  if (query) {
+    const expectedParams = new URLSearchParams(query);
+    for (const [key, value] of expectedParams) {
+      if (searchParams.get(key) !== value) return false;
+    }
+  }
   const base = hrefPath(href);
   return !siblings.some(
     (s) => {
       const siblingBase = hrefPath(s.href);
-      return siblingBase !== base && siblingBase.startsWith(base + "/") && isActive(path, s.href);
+      return siblingBase !== base && siblingBase.startsWith(base + "/") && childIsActive(path, searchParams, s.href, siblings);
     },
   );
 }
@@ -56,6 +64,8 @@ export default function TopNav({
   dict: Dict;
 }) {
   const path = usePathname();
+  const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
   const items: NavItem[] = [
     { href: "/", label: dict.nav.home },
     {
@@ -114,7 +124,7 @@ export default function TopNav({
   // กางกลุ่ม accordion ที่มีหน้า active อยู่ (ให้ผู้ใช้เห็นตำแหน่งปัจจุบัน)
   useEffect(() => {
     const activeGroup = items.find(
-      (it) => "children" in it && it.children.some((c) => isActive(path, c.href)),
+      (it) => "children" in it && it.children.some((c) => childIsActive(path, searchParams, c.href, it.children)),
     );
     if (activeGroup) {
       setOpenGroups((prev) =>
@@ -122,7 +132,7 @@ export default function TopNav({
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path]);
+  }, [path, searchKey]);
 
   // Lock body scroll ตอน drawer เปิด (กัน scroll ทะลุไปหลัง overlay)
   useEffect(() => {
@@ -136,7 +146,7 @@ export default function TopNav({
 
   const renderDesktopItem = (it: NavItem) => {
     if ("children" in it) {
-      const active = it.children.some((child) => isActive(path, child.href));
+      const active = it.children.some((child) => childIsActive(path, searchParams, child.href, it.children));
       const isOpen = openMenu === it.label;
       return (
         <div
@@ -169,7 +179,7 @@ export default function TopNav({
           {isOpen && (
             <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-base shadow-xl backdrop-blur-md">
               {it.children.map((child) => {
-                const childActive = childIsActive(path, child.href, it.children);
+                const childActive = childIsActive(path, searchParams, child.href, it.children);
                 return <Link key={child.href} href={child.href} role="menuitem" onClick={closeNavigation} className={`block whitespace-nowrap px-5 py-2.5 font-semibold transition-colors ${childActive ? "bg-yellow-400 text-green-950" : "text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
               })}
             </div>
@@ -454,7 +464,7 @@ export default function TopNav({
                     if ("children" in it) {
                       const isOpen = openGroups.includes(it.label);
                       const groupActive = it.children.some((c) =>
-                        isActive(path, c.href),
+                        childIsActive(path, searchParams, c.href, it.children),
                       );
                       return (
                         <div key={it.label}>
@@ -495,6 +505,7 @@ export default function TopNav({
                                   {it.children.map((c) => {
                                     const active = childIsActive(
                                       path,
+                                      searchParams,
                                       c.href,
                                       it.children,
                                     );

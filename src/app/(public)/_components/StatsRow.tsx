@@ -7,7 +7,7 @@ type Stat = { label: string; value: string; highlight?: boolean };
 
 export default function StatsRow({ stats }: { stats: Stat[] }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className={`grid gap-4 ${stats.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
       {stats.map((s, i) => (
         <motion.div
           key={s.label}

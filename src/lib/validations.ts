@@ -24,6 +24,7 @@ const matchBaseSchema = z.object({
   zone150Seats: z.number().int().nonnegative().max(200000).nullish(),
   zone120Seats: z.number().int().nonnegative().max(200000).nullish(),
   zone100Seats: z.number().int().nonnegative().max(200000).nullish(),
+  zoneAwaySeats: z.number().int().nonnegative().max(200000).nullish(),
   // เก็บไว้ชั่วคราวเพื่อรองรับ schema เดิม แต่ไม่รับราคาในระดับแมตช์อีกต่อไป
   pricePerSeat: z.null().optional(),
   competitionType: z.enum(["LEAGUE", "CUP"]).optional(),

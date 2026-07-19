@@ -16,6 +16,7 @@ type Match = {
   zone150Seats: number | null;
   zone120Seats: number | null;
   zone100Seats: number | null;
+  zoneAwaySeats: number | null;
   competitionType: string;
   status: string;
   description: string | null;
@@ -107,11 +108,12 @@ export default function MatchForm({
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
         <h2 className="text-sm font-bold text-slate-900">จำนวนที่นั่งเปิดขายแยกตามราคา</h2>
         <p className="mt-1 text-xs text-slate-600">เว้นว่างไว้หากยังไม่เปิดขายกลุ่มราคานั้น</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Field label="โซน 170 บาท" name="zone170Seats" type="number" defaultValue={initial?.zone170Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
           <Field label="โซน 150 บาท" name="zone150Seats" type="number" defaultValue={initial?.zone150Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
           <Field label="โซน 120 บาท" name="zone120Seats" type="number" defaultValue={initial?.zone120Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
           <Field label="โซน 100 บาท" name="zone100Seats" type="number" defaultValue={initial?.zone100Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
+          <Field label="โซนทีมเยือน" name="zoneAwaySeats" type="number" defaultValue={initial?.zoneAwaySeats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดจองทีมเยือน" />
         </div>
       </div>
 

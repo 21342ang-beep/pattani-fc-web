@@ -21,11 +21,43 @@ export type StandingRow = {
   points: number;
 };
 
+export type StandingTeamSeed = {
+  team: string;
+  logo?: string | null;
+};
+
+// รายชื่อสโมสรสำหรับตั้งต้นตารางไทยลีก ฤดูกาล 2026/27
+// เก็บไว้แม้ยังไม่มีผลการแข่งขัน เพื่อให้ตารางแสดงครบ 16 ทีมตั้งแต่เริ่มฤดูกาล
+export const LEAGUE_STANDING_TEAMS: StandingTeamSeed[] = [
+  { team: "ปัตตานี เอฟซี", logo: "/logo-pattani-fc.png" },
+  { team: "ราชบุรี เอฟซี" },
+  { team: "สิงห์ เชียงราย ยูไนเต็ด" },
+  { team: "นครราชสีมา มาสด้า เอฟซี" },
+  { team: "อุทัยธานี เอฟซี" },
+  { team: "ลำพูน วอริเออร์" },
+  { team: "ระยอง เอฟซี" },
+  { team: "สุโขทัย เอฟซี" },
+  { team: "ชลบุรี เอฟซี" },
+  { team: "อยุธยา ยูไนเต็ด" },
+  { team: "พีที ประจวบ เอฟซี" },
+  { team: "การท่าเรือ เอฟซี" },
+  { team: "เมืองทอง ยูไนเต็ด" },
+  { team: "บีจี ปทุม ยูไนเต็ด" },
+  { team: "ทรู แบงค็อก ยูไนเต็ด" },
+  { team: "บุรีรัมย์ ยูไนเต็ด" },
+];
+
 type StandingAccumulator = Omit<StandingRow, "rank" | "goalDifference">;
 
 // ตารางคะแนนคำนวณจากผลการแข่งขันที่ผู้ดูแลบันทึกแล้ว
-export function buildStandings(matches: StandingMatch[]): StandingRow[] {
+export function buildStandings(
+  matches: StandingMatch[],
+  initialTeams: StandingTeamSeed[] = [],
+): StandingRow[] {
   const teams = new Map<string, StandingAccumulator>();
+  const initialTeamOrder = new Map(
+    initialTeams.map((team, index) => [team.team, index]),
+  );
 
   const getTeam = (team: string, logo: string | null) => {
     const existing = teams.get(team);
@@ -48,6 +80,10 @@ export function buildStandings(matches: StandingMatch[]): StandingRow[] {
     teams.set(team, created);
     return created;
   };
+
+  for (const team of initialTeams) {
+    getTeam(team.team, team.logo ?? null);
+  }
 
   for (const match of matches) {
     if (match.homeScore === null || match.awayScore === null) continue;
@@ -79,6 +115,14 @@ export function buildStandings(matches: StandingMatch[]): StandingRow[] {
 
   return [...teams.values()]
     .map((team) => ({ ...team, goalDifference: team.goalsFor - team.goalsAgainst }))
-    .sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team, "th"))
+    .sort(
+      (a, b) =>
+        b.points - a.points ||
+        b.goalDifference - a.goalDifference ||
+        b.goalsFor - a.goalsFor ||
+        (initialTeamOrder.get(a.team) ?? Number.MAX_SAFE_INTEGER) -
+          (initialTeamOrder.get(b.team) ?? Number.MAX_SAFE_INTEGER) ||
+        a.team.localeCompare(b.team, "th"),
+    )
     .map((team, index) => ({ ...team, rank: index + 1 }));
 }

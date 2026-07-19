@@ -23,18 +23,7 @@ export default function SponsorFooter({ sponsors }: { sponsors: Sponsor[] }) {
         className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(135deg,transparent_47%,#fff_48%,transparent_49%)] [background-size:22px_22px]"
       />
       <div className="relative mx-auto max-w-7xl px-4">
-        <div className="flex items-center gap-4">
-          <span className="h-px flex-1 bg-yellow-100/30" />
-          <div className="text-center">
-            <p className="text-xl font-light uppercase tracking-[0.12em] text-yellow-100/85 sm:text-2xl">
-              Official Partners
-            </p>
-            <span className="mx-auto mt-2 block h-1 w-28 bg-yellow-300" />
-          </div>
-          <span className="h-px flex-1 bg-yellow-100/30" />
-        </div>
-
-        <div className="mt-8 grid grid-cols-3 gap-x-5 gap-y-6 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+        <div className="grid grid-cols-3 gap-x-5 gap-y-6 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
           {sponsors.map((sponsor) => {
             const selected = selectedSponsor === sponsor.id;
             return (
