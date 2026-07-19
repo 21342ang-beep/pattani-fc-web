@@ -214,6 +214,14 @@ export default function TopNav({
           <Link href="/privacy-policy" className="hover:underline">
             นโยบายส่วนตัว
           </Link>
+          <Link
+            href="/login"
+            aria-label={dict.util.admin}
+            title={dict.util.admin}
+            className="inline-flex size-7 items-center justify-center rounded-full transition hover:bg-green-950/10"
+          >
+            <Shield className="size-4" aria-hidden />
+          </Link>
         </div>
       </motion.div>
 
