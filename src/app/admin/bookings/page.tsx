@@ -26,7 +26,12 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     take: 100,
   });
   const priceGroups = new Map<number, { bookings: number; tickets: number }>();
+  const awayZoneSummary = { bookings: 0, tickets: 0 };
   for (const booking of allBookings) {
+    if (booking.zone === "AWAY") {
+      awayZoneSummary.bookings += 1;
+      awayZoneSummary.tickets += booking.quantity;
+    }
     const price = booking.quantity > 0 ? booking.totalAmount / booking.quantity : null;
     if (price == null || !Number.isInteger(price)) continue;
     const current = priceGroups.get(price) ?? { bookings: 0, tickets: 0 };
@@ -92,6 +97,14 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
           </div>
         </div>
       )}
+      <div className="mb-6">
+        <h2 className="mb-3 text-lg font-bold text-green-900">ข้อมูลการจองโซนทีมเยือน</h2>
+        <div className="max-w-sm rounded-xl border border-violet-200 bg-violet-50 p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest text-violet-700">โซนทีมเยือน</p>
+          <p className="mt-1 text-2xl font-black text-violet-950">{awayZoneSummary.tickets} ใบ</p>
+          <p className="mt-2 text-sm text-violet-800">{awayZoneSummary.bookings} รายการจอง</p>
+        </div>
+      </div>
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b bg-slate-50 text-xs uppercase">
