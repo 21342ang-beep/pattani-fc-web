@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   createSeasonPassBarcodes,
   deleteSeasonPassBarcodes,
+  resetSeasonPassBarcodes,
   type CreateBarcodesState,
 } from "@/app/actions/barcodes";
 
@@ -83,6 +84,21 @@ export default function BarcodeGenerator() {
     } finally {
       setDownloading(false);
     }
+  }
+
+  function resetBarcodes() {
+    if (activeBarcodes.length === 0) return;
+    if (!window.confirm(`ลบบาร์โค้ดทั้งหมดในแพ็กเกจ ฿${activePackage.price.toLocaleString("th-TH")} และเริ่มลำดับใหม่ที่ 0001 ใช่หรือไม่?\n\nรายการที่ถูกใช้งานแล้วจะไม่ถูกลบ`)) return;
+
+    startTransition(async () => {
+      const result = await resetSeasonPassBarcodes(activeTab);
+      if (!result.ok) {
+        setState({ ok: false, message: result.message, barcodes: [] });
+        return;
+      }
+      setBarcodesByTier((current) => ({ ...current, [activeTab]: [] }));
+      setState({ ok: true, message: `ลบแล้ว ${result.deleted.toLocaleString("th-TH")} ใบ — ครั้งถัดไปจะเริ่มที่ 0001`, barcodes: [] });
+    });
   }
 
   function deleteBarcodes(items: BarcodeItem[]) {
@@ -181,7 +197,7 @@ export default function BarcodeGenerator() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => deleteBarcodes(activeBarcodes)}
+              onClick={resetBarcodes}
               disabled={activeBarcodes.length === 0 || pending}
               className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >

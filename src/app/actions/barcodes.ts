@@ -156,3 +156,27 @@ export async function deleteSeasonPassBarcodes(
   revalidatePath("/admin/season-passes");
   return { ok: true, deleted: parsed.data.length };
 }
+
+// Admin — ล้างบาร์โค้ดที่ยังไม่ถูกใช้งานของแพ็กเกจ เพื่อรีเซ็ตลำดับกลับไป 0001
+export async function resetSeasonPassBarcodes(
+  tierId: BarcodeTierId,
+): Promise<{ ok: true; deleted: number } | { ok: false; message: string }> {
+  await verifyPermission("BARCODE_MANAGEMENT");
+  if (!createBarcodeSchema.shape.tierId.safeParse(tierId).success) {
+    return { ok: false, message: "แพ็กเกจไม่ถูกต้อง" };
+  }
+
+  const assigned = await prisma.seasonPassBarcode.count({
+    where: { tierId, orderId: { not: null } },
+  });
+  if (assigned > 0) {
+    return { ok: false, message: "รีเซ็ตไม่ได้ เพราะมีบาร์โค้ดของแพ็กเกจนี้ถูกใช้งานแล้ว" };
+  }
+
+  const result = await prisma.seasonPassBarcode.deleteMany({
+    where: { tierId, orderId: null },
+  });
+  revalidatePath("/admin/barcodes/create");
+  revalidatePath("/admin/season-passes");
+  return { ok: true, deleted: result.count };
+}
