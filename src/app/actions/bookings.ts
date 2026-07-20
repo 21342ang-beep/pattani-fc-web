@@ -138,3 +138,18 @@ export async function deleteBooking(
     return { error: "ลบไม่สำเร็จ" };
   }
 }
+
+// Admin — ลบข้อมูลการจองทั้งหมดสำหรับการทดสอบระบบ
+export async function deleteAllBookings(): Promise<
+  { ok: true; deleted: number } | { error: string }
+> {
+  await verifyPermission("BOOKINGS");
+  try {
+    const result = await prisma.booking.deleteMany();
+    revalidatePath("/admin/bookings");
+    revalidateTag("bookings", { expire: 0 });
+    return { ok: true, deleted: result.count };
+  } catch {
+    return { error: "ลบข้อมูลการจองไม่สำเร็จ" };
+  }
+}

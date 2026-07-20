@@ -43,7 +43,7 @@ export default async function TicketsPage() {
 
       {/* 1) เลือกโซนที่นั่ง + แผนผังสนาม (อยู่บน) */}
       {onSaleMatches.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 pt-12 md:pt-16">
+        <section id="matches" className="mx-auto max-w-6xl px-4 pt-12 md:pt-16 scroll-mt-24">
           <div className="mb-4">
             <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">Book now</p>
             <h2 className="mt-1 text-3xl font-black text-green-900 md:text-4xl">โปรแกรมที่เปิดจอง</h2>

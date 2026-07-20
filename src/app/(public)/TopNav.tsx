@@ -80,7 +80,7 @@ export default function TopNav({
     {
       label: dict.nav.tickets,
       children: [
-        { href: "/tickets#zones", label: dict.nav.ticketsByMatch },
+        { href: "/tickets#matches", label: dict.nav.ticketsByMatch },
         { href: "/tickets/season", label: dict.nav.ticketsByYear },
       ],
     },

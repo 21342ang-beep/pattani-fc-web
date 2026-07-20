@@ -4,6 +4,7 @@ import { formatBaht, formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import BookingStatusSelect from "./BookingStatusSelect";
 import DeleteBookingButton from "./DeleteBookingButton";
+import DeleteAllBookingsButton from "./DeleteAllBookingsButton";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
           >
             ⬇ ส่งออก CSV
           </a>
+          <DeleteAllBookingsButton />
         </div>
       </div>
       <form method="get" className="mb-6 flex flex-wrap items-end gap-2 rounded-xl border border-green-100 bg-white p-4 shadow-sm">

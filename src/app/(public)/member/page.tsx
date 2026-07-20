@@ -72,7 +72,7 @@ export default async function MemberPage(props: {
           aria-hidden
           className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(250,204,21,0.18),transparent_55%)]"
         />
-        <div className="relative mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 md:flex-row md:items-center md:justify-between">
+        <div className="relative mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <div className="grid size-14 place-items-center rounded-full bg-yellow-400 text-2xl font-black text-green-950">
               {customer.name.slice(0, 1).toUpperCase()}
@@ -95,7 +95,7 @@ export default async function MemberPage(props: {
       </section>
 
       {noticeMessage && (
-        <div className="mx-auto max-w-7xl px-4 pt-6">
+        <div className="mx-auto max-w-6xl px-4 pt-6">
           <p className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <span aria-hidden>ℹ️</span>
             <span>
@@ -107,7 +107,7 @@ export default async function MemberPage(props: {
       )}
 
       {/* Quick links */}
-      <section className="mx-auto max-w-7xl px-4 py-8">
+      <section className="mx-auto max-w-6xl px-4 py-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <QuickCard
             href="/matches"
@@ -125,7 +125,7 @@ export default async function MemberPage(props: {
       </section>
 
       {/* Activities */}
-      <section className="mx-auto max-w-7xl px-4 pb-16">
+      <section className="mx-auto max-w-6xl px-4 pb-16">
         <div className="flex items-end justify-between border-b-2 border-yellow-400/60 pb-3">
           <div>
             <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-yellow-600">

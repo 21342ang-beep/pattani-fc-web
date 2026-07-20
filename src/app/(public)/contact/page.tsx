@@ -2,7 +2,7 @@ export const metadata = { title: "ติดต่อเรา — Ticket Online"
 
 export default function ContactPage() {
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10 md:py-16">
       <header>
         <h1 className="text-2xl font-bold">ติดต่อเรา</h1>
         <p className="text-sm text-slate-600">มีคำถามเพิ่มเติม? ติดต่อทีมงานได้ตามช่องทางนี้</p>

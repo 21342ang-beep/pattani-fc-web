@@ -34,7 +34,7 @@ export default function SeasonTicketsPage() {
         subtitle="บัตรสมาชิกรายปี — ซื้อครั้งเดียว ดูทุกแมตช์เหย้าตลอดฤดูกาล พร้อมสิทธิพิเศษเฉพาะสมาชิก"
       />
 
-      <div className="mx-auto max-w-7xl px-4 py-14 md:py-20">
+      <div className="mx-auto w-full max-w-6xl px-4 py-14 md:py-20">
         <div className="mb-8 text-center md:mb-10">
           <p className="inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-widest text-yellow-600">
             <CalendarRange className="size-4" />

@@ -52,7 +52,7 @@ export default async function HomePage() {
         }
       />
 
-      <div className="mx-auto w-full max-w-5xl space-y-14 px-5 py-14 md:px-8 md:py-20">
+      <div className="mx-auto w-full max-w-6xl space-y-14 px-5 py-14 md:px-8 md:py-20">
         <section>
           {onSaleMatches.length > 0 && (
             <div className="mb-10 space-y-4">

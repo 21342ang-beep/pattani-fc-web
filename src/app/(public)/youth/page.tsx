@@ -176,7 +176,7 @@ export default function YouthPage() {
       </section>
 
       {/* 5 รุ่นอายุ */}
-      <section className="mx-auto max-w-7xl px-4 pt-14 md:pt-20">
+      <section className="hidden mx-auto max-w-6xl px-4 pt-14 md:pt-20">
         <div className="mb-6 text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-yellow-600">
             Age Groups
@@ -199,7 +199,7 @@ export default function YouthPage() {
       </section>
 
       {/* เสาหลัก 3 ข้อ */}
-      <section className="mx-auto max-w-7xl px-4 pt-14 md:pt-20">
+      <section className="hidden mx-auto max-w-6xl px-4 pt-14 md:pt-20">
         <div className="mb-6 text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-yellow-600">
             Pillars
@@ -225,7 +225,7 @@ export default function YouthPage() {
       </section>
 
       {/* Roadmap */}
-      <section className="mx-auto max-w-5xl px-4 pt-14 md:pt-20">
+      <section className="hidden mx-auto max-w-5xl px-4 pt-14 md:pt-20">
         <div className="mb-6 text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-yellow-600">
             Roadmap

@@ -31,7 +31,7 @@ export default async function ResultsPage({
   );
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10 md:py-16">
       <header>
         <h1 className="text-2xl font-bold">ผลการแข่งขัน</h1>
         <p className="text-sm text-slate-600">สรุปผลการแข่งขันและตารางคะแนน</p>

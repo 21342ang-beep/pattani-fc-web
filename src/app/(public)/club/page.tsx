@@ -67,7 +67,7 @@ export default function ClubPage() {
           aria-hidden
           className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:56px_56px]"
         />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-4 py-12 md:grid-cols-[1.2fr_1fr] md:gap-12 md:py-20">
+        <div className="relative mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 md:grid-cols-[1.2fr_1fr] md:gap-12 md:py-20">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-yellow-300/30 bg-yellow-400/10 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-widest text-yellow-200 backdrop-blur-sm">
               <span className="size-1.5 rounded-full bg-yellow-400" />

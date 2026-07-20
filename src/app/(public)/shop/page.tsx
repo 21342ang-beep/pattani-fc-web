@@ -72,7 +72,7 @@ export default async function ShopPage() {
         title="ร้านค้า"
         subtitle="สินค้าทางการของสโมสรปัตตานี เอฟซี · เสื้อแข่ง ของที่ระลึก"
       />
-      <div className="mx-auto max-w-7xl px-4 py-10">
+      <div className="mx-auto w-full max-w-6xl px-4 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <p className="inline-flex items-center gap-2 text-sm text-slate-600">
             <ShoppingBag className="size-4 text-green-800" />

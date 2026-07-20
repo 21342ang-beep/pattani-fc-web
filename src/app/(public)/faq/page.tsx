@@ -29,7 +29,7 @@ const faqs = [
 
 export default function FAQPage() {
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10 md:py-16">
       <header>
         <h1 className="text-2xl font-bold">คำถามที่พบบ่อย</h1>
         <p className="text-sm text-slate-600">ข้อสงสัยทั่วไปเกี่ยวกับการจองตั๋ว</p>

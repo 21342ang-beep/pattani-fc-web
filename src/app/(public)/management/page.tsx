@@ -101,6 +101,11 @@ function gridColsFor(columns: 1 | 2 | 3 | undefined): string {
 }
 
 export default function ManagementPage() {
+  // ให้คณะผู้บริหารแสดงเป็นหัวข้อแรกของหน้า
+  const orderedGroups = [...GROUPS].sort((a, b) =>
+    a.key === "executive" ? -1 : b.key === "executive" ? 1 : 0,
+  );
+
   return (
     <>
       <PageHero
@@ -108,7 +113,7 @@ export default function ManagementPage() {
         subtitle="คณะกรรมการบริหารและที่ปรึกษาสโมสรฟุตบอลปัตตานี เอฟซี"
       />
       <div className="mx-auto max-w-6xl space-y-10 px-4 py-10">
-        {GROUPS.map((g) => (
+        {orderedGroups.map((g) => (
           <section key={g.key}>
             <header className="mb-4 flex items-end justify-between gap-3 border-b-2 border-yellow-400/60 pb-3">
               <div className="flex items-center gap-3">

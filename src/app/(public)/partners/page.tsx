@@ -84,7 +84,7 @@ export default async function PartnersPage() {
           aria-hidden
           className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:56px_56px]"
         />
-        <div className="relative mx-auto max-w-7xl px-4 py-12 md:py-16">
+        <div className="relative mx-auto max-w-6xl px-4 py-12 md:py-16">
           <p className="inline-flex items-center gap-2 rounded-full border border-yellow-300/30 bg-yellow-400/10 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-widest text-yellow-200 backdrop-blur-sm">
             <Handshake className="size-3.5" />
             ร่วมเดินทางกับเรา
@@ -113,7 +113,7 @@ export default async function PartnersPage() {
 
       {/* Body */}
       <div className="bg-slate-100 py-12 md:py-16">
-        <div className="mx-auto max-w-7xl space-y-12 px-4">
+        <div className="mx-auto max-w-6xl space-y-12 px-4">
           {sponsors.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white py-16 text-center">
               <p className="text-lg text-slate-500">ยังไม่มีข้อมูลผู้สนับสนุน</p>
@@ -145,7 +145,7 @@ export default async function PartnersPage() {
 
       {/* CTA */}
       <section className="bg-green-950 py-14 text-yellow-100">
-        <div className="mx-auto flex max-w-7xl flex-col items-start gap-5 px-4 md:flex-row md:items-center md:justify-between">
+        <div className="mx-auto flex max-w-6xl flex-col items-start gap-5 px-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-bold uppercase tracking-widest text-yellow-300/80">
               สนใจเป็นพาร์ทเนอร์

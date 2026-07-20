@@ -20,7 +20,7 @@ export default async function PrivacyPolicyPage() {
     // ใช้ไฟล์เริ่มต้นจนกว่าจะมีผู้ดูแลอัปโหลด PDF
   }
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10 md:py-16">
+    <main className="mx-auto w-full max-w-6xl px-4 py-10 md:py-16">
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-widest text-yellow-600">
           Privacy Policy · PDPA
