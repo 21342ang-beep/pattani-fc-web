@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { access } from "fs/promises";
+import path from "path";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "นโยบายความเป็นส่วนตัว (PDPA) — Pattani FC",
@@ -6,7 +10,15 @@ export const metadata = {
     "นโยบายการเก็บและใช้ข้อมูลส่วนบุคคลของสมาชิก Pattani FC ตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล 2562",
 };
 
-export default function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage() {
+  const pdfPath = path.join(process.cwd(), "public", "uploads", "legal", "pattani-fc-sales-terms.pdf");
+  let attachmentHref = "/pattani-fc-sales-terms.txt";
+  try {
+    await access(pdfPath);
+    attachmentHref = "/uploads/legal/pattani-fc-sales-terms.pdf";
+  } catch {
+    // ใช้ไฟล์เริ่มต้นจนกว่าจะมีผู้ดูแลอัปโหลด PDF
+  }
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 md:py-16">
       <div className="mb-8">
@@ -109,6 +121,19 @@ export default function PrivacyPolicyPage() {
               pattanifc2009@gmail.com
             </a>
           </p>
+        </Section>
+
+        <Section title="9. ข้อกำหนดและเงื่อนไขการขายของ PATTANI FC">
+          <p>
+            กรุณาอ่านข้อกำหนดและเงื่อนไขการขายก่อนทำรายการสั่งซื้อบัตรหรือสินค้า
+          </p>
+          <a
+            href={attachmentHref}
+            download
+            className="inline-flex items-center rounded-md bg-green-800 px-4 py-2 font-semibold text-white hover:bg-green-700"
+          >
+            ดาวน์โหลดข้อกำหนดและเงื่อนไขการขาย
+          </a>
         </Section>
       </div>
 

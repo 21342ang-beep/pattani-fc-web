@@ -148,6 +148,9 @@ export default async function WebsiteManagementPage() {
           ศูนย์รวมการจัดการเนื้อหาทั้งหมดที่แสดงในหน้าเว็บไซต์สาธารณะ —
           แก้ไขผ่าน Payload CMS ได้ทันที พร้อมดูตัวอย่างหน้าจริงเทียบเคียง
         </p>
+        <Link href="/admin/website/sales-terms" className="mt-3 inline-flex rounded-md bg-green-800 px-4 py-2 text-sm font-semibold text-yellow-300 hover:bg-green-900">
+          จัดการไฟล์ข้อกำหนดการขาย
+        </Link>
       </div>
 
       {/* Quick stats */}
