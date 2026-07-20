@@ -121,7 +121,7 @@ export default function YouthPage() {
       />
 
       {/* แจ้งเตือน: ยังไม่ได้เปิดจริง */}
-      <section className="mx-auto max-w-5xl px-4 pt-8">
+      <section className="mx-auto max-w-6xl px-4 pt-8">
         <div className="flex items-start gap-3 rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-5 shadow-sm">
           <Info
             className="mt-0.5 size-5 shrink-0 text-yellow-700"
@@ -140,7 +140,7 @@ export default function YouthPage() {
       </section>
 
       {/* เป้าหมายหลัก */}
-      <section className="mx-auto max-w-5xl px-4 pt-10 md:pt-14">
+      <section className="mx-auto max-w-6xl px-4 pt-10 md:pt-14">
         <div className="overflow-hidden rounded-3xl border-2 border-green-900/10 bg-gradient-to-br from-green-900 via-green-800 to-green-950 p-7 text-yellow-100 shadow-xl md:p-10">
           <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-yellow-300/80">
             <Target className="size-4" /> Mission 2030
@@ -225,7 +225,7 @@ export default function YouthPage() {
       </section>
 
       {/* Roadmap */}
-      <section className="hidden mx-auto max-w-5xl px-4 pt-14 md:pt-20">
+      <section className="hidden mx-auto max-w-6xl px-4 pt-14 md:pt-20">
         <div className="mb-6 text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-yellow-600">
             Roadmap
@@ -277,7 +277,7 @@ export default function YouthPage() {
       </section>
 
       {/* CTA */}
-      <section className="mx-auto max-w-5xl px-4 py-14 md:py-20">
+      <section className="mx-auto max-w-6xl px-4 py-14 md:py-20">
         <div className="rounded-3xl border-2 border-green-100 bg-white p-7 shadow-sm md:p-10">
           <h2 className="text-2xl font-black text-green-900 md:text-3xl">
             สนใจร่วมเป็นส่วนหนึ่งของอคาเดมี?

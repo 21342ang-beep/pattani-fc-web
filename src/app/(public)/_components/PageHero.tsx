@@ -7,7 +7,7 @@ export default function PageHero({
 }) {
   return (
     <section className="bg-gradient-to-br from-green-900 via-green-800 to-green-950 text-white">
-      <div className="mx-auto max-w-7xl px-4 py-10 md:py-14">
+      <div className="mx-auto w-full max-w-6xl px-4 py-10 md:py-14">
         <h1 className="text-3xl font-black tracking-tight md:text-4xl">
           {title}
         </h1>

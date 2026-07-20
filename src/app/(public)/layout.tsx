@@ -26,7 +26,7 @@ export default async function PublicLayout({
       lang={locale}
       className={`${dbHeavent.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
+      <body className="min-h-full flex flex-col bg-white text-slate-900">
         <div className="flex min-h-screen flex-col">
           <ScrollProgress />
           <TopNav

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   Crown,
   Star,
@@ -35,6 +36,26 @@ export default function SeasonTicketsPage() {
       />
 
       <div className="mx-auto w-full max-w-6xl px-4 py-14 md:py-20">
+        <section className="mb-12">
+          <div className="mb-5 text-center">
+            <p className="text-sm font-bold uppercase tracking-widest text-yellow-600">Rainbow Stadium</p>
+            <h2 className="mt-1 text-3xl font-black text-green-900 md:text-4xl">แผนผังสนาม</h2>
+            <p className="mt-2 text-base text-slate-600">ตรวจสอบโซนที่นั่งก่อนเลือกแพ็กเกจสมาชิก</p>
+          </div>
+          <div className="overflow-hidden rounded-3xl border-2 border-green-900/10 bg-[#f3e7c8] p-3 shadow-xl md:p-5">
+            <div className="relative aspect-[1553/1053] w-full overflow-hidden rounded-2xl">
+              <Image
+                src="/stadium-zones-v2.jpg"
+                alt="แผนผังโซนที่นั่ง Rainbow Stadium — Pattani FC"
+                fill
+                sizes="(max-width: 768px) 100vw, 1152px"
+                className="object-contain"
+                priority
+              />
+            </div>
+          </div>
+        </section>
+
         <div className="mb-8 text-center md:mb-10">
           <p className="inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-widest text-yellow-600">
             <CalendarRange className="size-4" />

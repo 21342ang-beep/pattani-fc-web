@@ -4,7 +4,7 @@ export const metadata = { title: "ตรวจสอบการจอง — Pa
 
 export default function BookingSearchPage() {
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="mx-auto w-full max-w-6xl px-4 py-10 md:py-16">
       <header>
         <p className="text-sm font-bold uppercase tracking-widest text-yellow-600">Booking search</p>
         <h1 className="mt-1 text-3xl font-black text-green-900">ตรวจสอบการจอง</h1>

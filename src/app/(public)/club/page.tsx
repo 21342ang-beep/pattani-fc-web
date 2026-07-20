@@ -106,7 +106,7 @@ export default function ClubPage() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-5xl space-y-8 px-4 py-12 md:py-16">
+      <div className="mx-auto max-w-6xl space-y-8 px-4 py-12 md:py-16">
         {/* 1. วิสัยทัศน์ */}
         <FeatureCard
           icon={<Eye className="size-6" />}
