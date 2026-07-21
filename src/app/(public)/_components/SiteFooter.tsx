@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Mail, MapPin, Phone, Shield } from "lucide-react";
 import type { Dict } from "@/lib/i18n/dict";
-import { payload } from "@/lib/payload";
 import SponsorFooter from "./SponsorFooter";
 
 // แสดง Footer หลักของเว็บไซต์ พร้อมส่วนสปอนเซอร์ด้านบน
@@ -18,34 +17,14 @@ function SocialIcon({
   return <span className={`flex size-9 items-center justify-center rounded-lg bg-white/10 text-lg font-black text-green-100/60 transition-colors ${tone}`} aria-hidden>{symbol}</span>;
 }
 
-export default async function SiteFooter({ dict }: { dict: Dict }) {
-  const cms = await payload();
-  const { docs } = await cms.find({
-    collection: "sponsors",
-    where: { active: { equals: true } },
-    limit: 50,
-    sort: "createdAt",
-    overrideAccess: true,
-  });
-  const sponsors = (docs as unknown as {
-    id: string | number;
-    name: string;
-    logo?: { url?: string } | string | null;
-  }[]).map((sponsor) => ({
-    id: String(sponsor.id),
-    name: sponsor.name,
-    logoUrl:
-      typeof sponsor.logo === "object" && sponsor.logo
-        ? sponsor.logo.url
-        : undefined,
-  }));
+export default function SiteFooter({ dict }: { dict: Dict }) {
   if (!SHOW_SITE_FOOTER) {
-    return <SponsorFooter sponsors={sponsors} />;
+    return <SponsorFooter />;
   }
 
   return (
     <footer className="bg-green-950 text-yellow-100">
-      <SponsorFooter sponsors={sponsors} />
+      <SponsorFooter />
       <div className="relative overflow-hidden">
         <div
           aria-hidden
@@ -73,6 +52,23 @@ export default async function SiteFooter({ dict }: { dict: Dict }) {
             <p className="mx-auto mt-4 max-w-sm text-base text-green-100/70">
               {dict.footer.description}
             </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-3 text-base text-green-100/60">
+              <div className="flex items-center gap-2">
+                <MapPin className="size-5 shrink-0" /> {dict.footer.location}
+              </div>
+              <a
+                href="mailto:pattanifc2009@gmail.com"
+                className="flex items-center gap-2 transition hover:text-yellow-300"
+              >
+                <Mail className="size-5 shrink-0" /> pattanifc2009@gmail.com
+              </a>
+              <a
+                href="tel:+66731234567"
+                className="flex items-center gap-2 transition hover:text-yellow-300"
+              >
+                <Phone className="size-5 shrink-0" /> {dict.footer.phoneLabel} +66 (0) 73-123-4567
+              </a>
+            </div>
             <div className="mt-5 flex justify-center gap-3">
               <SocialButton
                 href="https://www.facebook.com/PattaniFC"
@@ -103,25 +99,7 @@ export default async function SiteFooter({ dict }: { dict: Dict }) {
 
         </div>
 
-        <div className="mt-10 grid gap-3 border-t border-yellow-300/10 pt-6 text-base text-green-100/60 md:grid-cols-3">
-          <div className="flex items-center gap-2">
-            <MapPin className="size-5" /> {dict.footer.location}
-          </div>
-          <a
-            href="mailto:pattanifc2009@gmail.com"
-            className="flex items-center gap-2 transition hover:text-yellow-300"
-          >
-            <Mail className="size-5" /> pattanifc2009@gmail.com
-          </a>
-          <a
-            href="tel:+66731234567"
-            className="flex items-center gap-2 transition hover:text-yellow-300"
-          >
-            <Phone className="size-5" /> {dict.footer.phoneLabel} +66 (0) 73-123-4567
-          </a>
-        </div>
-
-        <div className="mt-6 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-sm text-green-100/50 md:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-sm text-green-100/50 md:flex-row">
           <p>
             © {new Date().getFullYear()} Pattani FC. {dict.footer.rights}
           </p>

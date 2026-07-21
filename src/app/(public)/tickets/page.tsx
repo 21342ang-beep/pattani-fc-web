@@ -49,7 +49,7 @@ export default async function TicketsPage() {
             <h2 className="mt-1 text-3xl font-black text-green-900 md:text-4xl">โปรแกรมที่เปิดจอง</h2>
             <p className="mt-1 text-slate-600">เลือกแมตช์ที่ต้องการ แล้วจองตั๋วได้ทันที</p>
           </div>
-          <div className="space-y-4">{onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} />)}</div>
+          <div className="space-y-4">{onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} showBookingButton={false} />)}</div>
         </section>
       )}
 
