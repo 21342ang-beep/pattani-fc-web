@@ -98,6 +98,8 @@ export default async function HomePage() {
           />
         </section>
 
+        <HomePlayers players={homePlayers} />
+
         <section>
           <div className="mb-6 flex items-end justify-between gap-3">
             <div>
@@ -121,7 +123,6 @@ export default async function HomePage() {
           <FeaturedMatches matches={featured} />
         </section>
 
-        <HomePlayers players={homePlayers} />
       </div>
 
     </div>
