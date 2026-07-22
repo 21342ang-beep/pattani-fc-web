@@ -442,31 +442,6 @@ export default function TopNav({
                   </div>
                 )}
 
-                <div className="mb-4 border-b border-yellow-300/10 pb-3">
-                  <p className="mb-1 px-3 pt-1 text-[11px] font-bold uppercase tracking-widest text-yellow-300/60">
-                    บริการ
-                  </p>
-                  <Link
-                    href="/faq"
-                    className="block rounded-xl px-3 py-2.5 text-sm text-yellow-100 hover:bg-white/5"
-                  >
-                    {dict.util.faq}
-                  </Link>
-                  <Link
-                    href="/privacy-policy"
-                    className="block rounded-xl px-3 py-2.5 text-sm text-yellow-100 hover:bg-white/5"
-                  >
-                    นโยบายส่วนตัว
-                  </Link>
-                  <Link
-                    href="/login"
-                    className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-yellow-100 hover:bg-white/5"
-                  >
-                    <Shield className="size-4" aria-hidden strokeWidth={2.5} />
-                    {dict.util.admin}
-                  </Link>
-                </div>
-
                 <nav className="space-y-0.5">
                   {items.map((it) => {
                     if ("children" in it) {

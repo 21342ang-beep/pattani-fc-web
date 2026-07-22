@@ -88,7 +88,7 @@ html {
   /* DB Heavent ขนาดเล็กจะอ่านลำบาก — ขยับ base ขึ้นมาที่ 22px
      เพื่อให้ทุก rem (text-sm, text-base, text-lg ฯลฯ) ใหญ่ขึ้นพร้อมกัน
      โดยไม่กระทบ proportions ของเว็บ */
-  font-size: 22px;
+  font-size: clamp(17px, 1vw, 22px);
 }
 
 body {

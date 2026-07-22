@@ -15,7 +15,7 @@ export default async function HomePage() {
     prisma.match.findMany({
       where: { status: { in: ["SCHEDULED", "ON_SALE"] } },
       orderBy: { kickoffAt: "asc" },
-      take: 4,
+      take: 12,
     }),
     prisma.match.findMany({ where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" } }),
     prisma.booking.aggregate({
@@ -28,6 +28,9 @@ export default async function HomePage() {
     cms.findGlobal({ slug: "home-page", overrideAccess: true }),
   ]);
   const totalBooked = bookingSummary._sum.quantity ?? 0;
+  const upcomingHomeMatches = featured
+    .filter((match) => isPattaniHomeTeam(match.homeTeam))
+    .slice(0, 4);
   const totalAvailable = onSaleMatches.reduce((sum, match) => {
     const zoneCapacity =
       (match.zone170Seats ?? 0) +
@@ -105,7 +108,7 @@ export default async function HomePage() {
               ดูทั้งหมด <ArrowRight className="size-5" />
             </Link>
           </div>
-          <FeaturedMatches matches={featured} />
+          <FeaturedMatches matches={upcomingHomeMatches} />
           <Link
             href="/squad"
             className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-green-100 bg-green-950 px-5 py-4 text-yellow-100 transition hover:-translate-y-0.5 hover:bg-green-900 hover:shadow-lg"
@@ -121,6 +124,11 @@ export default async function HomePage() {
 
     </div>
   );
+}
+
+function isPattaniHomeTeam(teamName: string) {
+  const normalized = teamName.trim().toLocaleLowerCase("th-TH");
+  return normalized.includes("pattani") || normalized.includes("ปัตตานี");
 }
 
 function SectionHeader({

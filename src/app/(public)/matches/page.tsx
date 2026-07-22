@@ -107,6 +107,7 @@ export default async function MatchesListPage(props: {
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {listMatches.map((m) => {
             const isOnSale = m.status === "ON_SALE";
+            const isPattaniHomeMatch = isPattaniHomeTeam(m.homeTeam);
             return (
               <li key={m.id} className="flex flex-col rounded-lg border bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
@@ -123,21 +124,23 @@ export default async function MatchesListPage(props: {
                   <TeamCrest logo={m.awayTeamLogo} name={m.awayTeam} />
                 </div>
                 <p className="mt-2 text-center text-sm text-slate-600">{m.venue ?? "ยังไม่กำหนดสนาม"}</p>
-                <div className="mt-auto pt-4">
-                  <div className="mb-2 text-sm font-medium">
-                    ราคาแยกตามโซน
+                {isPattaniHomeMatch && (
+                  <div className="mt-auto pt-4">
+                    <div className="mb-2 text-sm font-medium">
+                      ราคาแยกตามโซน
+                    </div>
+                    <Link
+                      href={`/matches/${m.id}${zoneQS}`}
+                      className={`block w-full rounded-md px-3 py-2 text-center text-sm font-medium ${
+                        isOnSale
+                          ? "bg-slate-900 text-white hover:bg-slate-700"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {isOnSale ? "จองตั๋ว" : "ดูรายละเอียด"}
+                    </Link>
                   </div>
-                  <Link
-                    href={`/matches/${m.id}${zoneQS}`}
-                    className={`block w-full rounded-md px-3 py-2 text-center text-sm font-medium ${
-                      isOnSale
-                        ? "bg-slate-900 text-white hover:bg-slate-700"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {isOnSale ? "จองตั๋ว" : "ดูรายละเอียด"}
-                  </Link>
-                </div>
+                )}
               </li>
             );
           })}
@@ -145,6 +148,11 @@ export default async function MatchesListPage(props: {
       )}
     </div>
   );
+}
+
+function isPattaniHomeTeam(teamName: string) {
+  const normalized = teamName.trim().toLocaleLowerCase("th-TH");
+  return normalized.includes("pattani") || normalized.includes("ปัตตานี");
 }
 
 function OnSaleMainboard({

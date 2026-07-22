@@ -15,15 +15,11 @@ export type OnSaleMatch = {
 
 export default function OnSaleMatchBoard({
   match,
-  zoneQS = "",
   showBookingButton = true,
 }: {
   match: OnSaleMatch;
-  zoneQS?: string;
   showBookingButton?: boolean;
 }) {
-  const matchHref = `/matches/${match.id}${zoneQS}`;
-
   return (
     <article className="overflow-hidden rounded-2xl bg-gradient-to-br from-green-950 via-green-900 to-emerald-800 text-white shadow-xl">
       <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:p-10">
@@ -50,7 +46,7 @@ export default function OnSaleMatchBoard({
           </p>
           {showBookingButton ? (
             <Link
-              href={matchHref}
+              href="/tickets#matches"
               className="mt-6 flex w-full items-center justify-center rounded-xl bg-yellow-300 px-5 py-3 text-base font-black text-green-950 transition hover:bg-yellow-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300"
             >
               จองตั๋วตอนนี้
