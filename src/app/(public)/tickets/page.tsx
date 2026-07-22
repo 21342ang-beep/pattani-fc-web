@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 export const metadata = { title: "จองตั๋วรายแมตช์ — Pattani FC" };
 
 // โซนที่นั่ง Rainbow Stadium — ราคาต่อใบ (บาท) ตามแผนผังสนามจริง
-// สี (zoneColor) อิงจากสีบล็อกในแผนผังสนาม stadium-zones-v2.jpg
+// สี (zoneColor) อิงจากสีบล็อกในแผนผังสนาม stadium-zones-2026-27.png
 // AWAY = สำหรับแฟนทีมเยือนเท่านั้น
 type ZoneColor = "yellow" | "orange" | "red" | "green" | "blue" | "purple";
 type StadiumZone = {
@@ -20,13 +20,13 @@ type StadiumZone = {
   note?: string;
 };
 const STADIUM_ZONES: StadiumZone[] = [
-  { code: "N1", label: "เหนือ · พรีเมียม", priceBaht: 170, capacity: 546, color: "yellow" },
-  { code: "N2", label: "เหนือ", priceBaht: 150, capacity: 840, color: "orange" },
-  { code: "S", label: "ใต้ · กลางสนาม", priceBaht: 150, capacity: 1496, color: "yellow" },
-  { code: "W", label: "ตะวันตก", priceBaht: 100, capacity: 2065, color: "red" },
-  { code: "E", label: "ตะวันออก", priceBaht: 100, capacity: 2987, color: "red" },
-  { code: "S1", label: "ใต้-ตะวันตก", priceBaht: 120, capacity: 500, color: "green" },
-  { code: "S2", label: "ใต้-ตะวันออก", priceBaht: 120, capacity: 500, color: "blue" },
+  { code: "A1", label: "อัฒจันทร์เหนือ · A1", priceBaht: 170, capacity: 546, color: "green" },
+  { code: "A2", label: "อัฒจันทร์เหนือ · A2", priceBaht: 150, capacity: 840, color: "blue" },
+  { code: "B", label: "อัฒจันทร์ฝั่งตะวันออก · B", priceBaht: 100, capacity: 2987, color: "orange" },
+  { code: "C", label: "อัฒจันทร์ใต้ฝั่งตะวันออก · C", priceBaht: 120, capacity: 500, color: "green" },
+  { code: "D", label: "อัฒจันทร์ใต้ · D", priceBaht: 150, capacity: 1496, color: "blue" },
+  { code: "E", label: "อัฒจันทร์ใต้ฝั่งตะวันตก · E", priceBaht: 120, capacity: 500, color: "green" },
+  { code: "G", label: "อัฒจันทร์ฝั่งตะวันตก · G", priceBaht: 100, capacity: 2065, color: "orange" },
   { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: 1000, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
 ];
 
@@ -68,17 +68,15 @@ export default async function TicketsPage() {
         </div>
 
         {/* แผนผังสนาม — โชว์บนสุด ให้คนดูมุมมองก่อนเลือกโซน */}
-        <div className="overflow-hidden rounded-3xl border-2 border-green-900/10 bg-[#f3e7c8] p-3 shadow-xl md:p-5">
-          <div className="relative aspect-[1553/1053] w-full overflow-hidden rounded-2xl">
+        <div className="relative aspect-[1553/1053] w-full">
             <Image
-              src="/stadium-zones-v2.jpg"
+                src="/stadium-zones-2026-27-white.png"
               alt="แผนผังโซนที่นั่งของ Rainbow Stadium — Pattani FC (ความจุ 10,700)"
               fill
               priority
               sizes="(min-width: 1024px) 1024px, 100vw"
               className="object-contain"
             />
-          </div>
         </div>
         <p className="mt-3 text-center text-xs text-slate-500">
           ดูมุมมองที่คุณต้องการก่อน แล้วเลือกโซนจากตารางด้านล่าง
@@ -151,7 +149,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
   );
 }
 
-// สไตล์สีของแต่ละโซน — อิงสีบล็อกจากแผนผังสนาม (stadium-zones-v2.jpg)
+// สไตล์สีของแต่ละโซน — อิงสีบล็อกจากแผนผังสนาม (stadium-zones-2026-27.png)
 const ZONE_COLORS: Record<
   ZoneColor,
   { wrap: string; header: string; headerText: string; price: string; pill: string }

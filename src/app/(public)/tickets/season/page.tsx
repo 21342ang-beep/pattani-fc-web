@@ -45,7 +45,7 @@ export default function SeasonTicketsPage() {
           <div className="overflow-hidden rounded-3xl border-2 border-green-900/10 bg-[#f3e7c8] p-3 shadow-xl md:p-5">
             <div className="relative aspect-[1553/1053] w-full overflow-hidden rounded-2xl">
               <Image
-                src="/stadium-zones-v2.jpg"
+                src="/stadium-zones-2026-27-white.png"
                 alt="แผนผังโซนที่นั่ง Rainbow Stadium — Pattani FC"
                 fill
                 sizes="(max-width: 768px) 100vw, 1152px"

@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Loader2,
   Check,
+  ChevronDown,
   ChevronRight,
   Ticket,
   User,
@@ -37,6 +38,15 @@ import { createSeasonPassOrder } from "@/app/actions/season-passes";
 type Step = "form" | "payment" | "success";
 type Method = "card" | "promptpay" | "banking";
 type DeliveryMethod = "SHIPPING" | "PICKUP";
+const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"] as const;
+
+export type ShippingProvince = {
+  name: string;
+  districts: {
+    name: string;
+    postalCodes: string[];
+  }[];
+};
 
 interface CustomerData {
   name: string;
@@ -47,6 +57,7 @@ interface CustomerData {
   shipCity: string;
   shipProvince: string;
   shipPostalCode: string;
+  shirtSize: (typeof SHIRT_SIZES)[number] | "";
   shipNote: string;
   pickupLocation: string;
 }
@@ -63,11 +74,13 @@ export default function SeasonPassWizard({
   memberEmail,
   defaultName,
   defaultPhone,
+  shippingProvinces,
 }: {
   tier: SeasonTier;
   memberEmail: string | null;
   defaultName: string;
   defaultPhone: string;
+  shippingProvinces: ShippingProvince[];
 }) {
   const [step, setStep] = useState<Step>("form");
   const [customer, setCustomer] = useState<CustomerData>({
@@ -79,6 +92,7 @@ export default function SeasonPassWizard({
     shipCity: "",
     shipProvince: "",
     shipPostalCode: "",
+    shirtSize: "",
     shipNote: "",
     pickupLocation: SEASON_PASS_PICKUP_LOCATIONS[0],
   });
@@ -111,6 +125,7 @@ export default function SeasonPassWizard({
       shipCity: customer.shipCity,
       shipProvince: customer.shipProvince,
       shipPostalCode: customer.shipPostalCode,
+      shirtSize: customer.shirtSize,
       shipNote: customer.shipNote,
       pickupLocation: customer.pickupLocation,
     });
@@ -133,6 +148,7 @@ export default function SeasonPassWizard({
             <FormStep
               initial={customer}
               memberEmail={memberEmail}
+              shippingProvinces={shippingProvinces}
               onSubmit={handleFormSubmit}
               onDeliveryMethodChange={(m) =>
                 setCustomer((c) => ({ ...c, deliveryMethod: m }))
@@ -218,11 +234,13 @@ function StepBar({ step }: { step: Step }) {
 function FormStep({
   initial,
   memberEmail,
+  shippingProvinces,
   onSubmit,
   onDeliveryMethodChange,
 }: {
   initial: CustomerData;
   memberEmail: string | null;
+  shippingProvinces: ShippingProvince[];
   onSubmit: (data: CustomerData) => void;
   onDeliveryMethodChange: (method: DeliveryMethod) => void;
 }) {
@@ -236,9 +254,29 @@ function FormStep({
   const [shipCity, setShipCity] = useState(initial.shipCity);
   const [shipProvince, setShipProvince] = useState(initial.shipProvince);
   const [shipPostalCode, setShipPostalCode] = useState(initial.shipPostalCode);
+  const [shirtSize, setShirtSize] = useState(initial.shirtSize);
   const [shipNote, setShipNote] = useState(initial.shipNote);
   const [pickupLocation, setPickupLocation] = useState(initial.pickupLocation);
   const [errors, setErrors] = useState<Partial<Record<keyof CustomerData, string>>>({});
+  const selectedProvince = useMemo(
+    () => shippingProvinces.find((province) => province.name === shipProvince),
+    [shipProvince, shippingProvinces],
+  );
+  const selectedDistrict = selectedProvince?.districts.find(
+    (district) => district.name === shipCity,
+  );
+
+  function handleProvinceChange(province: string) {
+    setShipProvince(province);
+    setShipCity("");
+    setShipPostalCode("");
+  }
+
+  function handleDistrictChange(districtName: string) {
+    const district = selectedProvince?.districts.find((item) => item.name === districtName);
+    setShipCity(districtName);
+    setShipPostalCode(district?.postalCodes.length === 1 ? district.postalCodes[0] : "");
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -251,10 +289,11 @@ function FormStep({
     }
     if (deliveryMethod === "SHIPPING") {
       if (!shipAddress.trim()) nextErrors.shipAddress = "กรุณากรอกที่อยู่";
-      if (!shipCity.trim()) nextErrors.shipCity = "กรุณากรอกอำเภอ/เขต";
-      if (!shipProvince.trim()) nextErrors.shipProvince = "กรุณากรอกจังหวัด";
-      if (!/^\d{5}$/.test(shipPostalCode.trim()))
-        nextErrors.shipPostalCode = "รหัสไปรษณีย์ต้องเป็นเลข 5 หลัก";
+      if (!selectedProvince) nextErrors.shipProvince = "กรุณาเลือกจังหวัดจากรายการ";
+      if (!selectedDistrict) nextErrors.shipCity = "กรุณาเลือกอำเภอ/เขต";
+      if (!selectedDistrict?.postalCodes.includes(shipPostalCode))
+        nextErrors.shipPostalCode = "กรุณาเลือกรหัสไปรษณีย์ที่ตรงกับอำเภอ";
+      if (!shirtSize) nextErrors.shirtSize = "กรุณาเลือกไซส์เสื้อ";
     } else {
       if (!pickupLocation.trim())
         nextErrors.pickupLocation = "กรุณาเลือกจุดรับบัตร";
@@ -271,6 +310,7 @@ function FormStep({
       shipCity: shipCity.trim(),
       shipProvince: shipProvince.trim(),
       shipPostalCode: shipPostalCode.trim(),
+      shirtSize,
       shipNote: shipNote.trim(),
       pickupLocation: pickupLocation.trim(),
     });
@@ -375,21 +415,31 @@ function FormStep({
               />
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="อำเภอ/เขต" htmlFor="sp-ship-city" error={errors.shipCity}>
-                <input
-                  id="sp-ship-city"
-                  value={shipCity}
-                  onChange={(e) => setShipCity(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
-                />
-              </Field>
               <Field label="จังหวัด" htmlFor="sp-ship-province" error={errors.shipProvince}>
-                <input
+                <ProvinceSelect
                   id="sp-ship-province"
                   value={shipProvince}
-                  onChange={(e) => setShipProvince(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+                  provinces={shippingProvinces.map((province) => province.name)}
+                  onChange={handleProvinceChange}
                 />
+              </Field>
+              <Field label="อำเภอ/เขต" htmlFor="sp-ship-city" error={errors.shipCity}>
+                <select
+                  id="sp-ship-city"
+                  value={shipCity}
+                  onChange={(e) => handleDistrictChange(e.target.value)}
+                  disabled={!selectedProvince}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20 disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {selectedProvince ? "เลือกอำเภอ/เขต" : "เลือกจังหวัดก่อน"}
+                  </option>
+                  {selectedProvince?.districts.map((district) => (
+                    <option key={district.name} value={district.name}>
+                      {district.name}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </div>
             <Field
@@ -397,17 +447,37 @@ function FormStep({
               htmlFor="sp-ship-postal"
               error={errors.shipPostalCode}
             >
-              <input
+              <select
                 id="sp-ship-postal"
-                inputMode="numeric"
-                maxLength={5}
                 value={shipPostalCode}
+                onChange={(e) => setShipPostalCode(e.target.value)}
+                disabled={!selectedDistrict}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20 disabled:cursor-not-allowed disabled:bg-slate-100 sm:max-w-[180px]"
+              >
+                <option value="">{selectedDistrict ? "เลือกรหัสไปรษณีย์" : "เลือกอำเภอก่อน"}</option>
+                {selectedDistrict?.postalCodes.map((postalCode) => (
+                  <option key={postalCode} value={postalCode}>
+                    {postalCode}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="ไซส์เสื้อ" htmlFor="sp-shirt-size" error={errors.shirtSize}>
+              <select
+                id="sp-shirt-size"
+                value={shirtSize}
                 onChange={(e) =>
-                  setShipPostalCode(e.target.value.replace(/\D/g, "").slice(0, 5))
+                  setShirtSize(e.target.value as CustomerData["shirtSize"])
                 }
-                placeholder="5 หลัก"
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20 sm:max-w-[180px]"
-              />
+              >
+                <option value="">เลือกไซส์เสื้อ</option>
+                {SHIRT_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="หมายเหตุ (ไม่บังคับ)" htmlFor="sp-ship-note">
               <input
@@ -1210,6 +1280,82 @@ function Field({
       </label>
       {children}
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+function ProvinceSelect({
+  id,
+  value,
+  provinces,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  provinces: string[];
+  onChange: (province: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const inputValue = open ? query : value;
+  const filteredProvinces = provinces.filter((province) => province.includes(inputValue.trim()));
+
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        value={inputValue}
+        onFocus={() => {
+          setQuery(value);
+          setOpen(true);
+        }}
+        onBlur={() => {
+          window.setTimeout(() => {
+            setOpen(false);
+          }, 150);
+        }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+        }}
+        placeholder="พิมพ์ค้นหาหรือเลือกจังหวัด"
+        autoComplete="off"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open}
+        aria-controls={`${id}-options`}
+        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 pr-10 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+      />
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+      {open && (
+        <ul
+          id={`${id}-options`}
+          role="listbox"
+          className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+        >
+          {filteredProvinces.length > 0 ? (
+            filteredProvinces.map((province) => (
+              <li key={province} role="option" aria-selected={province === value}>
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onChange(province);
+                    setOpen(false);
+                  }}
+                  className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-green-50 ${
+                    province === value ? "bg-green-50 font-semibold text-green-900" : "text-slate-700"
+                  }`}
+                >
+                  {province}
+                </button>
+              </li>
+            ))
+          ) : (
+            <li className="px-4 py-2 text-sm text-slate-500">ไม่พบจังหวัดที่ค้นหา</li>
+          )}
+        </ul>
+      )}
     </div>
   );
 }

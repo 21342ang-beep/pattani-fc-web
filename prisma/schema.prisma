@@ -283,6 +283,7 @@ model SeasonPassOrder {
   shipCity         String?
   shipProvince     String?
   shipPostalCode   String?
+  shirtSize        String?
   shipNote         String?
   pickupLocation   String?
   // payment / status

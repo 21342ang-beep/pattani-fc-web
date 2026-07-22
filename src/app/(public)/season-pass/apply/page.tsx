@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getAllProvinces } from "geothai";
 import { prisma } from "@/lib/prisma";
 import { readCustomerSession } from "@/lib/customer-session";
 import { getSeasonTier } from "@/lib/season-pass-tiers";
-import SeasonPassWizard from "./SeasonPassWizard";
+import SeasonPassWizard, { type ShippingProvince } from "./SeasonPassWizard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "สมัครบัตรสมาชิกรายปี — Pattani FC" };
@@ -24,6 +25,15 @@ export default async function SeasonPassApplyPage(props: {
         select: { name: true, phone: true },
       })
     : null;
+  const shippingProvinces: ShippingProvince[] = getAllProvinces()
+    .map((province) => ({
+      name: province.name_th,
+      districts: province.districts.map((district) => ({
+        name: district.name_th,
+        postalCodes: [...new Set(district.subdistricts.map((subdistrict) => String(subdistrict.postal_code)))].sort(),
+      })),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "th-TH"));
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 md:py-14">
@@ -50,6 +60,7 @@ export default async function SeasonPassApplyPage(props: {
         memberEmail={session?.email ?? null}
         defaultName={customer?.name ?? session?.name ?? ""}
         defaultPhone={customer?.phone ?? ""}
+        shippingProvinces={shippingProvinces}
       />
     </div>
   );

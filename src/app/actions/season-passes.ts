@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getAllProvinces } from "geothai";
 import type { SeasonPassOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readCustomerSession } from "@/lib/customer-session";
@@ -11,7 +12,6 @@ import {
   SEASON_LABEL,
   SEASON_PASS_SHIPPING_FEE_BAHT,
   SEASON_TIERS,
-  type SeasonTierId,
 } from "@/lib/season-pass-tiers";
 
 // ─── Customer-facing: สร้างออเดอร์บัตรรายปี ─────────────────
@@ -46,6 +46,7 @@ const createSchema = z
       .regex(/^\d{5}$/, "รหัสไปรษณีย์ต้องเป็นเลข 5 หลัก")
       .optional()
       .or(z.literal("")),
+    shirtSize: z.enum(["S", "M", "L", "XL", "2XL", "3XL"] as const).optional().or(z.literal("")),
     shipNote: z.string().trim().max(300).optional().or(z.literal("")),
     // pickup — required only if deliveryMethod=PICKUP
     pickupLocation: z.string().trim().max(200).optional().or(z.literal("")),
@@ -75,6 +76,12 @@ const createSchema = z
           code: "custom",
           path: ["shipPostalCode"],
           message: "กรุณากรอกรหัสไปรษณีย์",
+        });
+      if (!d.shirtSize)
+        ctx.addIssue({
+          code: "custom",
+          path: ["shirtSize"],
+          message: "กรุณาเลือกไซส์เสื้อ",
         });
     } else if (d.deliveryMethod === "PICKUP") {
       if (!d.pickupLocation)
@@ -115,6 +122,21 @@ export async function createSeasonPassOrder(
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง", fieldErrors };
   }
 
+  if (parsed.data.deliveryMethod === "SHIPPING") {
+    const province = getAllProvinces().find(
+      (item) => item.name_th === parsed.data.shipProvince,
+    );
+    const district = province?.districts.find(
+      (item) => item.name_th === parsed.data.shipCity,
+    );
+    const postalCodes = new Set(
+      district?.subdistricts.map((item) => String(item.postal_code)) ?? [],
+    );
+    if (!province || !district || !postalCodes.has(parsed.data.shipPostalCode ?? "")) {
+      return { ok: false, error: "กรุณาเลือกจังหวัด อำเภอ และรหัสไปรษณีย์จากรายการ" };
+    }
+  }
+
   const tier = SEASON_TIERS.find((t) => t.id === parsed.data.tierId);
   if (!tier) return { ok: false, error: "ไม่พบระดับบัตรที่เลือก" };
 
@@ -153,6 +175,7 @@ export async function createSeasonPassOrder(
         shipCity: parsed.data.shipCity || null,
         shipProvince: parsed.data.shipProvince || null,
         shipPostalCode: parsed.data.shipPostalCode || null,
+        shirtSize: parsed.data.shirtSize || null,
         shipNote: parsed.data.shipNote || null,
         pickupLocation: parsed.data.pickupLocation || null,
         paymentMethod: parsed.data.paymentMethod,

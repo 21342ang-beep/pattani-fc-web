@@ -9,7 +9,7 @@ import { getStadiumZone, getZoneCapacity, getZonePriceGroup, getZonesForPriceGro
 
 // whitelist โซน — กัน XSS ผ่าน URL
 const ALLOWED_ZONES = [
-  "N1", "N2", "S", "S1", "S2", "W", "E", "AWAY",
+  "A1", "A2", "B", "C", "D", "E", "G", "AWAY",
 ] as const;
 
 export default async function MatchDetailPage(props: {
