@@ -43,7 +43,7 @@ function TeamCrest({ logo, name }: { logo: string | null; name: string }) {
           <Shield className="size-7 text-slate-300" />
         )}
       </div>
-      <span className="line-clamp-2 max-w-[9rem] text-center text-xs font-semibold text-green-900 sm:text-sm lg:text-base">
+      <span className="line-clamp-2 max-w-[10rem] text-center text-base font-semibold text-green-900 sm:text-lg lg:text-xl">
         {name}
       </span>
     </div>
@@ -88,32 +88,32 @@ export default function FeaturedMatches({
                   variant={isOnSale ? "default" : "secondary"}
                   className={
                     isOnSale
-                      ? "bg-emerald-100 px-2.5 py-1 text-xs text-emerald-700 hover:bg-emerald-100 sm:px-3 sm:text-sm"
-                      : "px-2.5 py-1 text-xs sm:px-3 sm:text-sm"
+                      ? "bg-emerald-100 px-3 py-1.5 text-base text-emerald-700 hover:bg-emerald-100 sm:text-lg"
+                      : "px-3 py-1.5 text-base sm:text-lg"
                   }
                 >
                   {isOnSale ? "เปิดจอง" : "ใกล้เปิด"}
                 </Badge>
-                <span className="flex items-center gap-1 text-xs text-muted-foreground sm:gap-1.5 sm:text-sm lg:text-base">
-                  <Calendar className="size-3.5 sm:size-4" />
+                <span className="flex items-center gap-1.5 text-base text-muted-foreground sm:text-lg lg:text-xl">
+                  <Calendar className="size-4" />
                   {m.kickoffAt ? formatDateTime(m.kickoffAt) : "ยังไม่กำหนด"}
                 </span>
               </CardHeader>
               <CardContent className="pb-3">
                 <div className="flex items-center justify-between gap-2 py-2">
                   <TeamCrest logo={m.homeTeamLogo} name={m.homeTeam} />
-                  <span className="text-sm font-bold uppercase tracking-widest text-yellow-600 sm:text-base lg:text-lg">
+                  <span className="text-lg font-bold uppercase tracking-widest text-yellow-600 sm:text-xl lg:text-2xl">
                     VS
                   </span>
                   <TeamCrest logo={m.awayTeamLogo} name={m.awayTeam} />
                 </div>
-                <p className="mt-3 flex items-center justify-center gap-1.5 text-sm text-muted-foreground sm:text-base lg:text-lg">
-                  <MapPin className="size-3.5 sm:size-4" /> {m.venue ?? "ยังไม่กำหนดสนาม"}
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-lg text-muted-foreground sm:text-xl lg:text-2xl">
+                  <MapPin className="size-4" /> {m.venue ?? "ยังไม่กำหนดสนาม"}
                 </p>
               </CardContent>
               {isPattaniHomeMatch && (
                 <CardFooter className="justify-between border-t pt-3">
-                  <span className="text-sm font-medium sm:text-base lg:text-lg">
+                  <span className="text-lg font-medium sm:text-xl lg:text-2xl">
                     {m.pricePerSeat != null
                       ? `เริ่มต้น ${formatBaht(m.pricePerSeat)}/ใบ`
                       : "ราคารอประกาศ"}
@@ -124,7 +124,7 @@ export default function FeaturedMatches({
                     variant={isOnSale ? "default" : "secondary"}
                     className={
                       isOnSale
-                        ? "bg-green-800 text-sm text-yellow-300 hover:bg-green-900 sm:text-base"
+                        ? "bg-green-800 text-lg text-yellow-300 hover:bg-green-900 sm:text-xl"
                         : ""
                     }
                   >

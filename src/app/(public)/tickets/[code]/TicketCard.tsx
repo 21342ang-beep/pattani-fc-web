@@ -68,17 +68,14 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
     setSaveMessage("");
     try {
       const ticketImages = Array.from(ticketRef.current.querySelectorAll("img"));
-      await Promise.all(
-        ticketImages.map((image) =>
-          image.complete ? image.decode?.().catch(() => undefined) : new Promise<void>((resolve) => {
-            image.addEventListener("load", () => resolve(), { once: true });
-            image.addEventListener("error", () => resolve(), { once: true });
-          }),
-        ),
+      await Promise.all(ticketImages.map(waitForImage));
+      await document.fonts?.ready;
+      // ให้เบราว์เซอร์วาดโลโก้ที่ decode แล้วลง ticket ก่อน html-to-image สร้าง clone
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       );
       const dataUrl = await toPng(ticketRef.current, {
         backgroundColor: "#0a1e15",
-        cacheBust: true,
         pixelRatio: 2,
       });
       const imageBlob = await fetch(dataUrl).then((response) => response.blob());
@@ -318,7 +315,12 @@ function TeamCrest({
         {logo && !useFallback ? (
           <div className="relative size-14">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logo} alt={name} className="size-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" />
+            <img
+              src={logo}
+              alt={name}
+              crossOrigin="anonymous"
+              className="size-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+            />
           </div>
         ) : (
           <Shield
@@ -334,6 +336,17 @@ function TeamCrest({
       </p>
     </div>
   );
+}
+
+async function waitForImage(image: HTMLImageElement) {
+  if (!image.complete) {
+    await new Promise<void>((resolve) => {
+      image.addEventListener("load", () => resolve(), { once: true });
+      image.addEventListener("error", () => resolve(), { once: true });
+    });
+  }
+
+  await image.decode?.().catch(() => undefined);
 }
 
 function Perforation() {

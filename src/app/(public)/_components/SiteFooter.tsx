@@ -41,18 +41,18 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
                 height={56}
               />
               <div>
-                <p className="text-base font-black tracking-wide text-yellow-300 sm:text-lg lg:text-xl">
+                <p className="text-xl font-black tracking-wide text-yellow-300 sm:text-2xl lg:text-3xl">
                   {dict.brand.name}
                 </p>
-                <p className="text-xs uppercase tracking-widest text-green-300 sm:text-sm">
+                <p className="text-base uppercase tracking-widest text-green-300 sm:text-lg">
                   {dict.footer.estTagline}
                 </p>
               </div>
             </Link>
-            <p className="mx-auto mt-4 max-w-md text-sm text-green-100/70 sm:text-base lg:text-lg">
+            <p className="mx-auto mt-4 max-w-md text-lg text-green-100/70 sm:text-xl lg:text-2xl">
               {dict.footer.description}
             </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-3 text-sm text-green-100/60 sm:gap-x-6 sm:text-base lg:text-lg">
+            <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-3 text-lg text-green-100/60 sm:gap-x-6 sm:text-xl lg:text-2xl">
               <div className="flex items-center gap-2">
                 <MapPin className="size-4 shrink-0 sm:size-5" /> {dict.footer.location}
               </div>
@@ -99,7 +99,7 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
 
         </div>
 
-        <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-xs text-green-100/50 sm:text-sm lg:text-base md:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-base text-green-100/50 sm:text-lg lg:text-xl md:flex-row">
           <p>
             © {new Date().getFullYear()} Pattani FC. {dict.footer.rights}
           </p>

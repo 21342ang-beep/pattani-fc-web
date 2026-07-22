@@ -160,7 +160,7 @@ export default function TopNav({
             onClick={() => setOpenMenu(isOpen ? null : it.label)}
             aria-expanded={isOpen}
             aria-haspopup="menu"
-            className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2.5 text-base font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${
+            className={`relative flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-3.5 text-xl font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${
               active || isOpen ? "text-green-950" : "text-white hover:text-white"
             }`}
           >
@@ -177,7 +177,7 @@ export default function TopNav({
             </svg>
           </button>
           {isOpen && (
-            <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-base shadow-xl backdrop-blur-md">
+            <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-xl shadow-xl backdrop-blur-md">
               {it.children.map((child) => {
                 const childActive = childIsActive(path, searchParams, child.href, it.children);
                 return <Link key={child.href} href={child.href} role="menuitem" onClick={closeNavigation} className={`block whitespace-nowrap px-5 py-2.5 font-semibold transition-colors ${childActive ? "bg-yellow-400 text-green-950" : "text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
@@ -189,7 +189,7 @@ export default function TopNav({
     }
     const active = isActive(path, it.href);
     return (
-      <Link key={it.href} href={it.href} onClick={closeNavigation} className={`relative whitespace-nowrap rounded-full px-3 py-2.5 text-base font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${active ? "text-green-950" : "text-white hover:text-white"}`}>
+    <Link key={it.href} href={it.href} onClick={closeNavigation} className={`relative whitespace-nowrap rounded-full px-5 py-3.5 text-xl font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${active ? "text-green-950" : "text-white hover:text-white"}`}>
         {active && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-yellow-400" transition={{ type: "spring", stiffness: 400, damping: 30 }} />}
         <span className="relative">{it.label}</span>
       </Link>
@@ -207,7 +207,7 @@ export default function TopNav({
         transition={{ duration: 0.25, ease: "easeInOut" }}
         className="hidden overflow-hidden bg-gradient-to-r from-yellow-400 via-yellow-300 to-green-700 xl:block"
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-end gap-6 px-4 py-2 text-base font-bold text-green-950">
+        <div className="mx-auto flex max-w-7xl items-center justify-end gap-6 px-4 py-2 text-lg font-bold text-green-950">
           <Link href="/faq" className="hover:underline">
             {dict.util.faq}
           </Link>
@@ -455,7 +455,7 @@ export default function TopNav({
                             type="button"
                             onClick={() => toggleGroup(it.label)}
                             aria-expanded={isOpen}
-                            className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-base font-bold transition-colors hover:bg-white/5 ${
+                          className={`flex w-full items-center justify-between rounded-xl px-4 py-4 text-xl font-bold transition-colors hover:bg-white/5 ${
                               groupActive ? "text-yellow-300" : "text-yellow-100"
                             }`}
                           >
@@ -497,7 +497,7 @@ export default function TopNav({
                                         key={c.href}
                                         href={c.href}
                                         onClick={closeNavigation}
-                                        className={`block rounded-xl px-3 py-2.5 text-base font-semibold transition-colors ${
+                                        className={`block rounded-xl px-4 py-3.5 text-xl font-semibold transition-colors ${
                                           active
                                             ? "bg-yellow-400 text-green-950"
                                             : "text-yellow-100 hover:bg-white/5"
@@ -520,7 +520,7 @@ export default function TopNav({
                         key={it.href}
                         href={it.href}
                         onClick={closeNavigation}
-                        className={`block rounded-xl px-3 py-3 text-base font-bold transition-colors ${
+                        className={`block rounded-xl px-4 py-4 text-xl font-bold transition-colors ${
                           active
                             ? "bg-yellow-400 text-green-950"
                             : "text-yellow-100 hover:bg-white/5"

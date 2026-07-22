@@ -103,19 +103,19 @@ export default async function HomePage() {
         <section>
           <div className="mb-6 flex items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-yellow-600 sm:text-sm">
+              <p className="text-base font-bold uppercase tracking-widest text-yellow-600 sm:text-lg">
                 Next matches
               </p>
-              <h2 className="mt-1.5 text-3xl font-black text-green-900 sm:text-4xl lg:text-5xl">
+              <h2 className="mt-1.5 text-5xl font-black text-green-900 sm:text-6xl lg:text-7xl">
                 แมตช์ที่กำลังจะมาถึง
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground sm:text-base lg:text-lg">
+              <p className="mt-2 text-lg text-muted-foreground sm:text-xl lg:text-2xl">
                 เลือกแมตช์ที่ต้องการ แล้วจองที่นั่งของคุณ
               </p>
             </div>
             <Link
               href="/matches"
-              className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-green-200 px-4 py-2 text-sm font-medium text-green-800 transition-all hover:bg-green-800 hover:text-yellow-300 sm:inline-flex sm:px-5 sm:py-2.5 sm:text-base"
+              className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-green-200 px-5 py-2.5 text-base font-medium text-green-800 transition-all hover:bg-green-800 hover:text-yellow-300 sm:inline-flex sm:text-lg"
             >
               ดูทั้งหมด <ArrowRight className="size-5" />
             </Link>
@@ -140,14 +140,14 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-6">
-      <p className="text-sm font-bold uppercase tracking-widest text-yellow-600">
+      <p className="text-base font-bold uppercase tracking-widest text-yellow-600 sm:text-lg">
         {eyebrow}
       </p>
-      <h2 className="mt-1.5 text-4xl font-black text-green-900 md:text-5xl">
+      <h2 className="mt-1.5 text-5xl font-black text-green-900 sm:text-6xl lg:text-7xl">
         {title}
       </h2>
       {subtitle && (
-        <p className="mt-2 text-base text-muted-foreground">{subtitle}</p>
+        <p className="mt-2 text-lg text-muted-foreground sm:text-xl">{subtitle}</p>
       )}
     </div>
   );

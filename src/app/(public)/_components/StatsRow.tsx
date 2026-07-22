@@ -24,8 +24,8 @@ export default function StatsRow({ stats }: { stats: Stat[] }) {
             }
           >
             <CardContent className="py-5">
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-              <p className="mt-1 text-2xl font-bold text-green-900">
+              <p className="text-base text-muted-foreground sm:text-lg">{s.label}</p>
+              <p className="mt-1 text-4xl font-bold text-green-900 sm:text-5xl">
                 {s.value}
               </p>
             </CardContent>

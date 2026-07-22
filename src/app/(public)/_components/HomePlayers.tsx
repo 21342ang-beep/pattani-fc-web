@@ -55,12 +55,12 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
       <div>
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-bold uppercase tracking-widest text-yellow-600">Our squad</p>
-            <h2 className="mt-1 text-3xl font-black text-green-900 sm:text-4xl">ผู้เล่นปัตตานี เอฟซี</h2>
+            <p className="text-lg font-bold uppercase tracking-widest text-yellow-600">Our squad</p>
+            <h2 className="mt-1 text-5xl font-black text-green-900 sm:text-6xl">ผู้เล่นปัตตานี เอฟซี</h2>
           </div>
           <Link
             href="/squad"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-green-200 px-4 py-2 text-sm font-bold text-green-800 transition hover:bg-green-800 hover:text-yellow-300"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-green-200 px-5 py-2.5 text-lg font-bold text-green-800 transition hover:bg-green-800 hover:text-yellow-300 sm:text-xl"
           >
             ดูทีมทั้งหมด <ArrowRight className="size-4" />
           </Link>
@@ -118,7 +118,7 @@ function PlayerSpotlight({ player, featured }: { player: HomePlayer; featured: b
       <span aria-hidden className="absolute -right-2 top-1 select-none text-7xl font-black leading-none text-white/[0.08] sm:text-8xl">
         {number}
       </span>
-      <span className="absolute left-3 top-4 rounded-full bg-black/25 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-yellow-200 backdrop-blur-sm">
+      <span className="absolute left-3 top-4 rounded-full bg-black/25 px-2 py-1 text-sm font-bold uppercase tracking-widest text-yellow-200 backdrop-blur-sm sm:text-base">
         {positionLabel[player.position]}
       </span>
 
@@ -141,8 +141,8 @@ function PlayerSpotlight({ player, featured }: { player: HomePlayer; featured: b
       </div>
 
       <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-green-900 px-3 py-2.5">
-        <span className="text-2xl font-black text-yellow-300">{number}</span>
-        <h3 className="line-clamp-1 text-sm font-black sm:text-base">{player.name}</h3>
+        <span className="text-4xl font-black text-yellow-300">{number}</span>
+        <h3 className="line-clamp-1 text-lg font-black sm:text-xl">{player.name}</h3>
       </div>
     </article>
   );
