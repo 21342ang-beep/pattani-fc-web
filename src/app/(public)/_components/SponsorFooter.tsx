@@ -11,43 +11,43 @@ const IMAGE_WIDTH = 1000;
 const IMAGE_HEIGHT = 326;
 const SPONSOR_IMAGE = "/sponsors-pattani-fc-2026-v2.png";
 
-// Bounding boxes follow the supplied sponsor artwork, so each logo can react independently.
+// Each box is measured against the visible pixels in the supplied artwork. Keeping the
+// padding small means the hover treatment hugs the logo instead of a generic grid cell.
 const sponsorRegions: SponsorRegion[] = [
-  { x: 18, y: 20, width: 110, height: 68 },
-  { x: 160, y: 20, width: 76, height: 68 },
-  { x: 258, y: 20, width: 82, height: 68 },
-  { x: 365, y: 20, width: 76, height: 68 },
-  { x: 465, y: 20, width: 84, height: 68 },
-  { x: 568, y: 20, width: 86, height: 68 },
-  { x: 674, y: 20, width: 86, height: 68 },
-  { x: 770, y: 20, width: 86, height: 68 },
-  { x: 870, y: 20, width: 116, height: 68 },
-  { x: 120, y: 105, width: 190, height: 58 },
-  { x: 330, y: 105, width: 92, height: 58 },
-  { x: 438, y: 105, width: 132, height: 58 },
-  { x: 585, y: 105, width: 116, height: 58 },
-  { x: 710, y: 105, width: 166, height: 58 },
-  { x: 155, y: 180, width: 82, height: 62 },
-  { x: 245, y: 180, width: 76, height: 62 },
-  { x: 335, y: 180, width: 108, height: 62 },
-  { x: 460, y: 180, width: 80, height: 62 },
-  { x: 560, y: 180, width: 90, height: 62 },
-  { x: 680, y: 180, width: 76, height: 62 },
-  { x: 770, y: 180, width: 82, height: 62 },
-  { x: 0, y: 250, width: 128, height: 48 },
-  { x: 140, y: 248, width: 66, height: 50 },
-  { x: 210, y: 248, width: 62, height: 50 },
-  { x: 280, y: 248, width: 62, height: 50 },
-  { x: 350, y: 248, width: 58, height: 50 },
-  { x: 415, y: 248, width: 58, height: 50 },
-  { x: 480, y: 248, width: 62, height: 50 },
-  { x: 550, y: 248, width: 62, height: 50 },
-  { x: 620, y: 248, width: 58, height: 50 },
-  { x: 685, y: 248, width: 62, height: 50 },
-  { x: 750, y: 248, width: 62, height: 50 },
-  { x: 820, y: 248, width: 62, height: 50 },
-  { x: 880, y: 248, width: 80, height: 50 },
-  { x: 960, y: 248, width: 40, height: 50 },
+  { x: 26, y: 37, width: 108, height: 43 },
+  { x: 172, y: 27, width: 52, height: 63 },
+  { x: 262, y: 27, width: 74, height: 63 },
+  { x: 366, y: 27, width: 67, height: 63 },
+  { x: 471, y: 27, width: 56, height: 63 },
+  { x: 564, y: 27, width: 70, height: 63 },
+  { x: 670, y: 27, width: 59, height: 63 },
+  { x: 771, y: 27, width: 59, height: 63 },
+  { x: 868, y: 34, width: 102, height: 52 },
+  { x: 128, y: 120, width: 162, height: 32 },
+  { x: 313, y: 113, width: 97, height: 50 },
+  { x: 439, y: 124, width: 119, height: 27 },
+  { x: 585, y: 116, width: 111, height: 44 },
+  { x: 712, y: 128, width: 162, height: 18 },
+  { x: 163, y: 188, width: 60, height: 49 },
+  { x: 256, y: 185, width: 52, height: 55 },
+  { x: 342, y: 198, width: 96, height: 24 },
+  { x: 461, y: 189, width: 77, height: 40 },
+  { x: 570, y: 202, width: 80, height: 23 },
+  { x: 693, y: 185, width: 50, height: 54 },
+  { x: 779, y: 188, width: 58, height: 49 },
+  { x: 9, y: 268, width: 139, height: 17 },
+  { x: 169, y: 255, width: 39, height: 42 },
+  { x: 229, y: 256, width: 49, height: 41 },
+  { x: 293, y: 257, width: 54, height: 39 },
+  { x: 361, y: 256, width: 47, height: 41 },
+  { x: 426, y: 256, width: 53, height: 41 },
+  { x: 498, y: 255, width: 44, height: 41 },
+  { x: 562, y: 255, width: 43, height: 42 },
+  { x: 623, y: 260, width: 59, height: 33 },
+  { x: 688, y: 260, width: 56, height: 32 },
+  { x: 759, y: 256, width: 49, height: 41 },
+  { x: 826, y: 255, width: 51, height: 41 },
+  { x: 893, y: 268, width: 96, height: 16 },
 ];
 
 export default function SponsorFooter() {
@@ -68,7 +68,7 @@ export default function SponsorFooter() {
               key={`${region.x}-${region.y}`}
               role="img"
               aria-label={`ผู้สนับสนุนรายที่ ${index + 1}`}
-              className="absolute cursor-default rounded-lg transition duration-200 ease-out hover:z-10 hover:scale-110 hover:shadow-[0_12px_22px_rgba(2,44,34,0.28)]"
+              className="absolute cursor-default transition duration-200 ease-out hover:z-10 hover:scale-110 hover:shadow-[0_4px_9px_rgba(2,44,34,0.16)]"
               style={{
                 left: `${(region.x / IMAGE_WIDTH) * 100}%`,
                 top: `${(region.y / IMAGE_HEIGHT) * 100}%`,

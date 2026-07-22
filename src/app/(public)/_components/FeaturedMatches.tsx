@@ -43,7 +43,7 @@ function TeamCrest({ logo, name }: { logo: string | null; name: string }) {
           <Shield className="size-7 text-slate-300" />
         )}
       </div>
-      <span className="line-clamp-2 max-w-[8rem] text-center text-xs font-semibold text-green-900">
+      <span className="line-clamp-2 max-w-[9rem] text-center text-sm font-semibold text-green-900 md:text-base">
         {name}
       </span>
     </div>
@@ -88,43 +88,43 @@ export default function FeaturedMatches({
                   variant={isOnSale ? "default" : "secondary"}
                   className={
                     isOnSale
-                      ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
-                      : ""
+                      ? "bg-emerald-100 px-3 py-1 text-sm text-emerald-700 hover:bg-emerald-100"
+                      : "px-3 py-1 text-sm"
                   }
                 >
                   {isOnSale ? "เปิดจอง" : "ใกล้เปิด"}
                 </Badge>
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Calendar className="size-3.5" />
+                <span className="flex items-center gap-1.5 text-sm text-muted-foreground md:text-base">
+                  <Calendar className="size-4" />
                   {m.kickoffAt ? formatDateTime(m.kickoffAt) : "ยังไม่กำหนด"}
                 </span>
               </CardHeader>
               <CardContent className="pb-3">
                 <div className="flex items-center justify-between gap-2 py-2">
                   <TeamCrest logo={m.homeTeamLogo} name={m.homeTeam} />
-                  <span className="text-sm font-bold uppercase tracking-widest text-yellow-600">
+                  <span className="text-base font-bold uppercase tracking-widest text-yellow-600 md:text-lg">
                     VS
                   </span>
                   <TeamCrest logo={m.awayTeamLogo} name={m.awayTeam} />
                 </div>
-                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
-                  <MapPin className="size-3.5" /> {m.venue ?? "ยังไม่กำหนดสนาม"}
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-base text-muted-foreground">
+                  <MapPin className="size-4" /> {m.venue ?? "ยังไม่กำหนดสนาม"}
                 </p>
               </CardContent>
               {isPattaniHomeMatch && (
                 <CardFooter className="justify-between border-t pt-3">
-                  <span className="text-sm font-medium">
+                  <span className="text-base font-medium">
                     {m.pricePerSeat != null
                       ? `เริ่มต้น ${formatBaht(m.pricePerSeat)}/ใบ`
                       : "ราคารอประกาศ"}
                   </span>
                   <Button
                     asChild
-                    size="sm"
+                    size="default"
                     variant={isOnSale ? "default" : "secondary"}
                     className={
                       isOnSale
-                        ? "bg-green-800 text-yellow-300 hover:bg-green-900"
+                        ? "bg-green-800 text-base text-yellow-300 hover:bg-green-900"
                         : ""
                     }
                   >

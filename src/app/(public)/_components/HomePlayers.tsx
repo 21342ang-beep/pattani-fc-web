@@ -1,6 +1,10 @@
+"use client";
+
+import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Shield } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export type HomePlayer = {
   id: string | number;
@@ -25,37 +29,69 @@ const positionTone: Record<HomePlayer["position"], string> = {
 };
 
 export default function HomePlayers({ players }: { players: HomePlayer[] }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    if (players.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % players.length);
+    }, 3000);
+
+    return () => window.clearInterval(interval);
+  }, [players.length]);
+
   if (players.length === 0) return null;
+  const activePlayer = players[activeIndex] ?? players[0];
 
   return (
-    <section className="relative overflow-hidden rounded-3xl bg-green-950 px-5 py-8 text-white sm:px-8 sm:py-10">
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(90deg,rgba(255,255,255,.45)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.45)_1px,transparent_1px)] [background-size:34px_34px]"
-      />
-      <div aria-hidden className="absolute -right-20 -top-24 size-80 rounded-full bg-yellow-300/15 blur-3xl" />
-
-      <div className="relative">
+    <section className="rounded-3xl border border-green-100 bg-white px-5 py-8 shadow-sm sm:px-8 sm:py-10">
+      <div>
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-bold uppercase tracking-widest text-yellow-300">Our squad</p>
-            <h2 className="mt-1 text-3xl font-black sm:text-4xl">ผู้เล่นปัตตานี เอฟซี</h2>
+            <p className="text-sm font-bold uppercase tracking-widest text-yellow-600">Our squad</p>
+            <h2 className="mt-1 text-3xl font-black text-green-900 sm:text-4xl">ผู้เล่นปัตตานี เอฟซี</h2>
           </div>
           <Link
             href="/squad"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-yellow-300/35 px-4 py-2 text-sm font-bold text-yellow-200 transition hover:bg-yellow-300 hover:text-green-950"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-green-200 px-4 py-2 text-sm font-bold text-green-800 transition hover:bg-green-800 hover:text-yellow-300"
           >
             ดูทีมทั้งหมด <ArrowRight className="size-4" />
           </Link>
         </div>
 
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          {players.map((player) => (
-            <li key={String(player.id)}>
-              <PlayerSpotlight player={player} />
-            </li>
-          ))}
-        </ul>
+        <div className="mx-auto max-w-xs overflow-hidden rounded-2xl">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={String(activePlayer.id)}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+            >
+              <PlayerSpotlight player={activePlayer} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {players.length > 1 && (
+          <div className="mt-4 flex justify-center gap-2" aria-label="เลือกผู้เล่น">
+            {players.map((player, index) => (
+              <button
+                key={String(player.id)}
+                type="button"
+                onClick={() => setActiveIndex(index)}
+                aria-label={`แสดง ${player.name}`}
+                aria-current={index === activeIndex}
+                className={`h-2 rounded-full transition-all ${
+                  index === activeIndex ? "w-6 bg-green-800" : "w-2 bg-green-200 hover:bg-green-400"
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

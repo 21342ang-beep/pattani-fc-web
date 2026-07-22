@@ -44,15 +44,15 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
                 <p className="text-lg font-black tracking-wide text-yellow-300">
                   {dict.brand.name}
                 </p>
-                <p className="text-xs uppercase tracking-widest text-green-300">
+                <p className="text-sm uppercase tracking-widest text-green-300">
                   {dict.footer.estTagline}
                 </p>
               </div>
             </Link>
-            <p className="mx-auto mt-4 max-w-sm text-base text-green-100/70">
+            <p className="mx-auto mt-4 max-w-md text-lg text-green-100/70">
               {dict.footer.description}
             </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-3 text-base text-green-100/60">
+            <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-3 text-lg text-green-100/60">
               <div className="flex items-center gap-2">
                 <MapPin className="size-5 shrink-0" /> {dict.footer.location}
               </div>
@@ -99,7 +99,7 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
 
         </div>
 
-        <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-sm text-green-100/50 md:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-base text-green-100/50 md:flex-row">
           <p>
             © {new Date().getFullYear()} Pattani FC. {dict.footer.rights}
           </p>

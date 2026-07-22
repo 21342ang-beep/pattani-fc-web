@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Users } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { payload } from "@/lib/payload";
 import HomeHero from "./_components/HomeHero";
@@ -98,8 +98,6 @@ export default async function HomePage() {
           />
         </section>
 
-        <HomePlayers players={homePlayers} />
-
         <section>
           <div className="mb-6 flex items-end justify-between gap-3">
             <div>
@@ -121,17 +119,9 @@ export default async function HomePage() {
             </Link>
           </div>
           <FeaturedMatches matches={featured} />
-          <Link
-            href="/squad"
-            className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-green-100 bg-green-950 px-5 py-4 text-yellow-100 transition hover:-translate-y-0.5 hover:bg-green-900 hover:shadow-lg"
-          >
-            <span className="flex items-center gap-3">
-              <span className="grid size-11 place-items-center rounded-xl bg-yellow-300 text-green-950"><Users className="size-6" /></span>
-              <span><span className="block text-lg font-bold">ผู้เล่น</span><span className="text-sm text-yellow-100/70">นักเตะชุดใหญ่</span></span>
-            </span>
-            <ArrowRight className="size-5" />
-          </Link>
         </section>
+
+        <HomePlayers players={homePlayers} />
       </div>
 
     </div>
