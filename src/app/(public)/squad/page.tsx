@@ -38,6 +38,7 @@ export default async function SquadPage() {
       where: { active: { equals: true } },
       sort: "jerseyNumber",
       limit: 100,
+      depth: 1,
       overrideAccess: true,
     }),
     cms.find({
@@ -141,6 +142,7 @@ export default async function SquadPage() {
 
 function PlayerCard({ player: p }: { player: PlayerDoc }) {
   const accent = POSITION_ACCENT[p.position] ?? POSITION_ACCENT.MF;
+  const photoUrl = mediaUrl(p.photo);
   return (
     <Card className="group relative h-full overflow-hidden rounded-2xl border-slate-200 bg-white p-0 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-yellow-400/50 hover:shadow-xl hover:shadow-green-900/10">
       <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-green-800 via-green-900 to-green-950">
@@ -186,9 +188,9 @@ function PlayerCard({ player: p }: { player: PlayerDoc }) {
             className={`absolute inset-0 rounded-full bg-gradient-to-br ${accent} opacity-30 blur-2xl transition group-hover:opacity-60`}
           />
           <div className="relative aspect-square h-full overflow-hidden rounded-full border-4 border-yellow-300/90 bg-green-950 shadow-2xl shadow-black/40 ring-1 ring-white/10">
-            {p.photoUrl ? (
+            {photoUrl ? (
               <Image
-                src={p.photoUrl}
+                src={photoUrl}
                 alt={p.name}
                 fill
                 unoptimized
@@ -228,8 +230,14 @@ type PlayerDoc = {
   jerseyNumber?: number;
   position: "GK" | "DF" | "MF" | "FW";
   nationality?: string;
-  photoUrl?: string;
+  photo?: { url?: string | null } | string | number | null;
 };
+
+function mediaUrl(media: PlayerDoc["photo"]) {
+  return typeof media === "object" && media !== null && "url" in media
+    ? media.url ?? undefined
+    : undefined;
+}
 
 type StaffDoc = {
   id: string | number;

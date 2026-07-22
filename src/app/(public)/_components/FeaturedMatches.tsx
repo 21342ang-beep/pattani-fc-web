@@ -69,6 +69,7 @@ export default function FeaturedMatches({
     <ul className="grid gap-4 md:grid-cols-2">
       {matches.map((m, i) => {
         const isOnSale = m.status === "ON_SALE";
+        const isPattaniHomeMatch = isPattaniHomeTeam(m.homeTeam);
         return (
           <motion.li
             key={m.id}
@@ -110,32 +111,39 @@ export default function FeaturedMatches({
                   <MapPin className="size-3.5" /> {m.venue ?? "ยังไม่กำหนดสนาม"}
                 </p>
               </CardContent>
-              <CardFooter className="justify-between border-t pt-3">
-                <span className="text-sm font-medium">
-                  {m.pricePerSeat != null
-                    ? `เริ่มต้น ${formatBaht(m.pricePerSeat)}/ใบ`
-                    : "ราคารอประกาศ"}
-                </span>
-                <Button
-                  asChild
-                  size="sm"
-                  variant={isOnSale ? "default" : "secondary"}
-                  className={
-                    isOnSale
-                      ? "bg-green-800 text-yellow-300 hover:bg-green-900"
-                      : ""
-                  }
-                >
-                  <Link href={`/matches/${m.id}`}>
-                    {isOnSale ? "จอง" : "ดู"}
-                    <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                </Button>
-              </CardFooter>
+              {isPattaniHomeMatch && (
+                <CardFooter className="justify-between border-t pt-3">
+                  <span className="text-sm font-medium">
+                    {m.pricePerSeat != null
+                      ? `เริ่มต้น ${formatBaht(m.pricePerSeat)}/ใบ`
+                      : "ราคารอประกาศ"}
+                  </span>
+                  <Button
+                    asChild
+                    size="sm"
+                    variant={isOnSale ? "default" : "secondary"}
+                    className={
+                      isOnSale
+                        ? "bg-green-800 text-yellow-300 hover:bg-green-900"
+                        : ""
+                    }
+                  >
+                    <Link href={`/matches/${m.id}`}>
+                      {isOnSale ? "จอง" : "ดู"}
+                      <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  </Button>
+                </CardFooter>
+              )}
             </Card>
           </motion.li>
         );
       })}
     </ul>
   );
+}
+
+function isPattaniHomeTeam(teamName: string) {
+  const normalized = teamName.trim().toLocaleLowerCase("th-TH");
+  return normalized.includes("pattani") || normalized.includes("ปัตตานี");
 }

@@ -31,7 +31,16 @@ export const Players: CollectionConfig = {
     },
     { name: "nationality", type: "text", label: "สัญชาติ" },
     { name: "dateOfBirth", type: "date", label: "วันเกิด" },
-    { name: "photoUrl", type: "text", label: "URL รูป" },
+    {
+      name: "photo",
+      type: "upload",
+      relationTo: "media",
+      label: "รูปผู้เล่น",
+      required: false,
+      admin: {
+        description: "แนบไฟล์รูปผู้เล่นจากเครื่อง แทนการวาง URL รูปภาพ",
+      },
+    },
     { name: "active", type: "checkbox", label: "อยู่ในทีมชุดปัจจุบัน", defaultValue: true },
   ],
 };

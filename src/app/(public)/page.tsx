@@ -6,12 +6,13 @@ import HomeHero from "./_components/HomeHero";
 import StatsRow from "./_components/StatsRow";
 import FeaturedMatches from "./_components/FeaturedMatches";
 import OnSaleMatchBoard from "./_components/OnSaleMatchBoard";
+import HomePlayers, { type HomePlayer } from "./_components/HomePlayers";
 
 export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();
-  const [featured, onSaleMatches, bookingSummary, homePage] = await Promise.all([
+  const [featured, onSaleMatches, bookingSummary, homePage, playersResult] = await Promise.all([
     prisma.match.findMany({
       where: {
         status: { in: ["SCHEDULED", "ON_SALE"] },
@@ -34,8 +35,17 @@ export default async function HomePage() {
       _sum: { quantity: true },
     }),
     cms.findGlobal({ slug: "home-page", overrideAccess: true }),
+    cms.find({
+      collection: "players",
+      where: { active: { equals: true } },
+      sort: "jerseyNumber",
+      limit: 4,
+      depth: 1,
+      overrideAccess: true,
+    }),
   ]);
   const totalBooked = bookingSummary._sum.quantity ?? 0;
+  const homePlayers = playersResult.docs as unknown as HomePlayer[];
   const totalAvailable = onSaleMatches.reduce((sum, match) => {
     const zoneCapacity =
       (match.zone170Seats ?? 0) +
@@ -87,6 +97,8 @@ export default async function HomePage() {
             ]}
           />
         </section>
+
+        <HomePlayers players={homePlayers} />
 
         <section>
           <div className="mb-6 flex items-end justify-between gap-3">

@@ -71,6 +71,28 @@ export default buildConfig({
       });
     }
     try {
+      const db = payload.db as unknown as {
+        drizzle: unknown;
+        execute: (args: {
+          drizzle: unknown;
+          raw: string;
+        }) => Promise<unknown>;
+      };
+      await db.execute({
+        drizzle: db.drizzle,
+        raw: "ALTER TABLE IF EXISTS payload.players DROP COLUMN IF EXISTS photo_url",
+      });
+      await db.execute({
+        drizzle: db.drizzle,
+        raw: "ALTER TABLE IF EXISTS payload.players ADD COLUMN IF NOT EXISTS photo_id integer",
+      });
+    } catch (err) {
+      payload.logger.warn({
+        err,
+        msg: "players photo column pre-migration skipped",
+      });
+    }
+    try {
       await pushDevSchema(payload.db as never);
       payload.logger.info("✓ Payload schema push (onInit) complete");
     } catch (err) {
