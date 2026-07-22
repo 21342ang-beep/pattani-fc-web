@@ -29,10 +29,11 @@ const positionTone: Record<HomePlayer["position"], string> = {
 };
 
 export default function HomePlayers({ players }: { players: HomePlayer[] }) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(() => Math.min(1, Math.max(0, players.length - 1)));
+  const hasCarousel = players.length > 3;
 
   useEffect(() => {
-    if (players.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (!hasCarousel || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return;
     }
 
@@ -41,10 +42,13 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
     }, 3000);
 
     return () => window.clearInterval(interval);
-  }, [players.length]);
+  }, [hasCarousel, players.length]);
 
   if (players.length === 0) return null;
-  const activePlayer = players[activeIndex] ?? players[0];
+  const visiblePlayers = hasCarousel
+    ? [-1, 0, 1].map((offset) => players[(activeIndex + offset + players.length) % players.length])
+    : players;
+  const centerCardIndex = hasCarousel ? 1 : Math.floor((visiblePlayers.length - 1) / 2);
 
   return (
     <section className="rounded-3xl border border-green-100 bg-white px-5 py-8 shadow-sm sm:px-8 sm:py-10">
@@ -62,21 +66,26 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
           </Link>
         </div>
 
-        <div className="mx-auto max-w-xs overflow-hidden rounded-2xl">
+        <div className="mx-auto max-w-4xl overflow-hidden px-2 py-6">
           <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={String(activePlayer.id)}
-              initial={{ opacity: 0, x: 24 }}
+            <motion.ul
+              key={String(activeIndex)}
+              initial={{ opacity: 0, x: 72 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
+              exit={{ opacity: 0, x: -72 }}
+              transition={{ duration: 0.45, ease: "easeOut" }}
+              className="grid grid-cols-3 items-center gap-3 sm:gap-5"
             >
-              <PlayerSpotlight player={activePlayer} />
-            </motion.div>
+              {visiblePlayers.map((player, index) => (
+                <li key={String(player.id)}>
+                  <PlayerSpotlight player={player} featured={index === centerCardIndex} />
+                </li>
+              ))}
+            </motion.ul>
           </AnimatePresence>
         </div>
 
-        {players.length > 1 && (
+        {hasCarousel && (
           <div className="mt-4 flex justify-center gap-2" aria-label="เลือกผู้เล่น">
             {players.map((player, index) => (
               <button
@@ -97,12 +106,14 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
   );
 }
 
-function PlayerSpotlight({ player }: { player: HomePlayer }) {
+function PlayerSpotlight({ player, featured }: { player: HomePlayer; featured: boolean }) {
   const photoUrl = mediaUrl(player.photo);
   const number = player.jerseyNumber?.toString().padStart(2, "0") ?? "--";
 
   return (
-    <article className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-green-800 to-green-950 shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/40">
+    <article className={`group relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-green-800 to-green-950 transition duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/40 ${
+      featured ? "-translate-y-4 scale-105 shadow-2xl shadow-green-950/30" : "scale-95 opacity-85 shadow-md"
+    }`}>
       <div aria-hidden className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${positionTone[player.position]}`} />
       <span aria-hidden className="absolute -right-2 top-1 select-none text-7xl font-black leading-none text-white/[0.08] sm:text-8xl">
         {number}
