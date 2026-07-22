@@ -13,9 +13,17 @@ export default async function HomePage() {
   const cms = await payload();
   const [featured, onSaleMatches, bookingSummary, homePage] = await Promise.all([
     prisma.match.findMany({
-      where: { status: { in: ["SCHEDULED", "ON_SALE"] } },
+      where: {
+        status: { in: ["SCHEDULED", "ON_SALE"] },
+        OR: [
+          { homeTeam: { contains: "Pattani", mode: "insensitive" } },
+          { homeTeam: { contains: "ปัตตานี" } },
+          { awayTeam: { contains: "Pattani", mode: "insensitive" } },
+          { awayTeam: { contains: "ปัตตานี" } },
+        ],
+      },
       orderBy: { kickoffAt: "asc" },
-      take: 12,
+      take: 4,
     }),
     prisma.match.findMany({ where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" } }),
     prisma.booking.aggregate({
@@ -28,9 +36,6 @@ export default async function HomePage() {
     cms.findGlobal({ slug: "home-page", overrideAccess: true }),
   ]);
   const totalBooked = bookingSummary._sum.quantity ?? 0;
-  const upcomingHomeMatches = featured
-    .filter((match) => isPattaniHomeTeam(match.homeTeam))
-    .slice(0, 4);
   const totalAvailable = onSaleMatches.reduce((sum, match) => {
     const zoneCapacity =
       (match.zone170Seats ?? 0) +
@@ -63,11 +68,6 @@ export default async function HomePage() {
               {onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} />)}
             </div>
           )}
-          <SectionHeader
-            eyebrow="ทางลัด"
-            title="ค้นพบสโมสร"
-            subtitle="เข้าถึงทุกข้อมูลเกี่ยวกับปัตตานี เอฟซีได้ในที่เดียว"
-          />
         </section>
 
         <section>
@@ -108,7 +108,7 @@ export default async function HomePage() {
               ดูทั้งหมด <ArrowRight className="size-5" />
             </Link>
           </div>
-          <FeaturedMatches matches={upcomingHomeMatches} />
+          <FeaturedMatches matches={featured} />
           <Link
             href="/squad"
             className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-green-100 bg-green-950 px-5 py-4 text-yellow-100 transition hover:-translate-y-0.5 hover:bg-green-900 hover:shadow-lg"
@@ -124,11 +124,6 @@ export default async function HomePage() {
 
     </div>
   );
-}
-
-function isPattaniHomeTeam(teamName: string) {
-  const normalized = teamName.trim().toLocaleLowerCase("th-TH");
-  return normalized.includes("pattani") || normalized.includes("ปัตตานี");
 }
 
 function SectionHeader({
