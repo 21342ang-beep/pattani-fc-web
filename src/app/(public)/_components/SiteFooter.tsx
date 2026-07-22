@@ -41,32 +41,32 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
                 height={56}
               />
               <div>
-                <p className="text-lg font-black tracking-wide text-yellow-300">
+                <p className="text-base font-black tracking-wide text-yellow-300 sm:text-lg lg:text-xl">
                   {dict.brand.name}
                 </p>
-                <p className="text-sm uppercase tracking-widest text-green-300">
+                <p className="text-xs uppercase tracking-widest text-green-300 sm:text-sm">
                   {dict.footer.estTagline}
                 </p>
               </div>
             </Link>
-            <p className="mx-auto mt-4 max-w-md text-lg text-green-100/70">
+            <p className="mx-auto mt-4 max-w-md text-sm text-green-100/70 sm:text-base lg:text-lg">
               {dict.footer.description}
             </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-3 text-lg text-green-100/60">
+            <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-3 text-sm text-green-100/60 sm:gap-x-6 sm:text-base lg:text-lg">
               <div className="flex items-center gap-2">
-                <MapPin className="size-5 shrink-0" /> {dict.footer.location}
+                <MapPin className="size-4 shrink-0 sm:size-5" /> {dict.footer.location}
               </div>
               <a
                 href="mailto:pattanifc2009@gmail.com"
                 className="flex items-center gap-2 transition hover:text-yellow-300"
               >
-                <Mail className="size-5 shrink-0" /> pattanifc2009@gmail.com
+                <Mail className="size-4 shrink-0 sm:size-5" /> pattanifc2009@gmail.com
               </a>
               <a
                 href="tel:+66731234567"
                 className="flex items-center gap-2 transition hover:text-yellow-300"
               >
-                <Phone className="size-5 shrink-0" /> {dict.footer.phoneLabel} +66 (0) 73-123-4567
+                <Phone className="size-4 shrink-0 sm:size-5" /> {dict.footer.phoneLabel} +66 (0) 73-123-4567
               </a>
             </div>
             <div className="mt-5 flex justify-center gap-3">
@@ -99,7 +99,7 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
 
         </div>
 
-        <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-base text-green-100/50 md:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-xs text-green-100/50 sm:text-sm lg:text-base md:flex-row">
           <p>
             © {new Date().getFullYear()} Pattani FC. {dict.footer.rights}
           </p>
