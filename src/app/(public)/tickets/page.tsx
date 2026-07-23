@@ -15,25 +15,41 @@ type StadiumZone = {
   code: string;
   label: string;
   priceBaht: number;
-  capacity: number;
+  capacity: number | null;
   color: ZoneColor;
   note?: string;
 };
 const STADIUM_ZONES: StadiumZone[] = [
-  { code: "A", label: "อัฒจันทร์เหนือ · A", priceBaht: 150, capacity: 546, color: "green" },
-  { code: "B", label: "อัฒจันทร์เหนือ · B", priceBaht: 150, capacity: 840, color: "green" },
-  { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", priceBaht: 100, capacity: 2987, color: "orange" },
-  { code: "D", label: "อัฒจันทร์ใต้ฝั่งตะวันออก · D", priceBaht: 120, capacity: 500, color: "yellow" },
-  { code: "E", label: "อัฒจันทร์ใต้ · E", priceBaht: 150, capacity: 1496, color: "green" },
-  { code: "F", label: "อัฒจันทร์ใต้ฝั่งตะวันตก · F", priceBaht: 120, capacity: 500, color: "yellow" },
-  { code: "H", label: "อัฒจันทร์ฝั่งตะวันตก · H", priceBaht: 100, capacity: 2065, color: "orange" },
-  { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: 1000, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
+  { code: "A", label: "อัฒจันทร์เหนือ · A", priceBaht: 150, capacity: null, color: "green" },
+  { code: "B", label: "อัฒจันทร์เหนือ · B", priceBaht: 150, capacity: null, color: "green" },
+  { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", priceBaht: 120, capacity: null, color: "yellow" },
+  { code: "D", label: "อัฒจันทร์ฝั่งตะวันออก · D", priceBaht: 100, capacity: null, color: "orange" },
+  { code: "E", label: "อัฒจันทร์ใต้ · E", priceBaht: 120, capacity: null, color: "yellow" },
+  { code: "F", label: "อัฒจันทร์ใต้ · F", priceBaht: 150, capacity: null, color: "green" },
+  { code: "G", label: "อัฒจันทร์ใต้ · G", priceBaht: 120, capacity: null, color: "yellow" },
+  { code: "I", label: "อัฒจันทร์ฝั่งตะวันตก · I", priceBaht: 100, capacity: null, color: "orange" },
+  { code: "J", label: "อัฒจันทร์ฝั่งตะวันตก · J", priceBaht: 120, capacity: null, color: "yellow" },
+  { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: null, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
 ];
 
 export default async function TicketsPage() {
   const onSaleMatches = await prisma.match.findMany({
     where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
   });
+  const capacityFor = (field: "zone150Seats" | "zone120Seats" | "zone100Seats" | "zoneAwaySeats") => {
+    const capacities = onSaleMatches.map((match) => match[field]).filter((capacity): capacity is number => capacity != null);
+    return capacities.length > 0 ? capacities.reduce((sum, capacity) => sum + capacity, 0) : null;
+  };
+  const capacitiesByPrice = {
+    100: capacityFor("zone100Seats"),
+    120: capacityFor("zone120Seats"),
+    150: capacityFor("zone150Seats"),
+    200: capacityFor("zoneAwaySeats"),
+  } as const;
+  const displayZones = STADIUM_ZONES.map((zone) => ({
+    ...zone,
+    capacity: capacitiesByPrice[zone.priceBaht as 100 | 120 | 150 | 200],
+  }));
   return (
     <>
       <PageHero
@@ -70,7 +86,7 @@ export default async function TicketsPage() {
         {/* แผนผังสนาม — โชว์บนสุด ให้คนดูมุมมองก่อนเลือกโซน */}
         <div className="relative aspect-[1553/1053] w-full">
             <Image
-                src="/stadium-zones-match-2026-27.png"
+                src="/stadium-zones-match-2026-27-v2.png"
               alt="แผนผังโซนที่นั่งของ Rainbow Stadium — Pattani FC (ความจุ 10,700)"
               fill
               priority
@@ -86,8 +102,8 @@ export default async function TicketsPage() {
         <p className="mb-6 mt-10 text-center text-sm font-medium text-slate-500">
           สีของแต่ละโซนอ้างอิงจากแผนผังสนามด้านบน — กดที่โซนเพื่อเลือกแมตช์
         </p>
-        <ul id="zones" className="grid scroll-mt-24 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {STADIUM_ZONES.map((z) => (
+        <ul id="zones" className="grid scroll-mt-24 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+          {displayZones.map((z) => (
             <li key={z.code}>
               <Link
                 href={`/matches?zone=${z.code}`}
@@ -228,7 +244,7 @@ function ZoneCard({ zone }: { zone: StadiumZone }) {
           <span className="ml-1 text-sm font-medium text-slate-500">บาท</span>
         </span>
         <span className="mt-1 text-sm font-medium text-slate-500">
-          {zone.capacity.toLocaleString("th-TH")} ที่นั่ง
+          {zone.capacity == null ? "ยังไม่เปิดขาย" : `${zone.capacity.toLocaleString("th-TH")} ที่นั่งเปิดขาย`}
         </span>
         {zone.note && (
           <span

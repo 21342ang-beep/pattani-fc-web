@@ -89,11 +89,10 @@ export default async function AdminMatchesPage(props: {
               <th className="px-3 py-2 text-left">ประเภท</th>
               <th className="px-3 py-2 text-left">เวลา</th>
               <th className="px-3 py-2 text-left">สถานะ</th>
-              <th className="px-3 py-2 text-right">โซน 170/จอง</th>
-              <th className="px-3 py-2 text-right">โซน 150/จอง</th>
-              <th className="px-3 py-2 text-right">โซน 120/จอง</th>
-              <th className="px-3 py-2 text-right">โซน 100/จอง</th>
-              <th className="px-3 py-2 text-right">โซนทีมเยือน/จอง</th>
+              <th className="px-3 py-2 text-right">150 บาท/จอง</th>
+              <th className="px-3 py-2 text-right">120 บาท/จอง</th>
+              <th className="px-3 py-2 text-right">100 บาท/จอง</th>
+              <th className="px-3 py-2 text-right">AWAY 200/จอง</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -121,7 +120,6 @@ export default async function AdminMatchesPage(props: {
                     {statusLabel[m.status] ?? m.status}
                   </span>
                 </td>
-                <ZoneBookingCell capacity={m.zone170Seats} bookings={m.bookings} price={170} />
                 <ZoneBookingCell capacity={m.zone150Seats} bookings={m.bookings} price={150} />
                 <ZoneBookingCell capacity={m.zone120Seats} bookings={m.bookings} price={120} />
                 <ZoneBookingCell capacity={m.zone100Seats} bookings={m.bookings} price={100} />
@@ -141,7 +139,7 @@ export default async function AdminMatchesPage(props: {
             ))}
             {matches.length === 0 && (
               <tr>
-                <td colSpan={10} className="p-6 text-center text-slate-500">
+                <td colSpan={9} className="p-6 text-center text-slate-500">
                   ยังไม่มีแมตช์ — เริ่มเพิ่มได้เลย
                 </td>
               </tr>
@@ -181,7 +179,7 @@ function ZoneBookingCell({
 }: {
   capacity: number | null;
   bookings: { zone: string | null; quantity: number }[];
-  price?: 170 | 150 | 120 | 100;
+  price?: 150 | 120 | 100;
   zoneCode?: "AWAY";
 }) {
   const booked = bookings.reduce((sum, booking) => {

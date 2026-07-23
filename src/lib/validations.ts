@@ -64,7 +64,7 @@ export const matchUpdateSchema = matchBaseSchema
 
 export const bookingCreateSchema = z.object({
   matchId: z.string().min(1),
-  zone: z.enum(["A", "B", "C", "D", "E", "F", "H", "AWAY"]),
+  zone: z.enum(["A", "B", "C", "D", "E", "F", "G", "I", "J", "AWAY"]),
   customerName: z.string().trim().min(1).max(100),
   // optional — guest booking ไม่มีอีเมล, member ใช้ session email (ใส่จาก server)
   customerEmail: z.string().trim().toLowerCase().email().max(200).nullish(),

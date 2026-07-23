@@ -67,6 +67,14 @@ async function parseFormToMatchInput(formData: FormData) {
     "awayTeamLogoExisting"
   );
 
+  const zone150Seats = numOrNull(formData.get("zone150Seats"));
+  const zone120Seats = numOrNull(formData.get("zone120Seats"));
+  const zone100Seats = numOrNull(formData.get("zone100Seats"));
+  const zoneAwaySeats = numOrNull(formData.get("zoneAwaySeats"));
+  const zoneCapacities = [zone150Seats, zone120Seats, zone100Seats, zoneAwaySeats].filter(
+    (capacity): capacity is number => capacity != null
+  );
+
   const data = {
     homeTeam: formData.get("homeTeam"),
     awayTeam: formData.get("awayTeam"),
@@ -74,12 +82,13 @@ async function parseFormToMatchInput(formData: FormData) {
     awayTeamLogo: away.path,
     venue: emptyToNull(formData.get("venue")),
     kickoffAt: emptyToNull(formData.get("kickoffAt")),
-    totalSeats: numOrNull(formData.get("totalSeats")),
-    zone170Seats: numOrNull(formData.get("zone170Seats")),
-    zone150Seats: numOrNull(formData.get("zone150Seats")),
-    zone120Seats: numOrNull(formData.get("zone120Seats")),
-    zone100Seats: numOrNull(formData.get("zone100Seats")),
-    zoneAwaySeats: numOrNull(formData.get("zoneAwaySeats")),
+    totalSeats: zoneCapacities.length > 0
+      ? zoneCapacities.reduce((sum, capacity) => sum + capacity, 0)
+      : numOrNull(formData.get("totalSeats")),
+    zone150Seats,
+    zone120Seats,
+    zone100Seats,
+    zoneAwaySeats,
     // ราคาเป็นของโซน ไม่ใช่ของแมตช์ และล้างค่าเก่าจากข้อมูลเดิมด้วย
     pricePerSeat: null,
     competitionType: (formData.get("competitionType") as string) || undefined,
@@ -133,6 +142,7 @@ export async function createMatch(
   await rollbackUploads(parsedForm.commitDelete);
   revalidatePath("/admin/matches");
   revalidatePath("/");
+  revalidatePath("/tickets");
   revalidatePath("/matches");
   revalidateTag("matches", { expire: 0 });
   redirect("/admin/matches");
@@ -169,6 +179,7 @@ export async function updateMatch(
   revalidatePath("/admin/matches");
   revalidatePath(`/admin/matches/${matchId}`);
   revalidatePath("/");
+  revalidatePath("/tickets");
   revalidatePath("/matches");
   revalidateTag("matches", { expire: 0 });
   redirect("/admin/matches");
@@ -192,6 +203,7 @@ export async function deleteMatch(matchId: string): Promise<{ ok: true } | { err
     if (m?.awayTeamLogo) await deleteTeamLogo(m.awayTeamLogo);
     revalidatePath("/admin/matches");
     revalidatePath("/");
+    revalidatePath("/tickets");
     revalidateTag("matches", { expire: 0 });
     return { ok: true };
   } catch {

@@ -12,7 +12,6 @@ type Match = {
   venue: string | null;
   kickoffAt: Date | string | null;
   totalSeats: number | null;
-  zone170Seats: number | null;
   zone150Seats: number | null;
   zone120Seats: number | null;
   zone100Seats: number | null;
@@ -37,6 +36,20 @@ export default function MatchForm({
   const initialKickoff = initial?.kickoffAt
     ? new Date(initial.kickoffAt).toISOString().slice(0, 16)
     : "";
+  const [zoneSeats, setZoneSeats] = useState({
+    zone150Seats: initial?.zone150Seats?.toString() ?? "",
+    zone120Seats: initial?.zone120Seats?.toString() ?? "",
+    zone100Seats: initial?.zone100Seats?.toString() ?? "",
+    zoneAwaySeats: initial?.zoneAwaySeats?.toString() ?? "",
+  });
+  const hasZoneSeats = Object.values(zoneSeats).some((value) => value.trim() !== "");
+  const calculatedTotalSeats = hasZoneSeats
+    ? Object.values(zoneSeats).reduce((sum, value) => sum + (Number(value) || 0), 0).toString()
+    : initial?.totalSeats?.toString() ?? "";
+
+  function updateZoneSeats(name: keyof typeof zoneSeats, value: string) {
+    setZoneSeats((current) => ({ ...current, [name]: value }));
+  }
 
   return (
     <form action={formAction} className="space-y-4 rounded-lg border bg-white p-6 shadow-sm">
@@ -98,8 +111,9 @@ export default function MatchForm({
           label="จำนวนที่นั่ง"
           name="totalSeats"
           type="number"
-          defaultValue={initial?.totalSeats?.toString() ?? ""}
-          hint="เว้นว่างได้"
+          value={calculatedTotalSeats}
+          readOnly
+          hint="คำนวณอัตโนมัติจากจำนวนที่นั่งแยกตามราคา"
         />
       </div>
       <p className="rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-900">
@@ -108,12 +122,11 @@ export default function MatchForm({
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
         <h2 className="text-sm font-bold text-slate-900">จำนวนที่นั่งเปิดขายแยกตามราคา</h2>
         <p className="mt-1 text-xs text-slate-600">เว้นว่างไว้หากยังไม่เปิดขายกลุ่มราคานั้น</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Field label="โซน 170 บาท" name="zone170Seats" type="number" defaultValue={initial?.zone170Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
-          <Field label="โซน 150 บาท" name="zone150Seats" type="number" defaultValue={initial?.zone150Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
-          <Field label="โซน 120 บาท" name="zone120Seats" type="number" defaultValue={initial?.zone120Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
-          <Field label="โซน 100 บาท" name="zone100Seats" type="number" defaultValue={initial?.zone100Seats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดขาย" />
-          <Field label="โซนทีมเยือน" name="zoneAwaySeats" type="number" defaultValue={initial?.zoneAwaySeats?.toString() ?? ""} hint="จำนวนที่นั่งเปิดจองทีมเยือน" />
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="150 บาท · โซน A, B, F" name="zone150Seats" type="number" value={zoneSeats.zone150Seats} onChange={(event) => updateZoneSeats("zone150Seats", event.target.value)} hint="จำนวนที่นั่งเปิดขายรวม" />
+          <Field label="120 บาท · โซน C, E, G, J" name="zone120Seats" type="number" value={zoneSeats.zone120Seats} onChange={(event) => updateZoneSeats("zone120Seats", event.target.value)} hint="จำนวนที่นั่งเปิดขายรวม" />
+          <Field label="100 บาท · โซน D, I" name="zone100Seats" type="number" value={zoneSeats.zone100Seats} onChange={(event) => updateZoneSeats("zone100Seats", event.target.value)} hint="จำนวนที่นั่งเปิดขายรวม" />
+          <Field label="200 บาท · โซน AWAY" name="zoneAwaySeats" type="number" value={zoneSeats.zoneAwaySeats} onChange={(event) => updateZoneSeats("zoneAwaySeats", event.target.value)} hint="จำนวนที่นั่งเปิดขายทีมเยือน" />
         </div>
       </div>
 
@@ -171,15 +184,21 @@ function Field({
   name,
   type = "text",
   defaultValue,
+  value,
+  onChange,
   required,
   hint,
+  readOnly,
 }: {
   label: string;
   name: string;
   type?: string;
   defaultValue?: string;
+  value?: string;
+  onChange?: React.ChangeEventHandler<HTMLInputElement>;
   required?: boolean;
   hint?: string;
+  readOnly?: boolean;
 }) {
   return (
     <div>
@@ -187,8 +206,10 @@ function Field({
       <input
         name={name}
         type={type}
-        defaultValue={defaultValue}
+        {...(value === undefined ? { defaultValue } : { value })}
+        onChange={onChange}
         required={required}
+        readOnly={readOnly}
         className="mt-1 w-full rounded-md border px-3 py-2"
       />
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
