@@ -208,7 +208,16 @@ const seasonPassScanSchema = z.object({
 });
 
 export type ScanSeasonPassResult =
-  | { ok: true; customerName: string; tierId: string; usesRemaining: number }
+  | {
+      ok: true;
+      passCode: string;
+      customerName: string;
+      customerPhone: string;
+      customerEmail: string | null;
+      seatZone: string;
+      tierId: string;
+      usesRemaining: number;
+    }
   | { ok: false; error: "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "INVALID" };
 
 // Season passes require an online, transactional check: this is what makes a
@@ -221,7 +230,18 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
   const { barcode, matchId } = parsed.data;
   const pass = await prisma.seasonPassBarcode.findUnique({
     where: { barcode: barcode.toUpperCase() },
-    include: { order: { select: { status: true, customerName: true } } },
+    include: {
+      order: {
+        select: {
+          status: true,
+          passCode: true,
+          customerName: true,
+          customerPhone: true,
+          customerEmail: true,
+          seatZone: true,
+        },
+      },
+    },
   });
   if (!pass) return { ok: false, error: "NOT_FOUND" };
   const order = pass.order;
@@ -241,7 +261,16 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
       });
       return scan.barcode.usesRemaining;
     });
-    return { ok: true, customerName: order.customerName, tierId: pass.tierId, usesRemaining: result };
+    return {
+      ok: true,
+      passCode: order.passCode,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      customerEmail: order.customerEmail,
+      seatZone: order.seatZone,
+      tierId: pass.tierId,
+      usesRemaining: result,
+    };
   } catch (error) {
     if (error instanceof Error && error.message === "EXHAUSTED") return { ok: false, error: "EXHAUSTED" };
     // PostgreSQL unique index [barcodeId, matchId] is the final duplicate guard.

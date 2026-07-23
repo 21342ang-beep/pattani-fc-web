@@ -64,6 +64,12 @@ export default async function AdminSeasonPassesPage(props: {
             บัตรสมาชิกครอบคลุม {SEASON_MATCHES} แมตช์เหย้าต่อฤดูกาล
           </p>
         </div>
+        <Link
+          href="/admin/season-passes/check"
+          className="rounded-md border border-green-200 bg-white px-3 py-1.5 text-sm font-medium text-green-900 hover:bg-green-50"
+        >
+          🎫 สแกนและประวัติการใช้งานบัตรรายปี
+        </Link>
       </div>
 
       {/* สรุปตัวเลข */}
