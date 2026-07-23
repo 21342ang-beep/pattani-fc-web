@@ -73,14 +73,14 @@ export default async function HomePage() {
       <div className="mx-auto w-full max-w-6xl space-y-14 px-5 py-14 md:px-8 md:py-20">
         <section>
           {onSaleMatches.length > 0 && (
-            <div className="mb-10 space-y-4">
+            <div className="animate-back-in-up mb-10 space-y-4">
               <SectionHeader eyebrow="Book now" title="โปรแกรมที่เปิดจอง" subtitle="เลือกแมตช์และจองตั๋วได้ทันที" />
               {onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} />)}
             </div>
           )}
         </section>
 
-        <section>
+        <section className="animate-fade-in-bottom-left">
           <SectionHeader
             eyebrow="ระบบจองตั๋ว"
             title="ภาพรวมการจอง"

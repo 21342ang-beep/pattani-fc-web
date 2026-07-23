@@ -161,19 +161,12 @@ export default function TopNav({
             aria-expanded={isOpen}
             aria-haspopup="menu"
             suppressHydrationWarning
-            className={`relative flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-3.5 text-xl font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${
-              active || isOpen ? "text-green-950" : "text-white hover:text-white"
+            className={`flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-3.5 text-xl tracking-[0.035em] [word-spacing:0.15em] transition-colors ${
+              active || isOpen ? "font-black text-white" : "font-bold text-white hover:text-white"
             }`}
           >
-            {(active || isOpen) && (
-              <motion.span
-                layoutId="nav-pill"
-                className="absolute inset-0 rounded-full bg-yellow-400"
-                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              />
-            )}
-            <span className="relative">{it.label}</span>
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden className={`relative size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}>
+            <span>{it.label}</span>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden className={`size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}>
               <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.4a.75.75 0 01-1.08 0l-4.25-4.4a.75.75 0 01.02-1.06z" clipRule="evenodd" />
             </svg>
           </button>
@@ -181,7 +174,7 @@ export default function TopNav({
             <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-xl shadow-xl backdrop-blur-md">
               {it.children.map((child) => {
                 const childActive = childIsActive(path, searchParams, child.href, it.children);
-                return <Link key={child.href} href={child.href} role="menuitem" onClick={closeNavigation} className={`block whitespace-nowrap px-5 py-2.5 font-semibold transition-colors ${childActive ? "bg-yellow-400 text-green-950" : "text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
+                return <Link key={child.href} href={child.href} role="menuitem" onClick={closeNavigation} className={`block whitespace-nowrap px-5 py-2.5 transition-colors ${childActive ? "font-black text-white" : "font-semibold text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
               })}
             </div>
           )}
@@ -190,9 +183,8 @@ export default function TopNav({
     }
     const active = isActive(path, it.href);
     return (
-    <Link key={it.href} href={it.href} onClick={closeNavigation} className={`relative whitespace-nowrap rounded-full px-5 py-3.5 text-xl font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${active ? "text-green-950" : "text-white hover:text-white"}`}>
-        {active && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-yellow-400" transition={{ type: "spring", stiffness: 400, damping: 30 }} />}
-        <span className="relative">{it.label}</span>
+    <Link key={it.href} href={it.href} onClick={closeNavigation} className={`whitespace-nowrap rounded-full px-5 py-3.5 text-xl tracking-[0.035em] [word-spacing:0.15em] transition-colors ${active ? "font-black text-white" : "font-bold text-white hover:text-white"}`}>
+        <span>{it.label}</span>
       </Link>
     );
   };
@@ -238,26 +230,27 @@ export default function TopNav({
       >
         {/* โลโก้กลาง — ลูกของกล่องแถบแบรนด์+เมนู จึงอยู่ในช่วงสองแถบนี้เสมอ
             ย่อตอน scroll เพราะแถบแบรนด์เตี้ยลง (motto หุบ) */}
-        <motion.div
-          style={{ x: "-50%", y: "-50%" }}
-          animate={{ scale: scrolled ? 0.82 : 1 }}
-          transition={{ duration: 0.25, ease: "easeInOut" }}
-          className="absolute left-1/2 top-1/2 z-50 hidden xl:block"
-        >
-          <Link
-            href="/"
-            aria-label="Pattani FC"
-            className="flex size-32 items-center justify-center transition-transform hover:scale-105"
+        <div className="animate-back-in-down absolute left-1/2 top-1/2 z-50 hidden xl:block">
+          <motion.div
+            style={{ x: "-50%", y: "-50%" }}
+            animate={{ scale: scrolled ? 0.82 : 1 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
           >
-            <Image
-              src="/logo-pattani-fc.png"
-              alt=""
-              width={128}
-              height={128}
-              className="size-full object-contain drop-shadow-lg"
-            />
-          </Link>
-        </motion.div>
+            <Link
+              href="/"
+              aria-label="Pattani FC"
+              className="flex size-32 items-center justify-center transition-transform hover:scale-105"
+            >
+              <Image
+                src="/logo-pattani-fc.png"
+                alt=""
+                width={128}
+                height={128}
+                className="size-full object-contain drop-shadow-lg"
+              />
+            </Link>
+          </motion.div>
+        </div>
         <motion.div
           animate={{ paddingTop: scrolled ? 8 : 12, paddingBottom: scrolled ? 8 : 12 }}
           transition={{ duration: 0.25 }}
@@ -353,11 +346,27 @@ export default function TopNav({
         <nav className="hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
           <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)] items-center px-2 py-2.5">
             <div className="flex items-center justify-end gap-2 pr-4">
-              {items.slice(0, 4).map(renderDesktopItem)}
+              {items.slice(0, 4).map((item, index) => (
+                <div
+                  key={item.label}
+                  className="animate-slide-in-left"
+                  style={{ animationDelay: `${index * 80}ms` }}
+                >
+                  {renderDesktopItem(item)}
+                </div>
+              ))}
             </div>
             <div aria-hidden />
             <div className="flex items-center justify-start gap-2 pl-4">
-              {items.slice(4).map(renderDesktopItem)}
+              {items.slice(4).map((item, index) => (
+                <div
+                  key={item.label}
+                  className="animate-slide-in-right"
+                  style={{ animationDelay: `${index * 80}ms` }}
+                >
+                  {renderDesktopItem(item)}
+                </div>
+              ))}
             </div>
           </div>
         </nav>
@@ -500,7 +509,7 @@ export default function TopNav({
                                         onClick={closeNavigation}
                                         className={`block rounded-xl px-4 py-3.5 text-xl font-semibold transition-colors ${
                                           active
-                                            ? "bg-yellow-400 text-green-950"
+                                            ? "font-black text-white"
                                             : "text-yellow-100 hover:bg-white/5"
                                         }`}
                                       >
@@ -523,7 +532,7 @@ export default function TopNav({
                         onClick={closeNavigation}
                         className={`block rounded-xl px-4 py-4 text-xl font-bold transition-colors ${
                           active
-                            ? "bg-yellow-400 text-green-950"
+                            ? "font-black text-white"
                             : "text-yellow-100 hover:bg-white/5"
                         }`}
                       >
