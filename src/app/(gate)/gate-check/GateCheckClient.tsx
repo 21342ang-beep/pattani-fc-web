@@ -167,6 +167,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
             EXHAUSTED: "บัตรนี้ใช้สิทธิ์ครบ 15 ครั้งแล้ว",
             INACTIVE: "บัตรรายปีนี้ยังไม่พร้อมใช้งาน",
             INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
+            LEAGUE_ONLY: "บัตรรายปีใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC",
           };
           const state: ScanState = { kind: "invalid", reason: reasons[result.error] };
           setScanState(state);

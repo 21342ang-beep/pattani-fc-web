@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
+import { isPattaniHomeTeam } from "@/lib/season-pass-home-match";
 
 // Server actions สำหรับหน้า /gate-check (ระบบสแกนเข้างานที่ประตูสนาม)
 // ทุก action ต้องผ่าน verifyAdmin → ป้องกันคนนอกใช้
@@ -218,7 +219,7 @@ export type ScanSeasonPassResult =
       tierId: string;
       usesRemaining: number;
     }
-  | { ok: false; error: "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "INVALID" };
+  | { ok: false; error: "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "INVALID" | "LEAGUE_ONLY" };
 
 // Season passes require an online, transactional check: this is what makes a
 // duplicate scan fail immediately even when two gates scan at the same time.
@@ -228,6 +229,13 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
   if (!parsed.success) return { ok: false, error: "INVALID" };
 
   const { barcode, matchId } = parsed.data;
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { competitionType: true, homeTeam: true },
+  });
+  if (!match || match.competitionType !== "LEAGUE" || !isPattaniHomeTeam(match.homeTeam)) {
+    return { ok: false, error: "LEAGUE_ONLY" };
+  }
   const pass = await prisma.seasonPassBarcode.findUnique({
     where: { barcode: barcode.toUpperCase() },
     include: {

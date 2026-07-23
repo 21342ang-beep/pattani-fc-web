@@ -37,6 +37,7 @@ export default function SeasonPassScanner({ matches, summaries }: { matches: Mat
           EXHAUSTED: "บัตรนี้ใช้สิทธิ์ครบตามจำนวนแมตช์แล้ว",
           INACTIVE: "บัตรรายปีนี้ยังไม่พร้อมใช้งาน",
           INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
+          LEAGUE_ONLY: "บัตรรายปีใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC",
         }[result.error];
         setError(message);
       } else {
