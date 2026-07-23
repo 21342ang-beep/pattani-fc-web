@@ -1,143 +1,198 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import Link from "next/link";
-import { ArrowRight, CreditCard, Ticket, Loader2 } from "lucide-react";
-import { lookupBooking, type LookupState } from "@/app/actions/lookupBooking";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleX,
+  Loader2,
+  ScanLine,
+} from "lucide-react";
+import {
+  scanBooking,
+  type BookingScanResult,
+} from "@/app/actions/lookupBooking";
 import { formatBaht, formatDateTime } from "@/lib/format";
 
-const statusLabel: Record<string, { text: string; cls: string }> = {
-  PENDING: { text: "รอชำระเงิน / ยืนยัน", cls: "bg-amber-100 text-amber-800" },
-  CONFIRMED: { text: "ยืนยันแล้ว", cls: "bg-emerald-100 text-emerald-800" },
-  CANCELLED: { text: "ยกเลิก", cls: "bg-slate-100 text-slate-600" },
-  REFUNDED: { text: "คืนเงินแล้ว", cls: "bg-blue-100 text-blue-800" },
+type ScanRecord = Extract<BookingScanResult, { ok: true }> & {
+  id: string;
+  receivedAt: string;
 };
 
-// ตรวจ format ฝั่ง client ก่อน → ตัด traffic ที่ไม่จำเป็น
+const statusLabel: Record<string, string> = {
+  PENDING: "รอชำระเงิน / ยืนยัน",
+  CONFIRMED: "ยืนยันแล้ว",
+  CANCELLED: "ยกเลิก",
+  REFUNDED: "คืนเงินแล้ว",
+};
+
 const CODE_FORMAT = /^[a-z0-9]{8,50}$/i;
+const MAX_HISTORY = 8;
 
 export default function CheckForm() {
   const [code, setCode] = useState("");
-  const [state, setState] = useState<LookupState>(undefined);
+  const [history, setHistory] = useState<ScanRecord[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const scanningCodes = useRef(new Set<string>());
 
-  // debounce auto-lookup เมื่อ code valid → ไม่ยิง action ทุกคีย์สโตรก
+  const scanCode = useCallback(
+    (rawCode: string) => {
+      const bookingCode = rawCode.trim();
+      if (!CODE_FORMAT.test(bookingCode) || scanningCodes.current.has(bookingCode)) return;
+
+      scanningCodes.current.add(bookingCode);
+      setError(null);
+      startTransition(async () => {
+        try {
+          const response = await scanBooking(bookingCode);
+          if (!response.ok) {
+            setError(response.message);
+            return;
+          }
+          const record: ScanRecord = {
+            ...response,
+            id: `${response.result.bookingCode}-${Date.now()}`,
+            receivedAt: new Date().toISOString(),
+          };
+          setHistory((current) => [record, ...current].slice(0, MAX_HISTORY));
+        } catch {
+          setError("ไม่สามารถบันทึกการสแกนได้ กรุณาลองอีกครั้ง");
+        } finally {
+          scanningCodes.current.delete(bookingCode);
+          setCode((current) => (current.trim() === bookingCode ? "" : current));
+          window.setTimeout(() => inputRef.current?.focus(), 0);
+        }
+      });
+    },
+    [startTransition],
+  );
+
+  // เครื่องสแกนส่วนใหญ่ส่ง Enter ปิดท้าย แต่รองรับการยิงโดยไม่มี Enter ด้วย
   useEffect(() => {
     const trimmed = code.trim();
-    if (!CODE_FORMAT.test(trimmed)) {
-      setState(undefined);
-      return;
-    }
-    const timer = setTimeout(() => {
-      startTransition(async () => {
-        const fd = new FormData();
-        fd.set("bookingCode", trimmed);
-        const next = await lookupBooking(undefined, fd);
-        setState(next);
-      });
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [code]);
+    if (!CODE_FORMAT.test(trimmed)) return;
+    const timer = window.setTimeout(() => scanCode(trimmed), 280);
+    return () => window.clearTimeout(timer);
+  }, [code, scanCode]);
 
-  const result = state?.result;
-  const checkoutHref = result ? `/checkout/${result.bookingCode}` : "#";
-  const ticketHref = result ? `/tickets/${result.bookingCode}` : "#";
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    scanCode(code);
+  }
+
+  const latest = history[0];
 
   return (
-    <>
-      <div className="space-y-3 rounded-lg border bg-white p-6 shadow-sm">
-        <label className="block">
-          <span className="text-sm font-medium">รหัสการจอง</span>
+    <div className="space-y-5">
+      <form onSubmit={handleSubmit} className="rounded-xl border bg-white p-6 shadow-sm">
+        <label className="block" htmlFor="booking-code">
+          <span className="text-sm font-semibold text-slate-800">สแกนบาร์โค้ด / รหัสการจอง</span>
           <input
+            ref={inputRef}
+            id="booking-code"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(event) => setCode(event.target.value)}
+            autoFocus
             autoComplete="off"
             spellCheck={false}
             inputMode="text"
             maxLength={50}
-            className="mt-1 w-full rounded-md border px-3 py-2 font-mono"
-            placeholder="เช่น c0xxxxxxxxxx..."
+            className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 font-mono text-base outline-none transition focus:border-green-700 focus:ring-2 focus:ring-green-700/20"
+            placeholder="ยิงบาร์โค้ดที่นี่"
+            aria-describedby="scan-help"
           />
         </label>
-
+        <p id="scan-help" className="mt-2 text-xs text-slate-500">
+          ระบบจะล้างช่องให้เองหลังสแกน เพื่อยิงบาร์โค้ดใบถัดไปได้ทันที
+        </p>
         {isPending && (
-          <p className="flex items-center gap-2 text-xs text-slate-500">
-            <Loader2 className="size-3.5 animate-spin" /> กำลังตรวจสอบ...
+          <p className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+            <Loader2 className="size-4 animate-spin" /> กำลังบันทึกการใช้งาน...
           </p>
         )}
-        {state?.error && !isPending && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {state.error}
+        {error && !isPending && (
+          <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+            {error}
           </p>
         )}
-        {!code.trim() && (
-          <p className="text-xs text-slate-500">
-            ใส่รหัสการจองที่ได้รับหลังจอง — ระบบจะแสดงผลทันทีเมื่อรหัสถูกต้อง
-          </p>
-        )}
-      </div>
+      </form>
 
-      {result && (
-        <div className="mt-6 rounded-lg border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">รายละเอียดการจอง</h2>
-          <dl className="mt-3 grid gap-2 text-sm">
-            <Row label="รหัสการจอง">
-              <span className="font-mono">{result.bookingCode}</span>
-            </Row>
-            <Row label="สถานะ">
-              <span
-                className={`rounded px-2 py-0.5 text-xs ${
-                  statusLabel[result.status]?.cls ?? "bg-slate-100"
-                }`}
-              >
-                {statusLabel[result.status]?.text ?? result.status}
-              </span>
-            </Row>
-            <Row label="ผู้จอง">{result.customerName}</Row>
-            <Row label="แมตช์">
-              {result.match.homeTeam} vs {result.match.awayTeam}
-            </Row>
-            <Row label="สนาม">{result.match.venue ?? "—"}</Row>
-            <Row label="เวลา">
-              {result.match.kickoffAt
-                ? formatDateTime(result.match.kickoffAt)
-                : "—"}
-            </Row>
-            <Row label="จำนวน">{result.quantity} ใบ</Row>
-            <Row label="ยอดรวม">{formatBaht(result.totalAmount)}</Row>
-            <Row label="วันที่จอง">{formatDateTime(result.createdAt)}</Row>
-          </dl>
+      {latest && <ScanResult record={latest} featured />}
 
-          {/* ปุ่ม action ตามสถานะ — phone gate จะถูกถามต่อในหน้าปลายทาง */}
-          {result.status === "PENDING" && (
-            <Link
-              href={checkoutHref}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-6 py-3 text-base font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.01] hover:bg-yellow-300"
-            >
-              <CreditCard className="size-5" /> ชำระเงิน
-              <ArrowRight className="size-5" />
-            </Link>
-          )}
-          {result.status === "CONFIRMED" && (
-            <Link
-              href={ticketHref}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-6 py-3 text-base font-bold text-yellow-300 transition hover:bg-green-900"
-            >
-              <Ticket className="size-5" /> ดู E-Ticket
-              <ArrowRight className="size-5" />
-            </Link>
-          )}
-        </div>
-      )}
-    </>
+      <section aria-live="polite" className="rounded-xl border bg-white p-5 shadow-sm">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+          <ScanLine className="size-5 text-green-800" /> รายการที่สแกนล่าสุด
+        </h2>
+        {history.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">ยังไม่มีรายการสแกนในรอบนี้</p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {history.map((record) => (
+              <ScanResult key={record.id} record={record} />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function ScanResult({ record, featured = false }: { record: ScanRecord; featured?: boolean }) {
+  const { result } = record;
+  const styles = {
+    SCANNED: {
+      container: "border-emerald-300 bg-emerald-50",
+      icon: <CheckCircle2 className="size-6 text-emerald-700" />,
+      title: "ใช้งานตั๋วแล้ว",
+    },
+    ALREADY_SCANNED: {
+      container: "border-amber-300 bg-amber-50",
+      icon: <AlertTriangle className="size-6 text-amber-700" />,
+      title: "สแกนแล้ว",
+    },
+    NOT_ELIGIBLE: {
+      container: "border-red-300 bg-red-50",
+      icon: <CircleX className="size-6 text-red-700" />,
+      title: "ไม่สามารถใช้งานตั๋ว",
+    },
+  }[record.outcome];
+
+  return (
+    <article className={`rounded-xl border p-4 ${styles.container} ${featured ? "shadow-sm" : ""}`}>
+      <div className="flex items-start gap-3">
+        {styles.icon}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <h3 className="font-bold text-slate-900">{styles.title}</h3>
+            <time className="text-xs text-slate-600" dateTime={record.receivedAt}>
+              {formatDateTime(record.receivedAt)}
+            </time>
+          </div>
+          <p className="mt-1 text-sm font-medium text-slate-700">{record.message}</p>
+          <dl className="mt-3 grid gap-x-5 gap-y-1 text-sm sm:grid-cols-2">
+            <Info label="รหัสการจอง"><span className="font-mono">{result.bookingCode}</span></Info>
+            <Info label="ผู้จอง">{result.customerName}</Info>
+            <Info label="แมตช์">{result.match.homeTeam} vs {result.match.awayTeam}</Info>
+            <Info label="จำนวน">{result.quantity} ใบ · {formatBaht(result.totalAmount)}</Info>
+            <Info label="ใช้สิทธิ์">{result.scanCount}/{result.quantity} ใบ · เหลือ {result.remainingScans} ใบ</Info>
+            <Info label="สถานะ">{statusLabel[result.status] ?? result.status}</Info>
+            <Info label="เวลาสแกน">
+              {result.lastScannedAt ? formatDateTime(result.lastScannedAt) : "ยังไม่ถูกบันทึกใช้"}
+            </Info>
+          </dl>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function Info({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-2">
-      <dt className="w-28 text-slate-500">{label}</dt>
-      <dd className="flex-1">{children}</dd>
+      <dt className="shrink-0 text-slate-500">{label}</dt>
+      <dd className="min-w-0 break-words text-slate-800">{children}</dd>
     </div>
   );
 }

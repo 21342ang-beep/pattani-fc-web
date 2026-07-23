@@ -16,9 +16,9 @@ export default async function CheckBookingPage() {
         >
           ← กลับไปหน้าการจอง
         </Link>
-        <h1 className="mt-1 text-2xl font-bold text-green-900">ตรวจสอบการจอง</h1>
+        <h1 className="mt-1 text-2xl font-bold text-green-900">สแกนใช้งานตั๋ว</h1>
         <p className="text-sm text-slate-600">
-          กรอกรหัสการจองเพื่อดูสถานะและรายละเอียด
+          ยิงบาร์โค้ดเพื่อบันทึกการใช้งานและตรวจสอบสิทธิ์เข้าชมการแข่งขัน
         </p>
       </header>
       <CheckForm />

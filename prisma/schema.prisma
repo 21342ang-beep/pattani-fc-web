@@ -165,10 +165,11 @@ model Booking {
   paidAt          DateTime?
   seatNumbers     String[]      // ที่นั่งที่ออกให้ เช่น ["A-101","A-102"]
   notes           String?
-  // gate check (สแกนเข้างาน) — sync จาก offline gate-check page
-  // null = ยังไม่ได้สแกน, มีค่า = สแกนเข้างานแล้ว → กันใช้ซ้ำที่ประตู
+  // เวลา scan ครั้งแรก (คงไว้รองรับระบบ gate-check แบบเดิม)
+  // รายการ scan รายใบอยู่ใน gateScans เพื่อรองรับ booking ที่มีหลายใบ
   scannedAt       DateTime?
   scannedBy       String?       // userId ของ admin ที่กด scan (เก็บไว้ audit)
+  gateScans       BookingGateScan[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -178,6 +179,18 @@ model Booking {
   @@index([customerEmail])
   @@index([customerPhone])
   @@index([scannedAt])
+}
+
+// หนึ่ง booking อาจมีหลายใบ จึงบันทึกการผ่านประตูแยกเป็นรายครั้ง
+// เพื่ออนุญาตการสแกนได้สูงสุดเท่ากับ quantity ของการจองนั้น
+model BookingGateScan {
+  id          String   @id @default(cuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  scannedAt   DateTime @default(now())
+  scannedBy   String
+
+  @@index([bookingId, scannedAt])
 }
 
 enum BookingStatus {
