@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
+import DeleteMemberButton from "./DeleteMemberButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "ข้อมูลผู้ใช้งาน — Pattani FC Admin" };
@@ -62,11 +63,12 @@ export default async function MembersPage(props: {
               <th className="px-3 py-2">สมัครผ่าน</th>
               <th className="px-3 py-2">วันที่สมัคร</th>
               <th className="px-3 py-2">เข้าใช้ล่าสุด</th>
+              <th className="px-3 py-2 text-right">จัดการ</th>
             </tr>
           </thead>
           <tbody>
             {members.length === 0 ? (
-              <tr><td colSpan={5} className="p-6 text-center text-slate-500">ไม่พบข้อมูลผู้ใช้งาน</td></tr>
+              <tr><td colSpan={6} className="p-6 text-center text-slate-500">ไม่พบข้อมูลผู้ใช้งาน</td></tr>
             ) : members.map((member) => (
               <tr key={member.id} className="border-t">
                 <td className="px-3 py-2 font-medium text-green-900">
@@ -77,6 +79,7 @@ export default async function MembersPage(props: {
                 <td className="px-3 py-2 text-xs text-slate-600">{member.accounts.length ? member.accounts.map((account) => account.provider).join(", ") : "อีเมล / รหัสผ่าน"}</td>
                 <td className="px-3 py-2 text-xs text-slate-600">{formatDateTime(member.createdAt)}</td>
                 <td className="px-3 py-2 text-xs text-slate-600">{member.lastLoginAt ? formatDateTime(member.lastLoginAt) : "ยังไม่เคยเข้าใช้"}</td>
+                <td className="px-3 py-2 text-right"><DeleteMemberButton memberId={member.id} memberName={member.name} /></td>
               </tr>
             ))}
           </tbody>
