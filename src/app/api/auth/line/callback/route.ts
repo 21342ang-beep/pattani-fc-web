@@ -52,6 +52,6 @@ export async function GET(req: Request) {
     );
   }
   return NextResponse.redirect(
-    successRedirectUrl(result.emailChanged ? "email_from_line" : undefined),
+    successRedirectUrl(result.emailChanged ? "email_from_line" : undefined, stateData.returnTo),
   );
 }

@@ -25,6 +25,12 @@ export type OAuthPendingProfile = {
   name: string;
   email: string;
   phone: string | null;
+  gender: string;
+  birthDate: string;
+  address: string;
+  province: string;
+  district: string;
+  postalCode: string;
   passwordHash: string;
 };
 
@@ -35,7 +41,15 @@ export type OAuthState = {
   nonce: string;
   expiresAt: number;
   profile?: OAuthPendingProfile;
+  returnTo?: string;
 };
+
+export function getSafeReturnTo(value: string | null | undefined): string | null {
+  if (!value || !value.startsWith("/season-pass/apply?") || value.startsWith("//")) {
+    return null;
+  }
+  return value;
+}
 
 export function requireAppUrl(): string {
   const raw = process.env.NEXT_PUBLIC_APP_URL;
@@ -88,9 +102,11 @@ export async function createOAuthState(
   intent: OAuthIntent,
   pdpaConsent: boolean,
   profile?: OAuthPendingProfile,
+  returnTo?: string | null,
 ): Promise<string> {
   const nonce = crypto.randomUUID();
   const expiresAt = Date.now() + STATE_TTL_MS;
+  const safeReturnTo = getSafeReturnTo(returnTo);
   const token = await signState({
     provider,
     intent,
@@ -98,6 +114,7 @@ export async function createOAuthState(
     nonce,
     expiresAt,
     ...(profile ? { profile } : {}),
+    ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
   });
   const store = await cookies();
   store.set(STATE_COOKIE_PREFIX + provider, token, {
@@ -130,8 +147,8 @@ export async function consumeOAuthState(
 
 // URL ปลายทางเมื่อ login/register สำเร็จ หรือมี error
 // notice = โน้ตให้หน้า /member แสดง banner (เช่น อีเมลถูกยึดตาม provider)
-export function successRedirectUrl(notice?: string): URL {
-  const url = new URL("/member", requireAppUrl());
+export function successRedirectUrl(notice?: string, returnTo?: string): URL {
+  const url = new URL(getSafeReturnTo(returnTo) ?? "/member", requireAppUrl());
   if (notice) url.searchParams.set("notice", notice);
   return url;
 }

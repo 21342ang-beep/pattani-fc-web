@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getAllProvinces } from "geothai";
 import { prisma } from "@/lib/prisma";
 import { readCustomerSession } from "@/lib/customer-session";
@@ -19,12 +19,24 @@ export default async function SeasonPassApplyPage(props: {
   // ⚠️ mock flow — ไม่มีการเขียน DB ใด ๆ
   // session ใช้แค่ auto-fill ฟอร์มให้สมาชิก (guest กรอกเองได้)
   const session = await readCustomerSession();
-  const customer = session
-    ? await prisma.customer.findUnique({
-        where: { id: session.customerId },
-        select: { name: true, phone: true },
-      })
-    : null;
+  if (!session) {
+    redirect(`/register?next=${encodeURIComponent(`/season-pass/apply?tier=${tier.id}`)}`);
+  }
+  const customer = await prisma.customer.findUnique({
+    where: { id: session.customerId },
+    select: {
+      name: true,
+      email: true,
+      phone: true,
+      address: true,
+      province: true,
+      district: true,
+      postalCode: true,
+    },
+  });
+  const memberEmail = customer?.email.endsWith("@accounts.pattanifc.local")
+    ? null
+    : (customer?.email ?? session.email);
   const shippingProvinces: ShippingProvince[] = getAllProvinces()
     .map((province) => ({
       name: province.name_th,
@@ -49,17 +61,19 @@ export default async function SeasonPassApplyPage(props: {
           สมัคร {tier.name}
         </h1>
         <p className="mt-2 text-base text-slate-600">
-          {session
-            ? `ยินดีต้อนรับกลับ ${session.name} — เราเติมข้อมูลบางส่วนให้แล้ว`
-            : "ไม่ต้องเป็นสมาชิกก็สมัครได้ — กรอกข้อมูลติดต่อด้านล่าง"}
+          {`ยินดีต้อนรับกลับ ${session.name} — เราเติมข้อมูลสมาชิกให้แล้ว`}
         </p>
       </div>
 
       <SeasonPassWizard
         tier={tier}
-        memberEmail={session?.email ?? null}
-        defaultName={customer?.name ?? session?.name ?? ""}
+        memberEmail={memberEmail}
+        defaultName={customer?.name ?? session.name}
         defaultPhone={customer?.phone ?? ""}
+        defaultAddress={customer?.address ?? ""}
+        defaultProvince={customer?.province ?? ""}
+        defaultDistrict={customer?.district ?? ""}
+        defaultPostalCode={customer?.postalCode ?? ""}
         shippingProvinces={shippingProvinces}
       />
     </div>

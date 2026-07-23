@@ -160,6 +160,7 @@ export default function TopNav({
             onClick={() => setOpenMenu(isOpen ? null : it.label)}
             aria-expanded={isOpen}
             aria-haspopup="menu"
+            suppressHydrationWarning
             className={`relative flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-3.5 text-xl font-bold tracking-[0.035em] [word-spacing:0.15em] transition-colors ${
               active || isOpen ? "text-green-950" : "text-white hover:text-white"
             }`}

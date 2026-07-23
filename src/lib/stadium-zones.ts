@@ -1,11 +1,11 @@
 export const STADIUM_ZONES = {
-  A1: { label: "อัฒจันทร์เหนือ · A1", priceSatang: 17_000 },
-  A2: { label: "อัฒจันทร์เหนือ · A2", priceSatang: 15_000 },
-  B: { label: "อัฒจันทร์ฝั่งตะวันออก · B", priceSatang: 10_000 },
-  C: { label: "อัฒจันทร์ใต้ฝั่งตะวันออก · C", priceSatang: 12_000 },
-  D: { label: "อัฒจันทร์ใต้ · D", priceSatang: 15_000 },
-  E: { label: "อัฒจันทร์ใต้ฝั่งตะวันตก · E", priceSatang: 12_000 },
-  G: { label: "อัฒจันทร์ฝั่งตะวันตก · G", priceSatang: 10_000 },
+  A: { label: "อัฒจันทร์เหนือ · A", priceSatang: 15_000 },
+  B: { label: "อัฒจันทร์เหนือ · B", priceSatang: 15_000 },
+  C: { label: "อัฒจันทร์ฝั่งตะวันออก · C", priceSatang: 10_000 },
+  D: { label: "อัฒจันทร์ใต้ฝั่งตะวันออก · D", priceSatang: 12_000 },
+  E: { label: "อัฒจันทร์ใต้ · E", priceSatang: 15_000 },
+  F: { label: "อัฒจันทร์ใต้ฝั่งตะวันตก · F", priceSatang: 12_000 },
+  H: { label: "อัฒจันทร์ฝั่งตะวันตก · H", priceSatang: 10_000 },
   AWAY: { label: "ทีมเยือน", priceSatang: 20_000 },
 } as const;
 

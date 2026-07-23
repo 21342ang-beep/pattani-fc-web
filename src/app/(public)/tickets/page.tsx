@@ -20,13 +20,13 @@ type StadiumZone = {
   note?: string;
 };
 const STADIUM_ZONES: StadiumZone[] = [
-  { code: "A1", label: "อัฒจันทร์เหนือ · A1", priceBaht: 170, capacity: 546, color: "green" },
-  { code: "A2", label: "อัฒจันทร์เหนือ · A2", priceBaht: 150, capacity: 840, color: "blue" },
-  { code: "B", label: "อัฒจันทร์ฝั่งตะวันออก · B", priceBaht: 100, capacity: 2987, color: "orange" },
-  { code: "C", label: "อัฒจันทร์ใต้ฝั่งตะวันออก · C", priceBaht: 120, capacity: 500, color: "green" },
-  { code: "D", label: "อัฒจันทร์ใต้ · D", priceBaht: 150, capacity: 1496, color: "blue" },
-  { code: "E", label: "อัฒจันทร์ใต้ฝั่งตะวันตก · E", priceBaht: 120, capacity: 500, color: "green" },
-  { code: "G", label: "อัฒจันทร์ฝั่งตะวันตก · G", priceBaht: 100, capacity: 2065, color: "orange" },
+  { code: "A", label: "อัฒจันทร์เหนือ · A", priceBaht: 150, capacity: 546, color: "green" },
+  { code: "B", label: "อัฒจันทร์เหนือ · B", priceBaht: 150, capacity: 840, color: "green" },
+  { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", priceBaht: 100, capacity: 2987, color: "orange" },
+  { code: "D", label: "อัฒจันทร์ใต้ฝั่งตะวันออก · D", priceBaht: 120, capacity: 500, color: "yellow" },
+  { code: "E", label: "อัฒจันทร์ใต้ · E", priceBaht: 150, capacity: 1496, color: "green" },
+  { code: "F", label: "อัฒจันทร์ใต้ฝั่งตะวันตก · F", priceBaht: 120, capacity: 500, color: "yellow" },
+  { code: "H", label: "อัฒจันทร์ฝั่งตะวันตก · H", priceBaht: 100, capacity: 2065, color: "orange" },
   { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: 1000, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
 ];
 
@@ -70,7 +70,7 @@ export default async function TicketsPage() {
         {/* แผนผังสนาม — โชว์บนสุด ให้คนดูมุมมองก่อนเลือกโซน */}
         <div className="relative aspect-[1553/1053] w-full">
             <Image
-                src="/stadium-zones-2026-27.png"
+                src="/stadium-zones-match-2026-27.png"
               alt="แผนผังโซนที่นั่งของ Rainbow Stadium — Pattani FC (ความจุ 10,700)"
               fill
               priority

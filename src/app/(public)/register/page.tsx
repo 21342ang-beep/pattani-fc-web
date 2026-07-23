@@ -2,8 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Shield } from "lucide-react";
+import { getAllProvinces } from "geothai";
 import { readCustomerSession } from "@/lib/customer-session";
-import RegisterForm from "./RegisterForm";
+import { getSafeReturnTo } from "@/lib/oauth";
+import RegisterForm, { type ShippingProvince } from "./RegisterForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "สมัครสมาชิก — Pattani FC" };
@@ -24,16 +26,26 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default async function RegisterPage(props: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const session = await readCustomerSession();
-  if (session) redirect("/member");
   const sp = await props.searchParams;
+  const returnTo = getSafeReturnTo(sp.next);
+  const session = await readCustomerSession();
+  if (session) redirect(returnTo ?? "/member");
   const errorMessage = sp.error ? ERROR_MESSAGES[sp.error] : undefined;
+  const shippingProvinces: ShippingProvince[] = getAllProvinces()
+    .map((province) => ({
+      name: province.name_th,
+      districts: province.districts.map((district) => ({
+        name: district.name_th,
+        postalCodes: [...new Set(district.subdistricts.map((subdistrict) => String(subdistrict.postal_code)))].sort(),
+      })),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "th-TH"));
 
   return (
     <main className="flex flex-1 items-center justify-center bg-gradient-to-br from-green-50 via-yellow-50 to-green-100 px-4 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-green-200 bg-white p-7 shadow-xl">
+      <div className="w-full max-w-lg rounded-2xl border border-green-200 bg-white p-7 shadow-xl">
         <div className="mb-5 flex flex-col items-center">
           <Image
             src="/logo-pattani-fc.png"
@@ -52,7 +64,7 @@ export default async function RegisterPage(props: {
           </p>
         </div>
 
-        <RegisterForm errorMessage={errorMessage} />
+        <RegisterForm errorMessage={errorMessage} shippingProvinces={shippingProvinces} returnTo={returnTo ?? undefined} />
 
         <p className="mt-5 text-center text-sm text-slate-600">
           มีบัญชีอยู่แล้ว?{" "}

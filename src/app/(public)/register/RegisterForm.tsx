@@ -8,6 +8,11 @@ import {
 } from "@/app/actions/customer-auth";
 import PasswordInput from "@/components/PasswordInput";
 
+export type ShippingProvince = {
+  name: string;
+  districts: { name: string; postalCodes: string[] }[];
+};
+
 // สมัครแบบ hybrid — flow เดียว:
 //   1) กรอกข้อมูลให้ครบ (ชื่อ/อีเมล/เบอร์/รหัสผ่าน) + ยอมรับ PDPA
 //   2) เลือกวิธีเข้าระบบ:
@@ -17,15 +22,36 @@ import PasswordInput from "@/components/PasswordInput";
 // ปุ่มทุกอันเป็น submit ของฟอร์มเดียวกัน — ค่า name="mode" บอก action ว่าลูกค้ากดอะไร
 export default function RegisterForm({
   errorMessage,
+  shippingProvinces,
+  returnTo,
 }: {
   errorMessage?: string;
+  shippingProvinces: ShippingProvince[];
+  returnTo?: string;
 }) {
   const [pdpaChecked, setPdpaChecked] = useState(false);
+  const [province, setProvince] = useState("");
+  const [district, setDistrict] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [state, formAction, pending] = useActionState<CustomerAuthState, FormData>(
     registerCustomer,
     undefined,
   );
   const fe = state?.fieldErrors ?? {};
+  const selectedProvince = shippingProvinces.find((item) => item.name === province);
+  const selectedDistrict = selectedProvince?.districts.find((item) => item.name === district);
+
+  function handleProvinceChange(value: string) {
+    setProvince(value);
+    setDistrict("");
+    setPostalCode("");
+  }
+
+  function handleDistrictChange(value: string) {
+    const nextDistrict = selectedProvince?.districts.find((item) => item.name === value);
+    setDistrict(value);
+    setPostalCode(nextDistrict?.postalCodes.length === 1 ? nextDistrict.postalCodes[0] : "");
+  }
 
   return (
     <div className="space-y-4">
@@ -41,6 +67,7 @@ export default function RegisterForm({
           name="pdpaConsent"
           value={pdpaChecked ? "on" : ""}
         />
+        {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
 
         {/* ─── ข้อมูลลูกค้า ─── */}
         <Field
@@ -56,7 +83,6 @@ export default function RegisterForm({
           name="email"
           type="email"
           autoComplete="email"
-          required
           error={fe.email}
           hint="ถ้าผูกกับ Google/LINE ระบบจะยึดอีเมลจากบัญชีนั้นเพื่อความปลอดภัย"
         />
@@ -65,8 +91,63 @@ export default function RegisterForm({
           name="phone"
           type="tel"
           autoComplete="tel"
+          required
           error={fe.phone}
         />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SelectField label="เพศ" error={fe.gender} required>
+            <select name="gender" required defaultValue="" className={selectClassName(!!fe.gender)}>
+              <option value="" disabled>เลือกเพศ</option>
+              <option value="MALE">ชาย</option>
+              <option value="FEMALE">หญิง</option>
+              <option value="NON_BINARY">ไม่ระบุเพศตามกำเนิด</option>
+              <option value="PREFER_NOT_TO_SAY">ไม่ประสงค์ระบุ</option>
+            </select>
+          </SelectField>
+          <Field
+            label="วันเกิด"
+            name="birthDate"
+            type="date"
+            autoComplete="bday"
+            max={new Date().toISOString().slice(0, 10)}
+            required
+            error={fe.birthDate}
+          />
+        </div>
+        <div className="rounded-lg border border-green-100 bg-green-50/40 p-4">
+          <p className="text-sm font-bold text-green-900">ที่อยู่สำหรับจัดส่ง</p>
+          <div className="mt-3 space-y-3">
+            <Field
+              label="ที่อยู่"
+              name="address"
+              type="text"
+              autoComplete="street-address"
+              placeholder="บ้านเลขที่ / หมู่ / ซอย / ถนน"
+              required
+              error={fe.address}
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SelectField label="จังหวัด" error={fe.province} required>
+                <select name="province" value={province} onChange={(event) => handleProvinceChange(event.target.value)} required className={selectClassName(!!fe.province)}>
+                  <option value="">เลือกจังหวัด</option>
+                  {shippingProvinces.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+                </select>
+              </SelectField>
+              <SelectField label="อำเภอ/เขต" error={fe.district} required>
+                <select name="district" value={district} onChange={(event) => handleDistrictChange(event.target.value)} disabled={!selectedProvince} required className={selectClassName(!!fe.district)}>
+                  <option value="">{selectedProvince ? "เลือกอำเภอ/เขต" : "เลือกจังหวัดก่อน"}</option>
+                  {selectedProvince?.districts.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+                </select>
+              </SelectField>
+            </div>
+            <SelectField label="รหัสไปรษณีย์" error={fe.postalCode} required>
+              <select name="postalCode" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} disabled={!selectedDistrict} required className={selectClassName(!!fe.postalCode)}>
+                <option value="">{selectedDistrict ? "เลือกรหัสไปรษณีย์" : "เลือกอำเภอก่อน"}</option>
+                {selectedDistrict?.postalCodes.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </SelectField>
+          </div>
+        </div>
         <PasswordField
           label="รหัสผ่าน"
           name="password"
@@ -223,6 +304,36 @@ function LineIcon() {
   );
 }
 
+function selectClassName(invalid: boolean) {
+  return `w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+    invalid
+      ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+      : "border-green-200 focus:border-green-600 focus:ring-green-600/20"
+  }`;
+}
+
+function SelectField({
+  label,
+  error,
+  required = false,
+  children,
+}: {
+  label: string;
+  error?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-green-900">
+        {label} <RequirementLabel required={required} />
+      </label>
+      <div className="mt-1">{children}</div>
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 function Field({
   label,
   hint,
@@ -235,7 +346,9 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-green-900">{label}</label>
+      <label className="block text-sm font-medium text-green-900">
+        {label} <RequirementLabel required={!!input.required} />
+      </label>
       <input
         {...input}
         suppressHydrationWarning
@@ -266,7 +379,9 @@ function PasswordField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-green-900">{label}</label>
+      <label className="block text-sm font-medium text-green-900">
+        {label} <RequirementLabel required={!!input.required} />
+      </label>
       <div className="mt-1">
         <PasswordInput {...input} invalid={!!error} />
       </div>
@@ -276,5 +391,13 @@ function PasswordField({
         <p className="mt-1 text-xs text-slate-500">{hint}</p>
       ) : null}
     </div>
+  );
+}
+
+function RequirementLabel({ required }: { required: boolean }) {
+  return required ? (
+    <span className="text-xs font-semibold text-red-600">* จำเป็น</span>
+  ) : (
+    <span className="text-xs font-normal text-slate-400">(ไม่บังคับ)</span>
   );
 }

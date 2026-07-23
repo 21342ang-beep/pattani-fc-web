@@ -9,19 +9,37 @@ import {
   deleteCustomerSession,
 } from "@/lib/customer-session";
 import { rateLimit } from "@/lib/rate-limit";
-import { createOAuthState } from "@/lib/oauth";
+import { createOAuthState, getSafeReturnTo } from "@/lib/oauth";
 import { buildGoogleAuthUrl, isGoogleConfigured } from "@/lib/oauth-google";
 import { buildLineAuthUrl, isLineConfigured } from "@/lib/oauth-line";
 
 const registerSchema = z.object({
   name: z.string().trim().min(2, "กรอกชื่อ-นามสกุลให้ครบ").max(100),
-  email: z.string().trim().toLowerCase().email("อีเมลไม่ถูกต้อง"),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("อีเมลไม่ถูกต้อง")
+    .optional()
+    .or(z.literal("")),
   phone: z
     .string()
     .trim()
-    .regex(/^[0-9+\-\s]{9,15}$/, "เบอร์โทรไม่ถูกต้อง")
-    .optional()
-    .or(z.literal("")),
+    .regex(/^[0-9+\-\s]{9,15}$/, "เบอร์โทรไม่ถูกต้อง"),
+  gender: z.enum(["MALE", "FEMALE", "NON_BINARY", "PREFER_NOT_TO_SAY"], {
+    message: "กรุณาเลือกเพศ",
+  }),
+  birthDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "กรุณาเลือกวันเกิด")
+    .refine((value) => {
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(date.getTime()) && date <= new Date();
+    }, "วันเกิดไม่ถูกต้อง"),
+  address: z.string().trim().min(5, "กรุณากรอกที่อยู่").max(500),
+  province: z.string().trim().min(1, "กรุณาเลือกจังหวัด"),
+  district: z.string().trim().min(1, "กรุณาเลือกอำเภอ/เขต"),
+  postalCode: z.string().regex(/^\d{5}$/, "กรุณาเลือกรหัสไปรษณีย์"),
   password: z
     .string()
     .min(8, "รหัสผ่านต้องอย่างน้อย 8 ตัวอักษร")
@@ -61,11 +79,18 @@ export async function registerCustomer(
   // mode = ปุ่มที่ลูกค้ากด: "password" (สมัครด้วยรหัสผ่าน) | "google" | "line"
   // ทุกโหมด validate ฟอร์มเต็มเหมือนกัน (บัญชี hybrid = มีรหัสผ่านเสมอ)
   const mode = String(formData.get("mode") ?? "password");
+  const returnTo = getSafeReturnTo(formData.get("returnTo")?.toString());
 
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     phone: formData.get("phone") || "",
+    gender: formData.get("gender"),
+    birthDate: formData.get("birthDate"),
+    address: formData.get("address"),
+    province: formData.get("province"),
+    district: formData.get("district"),
+    postalCode: formData.get("postalCode"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
     pdpaConsent: formData.get("pdpaConsent"),
@@ -79,7 +104,8 @@ export async function registerCustomer(
     return { error: "กรุณาตรวจสอบข้อมูล", fieldErrors };
   }
 
-  const { name, email, phone, password } = parsed.data;
+  const { name, email, phone, gender, birthDate, address, province, district, postalCode, password } = parsed.data;
+  const accountEmail = email || `member-${crypto.randomUUID()}@accounts.pattanifc.local`;
 
   // ── โหมดผูก Google / LINE ──
   // validate ครบแล้ว → hash รหัสผ่าน, ฝากข้อมูลไว้ใน OAuth state (signed cookie),
@@ -99,10 +125,16 @@ export async function registerCustomer(
     const passwordHash = await bcrypt.hash(password, 12);
     const nonce = await createOAuthState(provider, "register", true, {
       name,
-      email,
+      email: email || "",
       phone: phone || null,
+      gender,
+      birthDate,
+      address,
+      province,
+      district,
+      postalCode,
       passwordHash,
-    });
+    }, returnTo);
     const authUrl =
       provider === "GOOGLE"
         ? buildGoogleAuthUrl(nonce)
@@ -112,7 +144,7 @@ export async function registerCustomer(
 
   // ── โหมดสมัครด้วยรหัสผ่าน (email/password) ──
   // กัน race: ตรวจซ้ำก่อน แล้ว create — error code P2002 จะกันได้อีกชั้น
-  const existing = await prisma.customer.findUnique({ where: { email } });
+  const existing = email ? await prisma.customer.findUnique({ where: { email } }) : null;
   if (existing) {
     return {
       error: "อีเมลนี้ถูกใช้งานแล้ว",
@@ -125,10 +157,16 @@ export async function registerCustomer(
   try {
     const customer = await prisma.customer.create({
       data: {
-        email,
+        email: accountEmail,
         passwordHash,
         name,
         phone: phone || null,
+        gender,
+        birthDate: new Date(`${birthDate}T00:00:00.000Z`),
+        address,
+        province,
+        district,
+        postalCode,
         pdpaConsentAt: new Date(),
       },
     });
@@ -144,7 +182,7 @@ export async function registerCustomer(
     return { error: "เกิดข้อผิดพลาดในการสมัคร กรุณาลองใหม่อีกครั้ง" };
   }
 
-  redirect("/member");
+  redirect(returnTo ?? "/member");
 }
 
 export async function loginCustomer(

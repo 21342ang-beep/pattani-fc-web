@@ -21,6 +21,7 @@ import {
 const createSchema = z
   .object({
     tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"] as const),
+    seatZone: z.enum(["VIP-A", "VIP-B", "PRIMIUM-A", "PRIMIUM-B", "PRIMIUM-E", "GOLD-D", "GOLD-F"] as const),
     name: z.string().trim().min(2, "กรุณากรอกชื่อ").max(100),
     phone: z
       .string()
@@ -163,6 +164,7 @@ export async function createSeasonPassOrder(
       data: {
         passCode: barcode.barcode,
         tierId: parsed.data.tierId,
+        seatZone: parsed.data.seatZone,
         seasonLabel: SEASON_LABEL,
         priceBaht: tier.priceBaht,
         shippingFeeBaht,

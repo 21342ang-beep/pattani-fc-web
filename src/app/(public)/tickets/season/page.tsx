@@ -10,6 +10,7 @@ import {
   CalendarRange,
 } from "lucide-react";
 import PageHero from "../../_components/PageHero";
+import { readCustomerSession } from "@/lib/customer-session";
 import {
   SEASON_MATCHES,
   SEASON_TIERS,
@@ -27,7 +28,8 @@ const TIER_ICONS: Record<SeasonTierId, React.ReactNode> = {
   gold: <Medal className="size-7" />,
 };
 
-export default function SeasonTicketsPage() {
+export default async function SeasonTicketsPage() {
+  const session = await readCustomerSession();
   return (
     <>
       <PageHero
@@ -42,17 +44,15 @@ export default function SeasonTicketsPage() {
             <h2 className="mt-1 text-3xl font-black text-green-900 md:text-4xl">แผนผังสนาม</h2>
             <p className="mt-2 text-base text-slate-600">ตรวจสอบโซนที่นั่งก่อนเลือกแพ็กเกจสมาชิก</p>
           </div>
-          <div className="overflow-hidden rounded-3xl border-2 border-green-900/10 bg-[#f3e7c8] p-3 shadow-xl md:p-5">
-            <div className="relative aspect-[1553/1053] w-full overflow-hidden rounded-2xl">
+          <div className="relative aspect-[1553/1053] w-full">
               <Image
-                src="/stadium-zones-2026-27-white.png"
+                src="/stadium-zones-season-2026-27.png"
                 alt="แผนผังโซนที่นั่ง Rainbow Stadium — Pattani FC"
                 fill
                 sizes="(max-width: 768px) 100vw, 1152px"
                 className="object-contain"
                 priority
               />
-            </div>
           </div>
         </section>
 
@@ -71,7 +71,7 @@ export default function SeasonTicketsPage() {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {SEASON_TIERS.filter((t) => t.id !== "vvip-elite").map((t) => (
-            <TierCard key={t.id} tier={t} />
+            <TierCard key={t.id} tier={t} isMember={!!session} />
           ))}
         </div>
 
@@ -83,7 +83,7 @@ export default function SeasonTicketsPage() {
   );
 }
 
-function TierCard({ tier }: { tier: SeasonTier }) {
+function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
   const highlighted = tier.highlight;
   const priceLabel = tier.priceBaht.toLocaleString("th-TH");
   const unitLabel = `บาท / ฤดูกาล · ${SEASON_MATCHES} แมตช์`;
@@ -178,7 +178,7 @@ function TierCard({ tier }: { tier: SeasonTier }) {
       </ul>
 
       <Link
-        href={`/season-pass/apply?tier=${tier.id}`}
+        href={isMember ? `/season-pass/apply?tier=${tier.id}` : `/register?next=${encodeURIComponent(`/season-pass/apply?tier=${tier.id}`)}`}
         className={`mt-7 inline-flex w-full items-center justify-center rounded-full px-5 py-3 text-base font-bold transition ${
           highlighted
             ? "bg-yellow-400 text-green-950 hover:bg-yellow-300"

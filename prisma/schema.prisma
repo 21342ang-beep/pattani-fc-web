@@ -55,6 +55,12 @@ model Customer {
   passwordHash    String?
   name            String
   phone           String?
+  gender          String?
+  birthDate       DateTime?
+  address         String?
+  province        String?
+  district        String?
+  postalCode      String?
   emailVerifiedAt DateTime?
   lastLoginAt     DateTime?
   pdpaConsentAt   DateTime?
@@ -269,6 +275,7 @@ model SeasonPassOrder {
   id               String                    @id @default(cuid())
   passCode         String                    @unique
   tierId           String                    // "vvip-elite" | "vip-advanced" | "premium" | "gold"
+  seatZone         String
   seasonLabel      String                    // "2026/27"
   priceBaht        Int                       // สแนปช็อตราคาบัตร ณ วันซื้อ
   shippingFeeBaht  Int                       @default(0)

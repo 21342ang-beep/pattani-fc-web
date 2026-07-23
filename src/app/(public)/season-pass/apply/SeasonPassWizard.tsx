@@ -39,6 +39,15 @@ type Step = "form" | "payment" | "success";
 type Method = "card" | "promptpay" | "banking";
 type DeliveryMethod = "SHIPPING" | "PICKUP";
 const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"] as const;
+const SEASON_SEAT_ZONES = [
+  "VIP-A",
+  "VIP-B",
+  "PRIMIUM-A",
+  "PRIMIUM-B",
+  "PRIMIUM-E",
+  "GOLD-D",
+  "GOLD-F",
+] as const;
 
 export type ShippingProvince = {
   name: string;
@@ -52,6 +61,7 @@ interface CustomerData {
   name: string;
   phone: string;
   email: string;
+  seatZone: (typeof SEASON_SEAT_ZONES)[number] | "";
   deliveryMethod: DeliveryMethod;
   shipAddress: string;
   shipCity: string;
@@ -74,12 +84,20 @@ export default function SeasonPassWizard({
   memberEmail,
   defaultName,
   defaultPhone,
+  defaultAddress,
+  defaultProvince,
+  defaultDistrict,
+  defaultPostalCode,
   shippingProvinces,
 }: {
   tier: SeasonTier;
   memberEmail: string | null;
   defaultName: string;
   defaultPhone: string;
+  defaultAddress: string;
+  defaultProvince: string;
+  defaultDistrict: string;
+  defaultPostalCode: string;
   shippingProvinces: ShippingProvince[];
 }) {
   const [step, setStep] = useState<Step>("form");
@@ -87,11 +105,12 @@ export default function SeasonPassWizard({
     name: defaultName,
     phone: defaultPhone,
     email: memberEmail ?? "",
+    seatZone: "",
     deliveryMethod: "PICKUP",
-    shipAddress: "",
-    shipCity: "",
-    shipProvince: "",
-    shipPostalCode: "",
+    shipAddress: defaultAddress,
+    shipCity: defaultDistrict,
+    shipProvince: defaultProvince,
+    shipPostalCode: defaultPostalCode,
     shirtSize: "",
     shipNote: "",
     pickupLocation: SEASON_PASS_PICKUP_LOCATIONS[0],
@@ -114,11 +133,17 @@ export default function SeasonPassWizard({
   // เรียก server action → บันทึกออเดอร์ลง DB → คืน passCode ที่แท้จริง
   async function handlePaymentSuccess(paymentMethod: Method): Promise<boolean> {
     setSaveError(null);
+    if (!customer.seatZone) {
+      setSaveError("กรุณาเลือกโซนที่นั่ง");
+      setStep("form");
+      return false;
+    }
     const res = await createSeasonPassOrder({
       tierId: tier.id,
       name: customer.name,
       phone: customer.phone,
       email: customer.email || "",
+      seatZone: customer.seatZone,
       paymentMethod,
       deliveryMethod: customer.deliveryMethod,
       shipAddress: customer.shipAddress,
@@ -247,6 +272,7 @@ function FormStep({
   const [name, setName] = useState(initial.name);
   const [phone, setPhone] = useState(initial.phone);
   const [email, setEmail] = useState(initial.email);
+  const [seatZone, setSeatZone] = useState(initial.seatZone);
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(
     initial.deliveryMethod,
   );
@@ -287,6 +313,7 @@ function FormStep({
     if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       nextErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
     }
+    if (!seatZone) nextErrors.seatZone = "กรุณาเลือกโซนที่นั่ง";
     if (deliveryMethod === "SHIPPING") {
       if (!shipAddress.trim()) nextErrors.shipAddress = "กรุณากรอกที่อยู่";
       if (!selectedProvince) nextErrors.shipProvince = "กรุณาเลือกจังหวัดจากรายการ";
@@ -305,6 +332,7 @@ function FormStep({
       name: name.trim(),
       phone: phone.trim(),
       email: email.trim(),
+      seatZone,
       deliveryMethod,
       shipAddress: shipAddress.trim(),
       shipCity: shipCity.trim(),
@@ -374,6 +402,26 @@ function FormStep({
             memberEmail ? "bg-slate-50 text-slate-600" : ""
           }`}
         />
+      </Field>
+
+      <Field
+        label="โซนที่นั่ง"
+        htmlFor="sp-seat-zone"
+        error={errors.seatZone}
+        hint="กรุณาเลือกโซนสำหรับบัตรรายปี"
+      >
+        <select
+          id="sp-seat-zone"
+          value={seatZone}
+          onChange={(e) => setSeatZone(e.target.value as typeof seatZone)}
+          required
+          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-base outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+        >
+          <option value="">เลือกโซนที่นั่ง</option>
+          {SEASON_SEAT_ZONES.map((zone) => (
+            <option key={zone} value={zone}>{zone}</option>
+          ))}
+        </select>
       </Field>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
