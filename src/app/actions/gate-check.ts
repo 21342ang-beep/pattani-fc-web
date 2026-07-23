@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { isPattaniHomeTeam } from "@/lib/season-pass-home-match";
@@ -283,5 +284,33 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
     if (error instanceof Error && error.message === "EXHAUSTED") return { ok: false, error: "EXHAUSTED" };
     // PostgreSQL unique index [barcodeId, matchId] is the final duplicate guard.
     return { ok: false, error: "DUPLICATE" };
+  }
+}
+
+// ใช้สำหรับล้างรายการทดสอบจากหน้าผู้ดูแลบัตรรายปีเท่านั้น
+// เมื่อลบ scan จะคืนสิทธิ์ 1 แมตช์กลับให้บัตรใบนั้นเสมอ
+export async function deleteSeasonPassScan(scanId: string): Promise<{ ok: true } | { error: string }> {
+  await verifyPermission("SEASON_PASSES");
+  if (!z.string().regex(/^[a-z0-9]+$/i).safeParse(scanId).success) {
+    return { error: "รหัสรายการสแกนไม่ถูกต้อง" };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const scan = await tx.seasonPassScan.findUnique({
+        where: { id: scanId },
+        select: { id: true, barcodeId: true },
+      });
+      if (!scan) throw new Error("NOT_FOUND");
+      await tx.seasonPassScan.delete({ where: { id: scan.id } });
+      await tx.seasonPassBarcode.update({
+        where: { id: scan.barcodeId },
+        data: { usesRemaining: { increment: 1 } },
+      });
+    });
+    revalidatePath("/admin/season-passes/check");
+    return { ok: true };
+  } catch {
+    return { error: "ลบข้อมูลการสแกนไม่สำเร็จ" };
   }
 }

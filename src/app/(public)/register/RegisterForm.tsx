@@ -104,15 +104,15 @@ export default function RegisterForm({
               <option value="PREFER_NOT_TO_SAY">ไม่ประสงค์ระบุ</option>
             </select>
           </SelectField>
-          <Field
-            label="วันเกิด"
-            name="birthDate"
-            type="date"
-            autoComplete="bday"
-            max={new Date().toISOString().slice(0, 10)}
-            required
-            error={fe.birthDate}
-          />
+          <SelectField label="ปีเกิด" error={fe.birthDate} required>
+            <select name="birthDate" required defaultValue="" className={selectClassName(!!fe.birthDate)} suppressHydrationWarning>
+              <option value="" disabled>เลือกปีเกิด</option>
+              {Array.from({ length: 101 }, (_, index) => {
+                const year = new Date().getFullYear() - index;
+                return <option key={year} value={`${year}-01-01`}>{year}</option>;
+              })}
+            </select>
+          </SelectField>
         </div>
         <div className="rounded-lg border border-green-100 bg-green-50/40 p-4">
           <p className="text-sm font-bold text-green-900">ที่อยู่ตามบัตรประชาชน</p>

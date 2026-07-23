@@ -3,6 +3,7 @@ import { verifyPermission } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
 import CheckForm from "./CheckForm";
+import DeleteBookingGateScanButton from "./DeleteBookingGateScanButton";
 
 export const metadata = { title: "ตรวจสอบการจอง — Pattani FC Admin" };
 
@@ -64,6 +65,7 @@ export default async function CheckBookingPage() {
                 <th className="px-3 py-2">ผู้จอง</th>
                 <th className="px-3 py-2">แมตช์</th>
                 <th className="px-3 py-2">ผู้สแกน</th>
+                <th className="px-3 py-2 text-right">ทดสอบ</th>
               </tr>
             </thead>
             <tbody>
@@ -74,11 +76,12 @@ export default async function CheckBookingPage() {
                   <td className="px-3 py-2 font-medium">{scan.booking.customerName}</td>
                   <td className="px-3 py-2">{scan.booking.match.homeTeam} vs {scan.booking.match.awayTeam}</td>
                   <td className="px-3 py-2 font-mono text-xs text-slate-500">{scan.scannedBy}</td>
+                  <td className="px-3 py-2 text-right"><DeleteBookingGateScanButton scanId={scan.id} /></td>
                 </tr>
               ))}
               {scans.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-slate-500">ยังไม่มีข้อมูลการสแกนใช้งานบัตร</td>
+                  <td colSpan={6} className="px-3 py-8 text-center text-slate-500">ยังไม่มีข้อมูลการสแกนใช้งานบัตร</td>
                 </tr>
               )}
             </tbody>

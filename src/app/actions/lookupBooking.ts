@@ -169,6 +169,38 @@ export async function scanBooking(bookingCode: string): Promise<BookingScanResul
   return response;
 }
 
+// ใช้สำหรับล้างผลสแกนในการทดสอบ — ลบแล้วคืนโควตาตั๋ว 1 ใบให้ booking นั้น
+export async function deleteBookingGateScan(scanId: string): Promise<{ ok: true } | { error: string }> {
+  const user = await getAdminUser();
+  if (!hasPermission(user, "BOOKINGS")) return { error: "ไม่มีสิทธิ์ลบข้อมูลการสแกน" };
+  if (!z.string().regex(/^[a-z0-9]+$/i).safeParse(scanId).success) {
+    return { error: "รหัสรายการสแกนไม่ถูกต้อง" };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const scan = await tx.bookingGateScan.findUnique({
+        where: { id: scanId },
+        select: { id: true, bookingId: true },
+      });
+      if (!scan) throw new Error("NOT_FOUND");
+      await tx.bookingGateScan.delete({ where: { id: scan.id } });
+      const remaining = await tx.bookingGateScan.count({ where: { bookingId: scan.bookingId } });
+      if (remaining === 0) {
+        await tx.booking.update({
+          where: { id: scan.bookingId },
+          data: { scannedAt: null, scannedBy: null },
+        });
+      }
+    });
+    revalidatePath("/admin/bookings");
+    revalidatePath("/admin/bookings/check");
+    return { ok: true };
+  } catch {
+    return { error: "ลบข้อมูลการสแกนไม่สำเร็จ" };
+  }
+}
+
 export type LookupState =
   | { error?: string; result?: undefined }
   | { error?: undefined; result: BookingLookupResult }
