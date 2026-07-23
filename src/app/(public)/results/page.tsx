@@ -31,39 +31,39 @@ export default async function ResultsPage({
   );
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10 md:py-16">
+    <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-12 md:py-16 lg:py-20">
       <header>
-        <h1 className="text-2xl font-bold">ผลการแข่งขัน</h1>
-        <p className="text-sm text-slate-600">สรุปผลการแข่งขันและตารางคะแนน</p>
+        <h1 className="text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">ผลการแข่งขัน</h1>
+        <p className="mt-2 text-lg text-slate-600 md:text-xl lg:text-2xl">สรุปผลการแข่งขันและตารางคะแนน</p>
       </header>
-      <nav className="flex gap-2" aria-label="ประเภทการแข่งขัน">
-        <Link href="/results?competition=LEAGUE" className={`rounded-full px-4 py-2 text-sm font-semibold ${competitionType === "LEAGUE" ? "bg-green-800 text-white" : "border bg-white text-green-800"}`}>บอลลีก</Link>
-        <Link href="/results?competition=CUP" className={`rounded-full px-4 py-2 text-sm font-semibold ${competitionType === "CUP" ? "bg-green-800 text-white" : "border bg-white text-green-800"}`}>บอลถ้วย</Link>
+      <nav className="flex flex-wrap gap-3" aria-label="ประเภทการแข่งขัน">
+        <Link href="/results?competition=LEAGUE" className={`rounded-full px-6 py-3 text-lg font-semibold md:px-7 md:py-3.5 md:text-xl ${competitionType === "LEAGUE" ? "bg-green-800 text-white" : "border bg-white text-green-800"}`}>บอลลีก</Link>
+        <Link href="/results?competition=CUP" className={`rounded-full px-6 py-3 text-lg font-semibold md:px-7 md:py-3.5 md:text-xl ${competitionType === "CUP" ? "bg-green-800 text-white" : "border bg-white text-green-800"}`}>บอลถ้วย</Link>
       </nav>
       <section>
-        <h2 className="mb-3 text-xl font-bold text-green-900">ตารางคะแนน {competitionType === "LEAGUE" ? "บอลลีก" : "บอลถ้วย"}</h2>
+        <h2 className="mb-5 text-3xl font-black text-green-900 md:text-4xl lg:text-5xl">ตารางคะแนน {competitionType === "LEAGUE" ? "บอลลีก" : "บอลถ้วย"}</h2>
         <StandingsTable standings={standings} />
       </section>
       <section>
-        <h2 className="mb-3 text-xl font-bold text-green-900">ผลการแข่งขัน</h2>
+        <h2 className="mb-5 text-3xl font-black text-green-900 md:text-4xl lg:text-5xl">ผลการแข่งขัน</h2>
         {matches.length === 0 ? (
-          <div className="rounded-lg border bg-white p-8 text-center text-slate-500">ยังไม่มีผลการแข่งขัน</div>
+          <div className="rounded-lg border bg-white p-8 text-center text-lg text-slate-500 md:text-xl">ยังไม่มีผลการแข่งขัน</div>
         ) : (
           <div className="space-y-3">
             {matches.map((match) => (
-              <article key={match.id} className="rounded-xl border bg-white p-5 shadow-sm">
-                <p className="text-center text-xs text-slate-500">{match.kickoffAt ? formatDateTime(match.kickoffAt) : "ผลการแข่งขัน"}</p>
-                <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-center">
-                  <h2 className="font-bold text-green-900">{match.homeTeam}</h2>
-                  <p className="rounded-lg bg-green-950 px-4 py-2 text-xl font-black text-yellow-300">{match.homeScore} - {match.awayScore}</p>
-                  <h2 className="font-bold text-green-900">{match.awayTeam}</h2>
+              <article key={match.id} className="rounded-xl border bg-white p-6 shadow-sm md:p-7">
+                <p className="text-center text-base text-slate-500 md:text-lg">{match.kickoffAt ? formatDateTime(match.kickoffAt) : "ผลการแข่งขัน"}</p>
+                <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-center md:gap-6">
+                  <h2 className="text-xl font-bold text-green-900 md:text-2xl">{match.homeTeam}</h2>
+                  <p className="rounded-lg bg-green-950 px-5 py-3 text-3xl font-black text-yellow-300 md:px-6 md:py-4 md:text-4xl">{match.homeScore} - {match.awayScore}</p>
+                  <h2 className="text-xl font-bold text-green-900 md:text-2xl">{match.awayTeam}</h2>
                 </div>
               </article>
             ))}
           </div>
         )}
       </section>
-      <Link href="/matches" className="inline-block text-sm font-semibold text-green-800 hover:underline">ดูโปรแกรมการแข่งขัน →</Link>
+      <Link href="/matches" className="inline-block text-lg font-semibold text-green-800 hover:underline md:text-xl">ดูโปรแกรมการแข่งขัน →</Link>
     </div>
   );
 }

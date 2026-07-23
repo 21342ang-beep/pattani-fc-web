@@ -11,21 +11,21 @@ export default function BookingSearchForm() {
 
   return (
     <>
-      <form action={formAction} className="mt-6 rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-semibold text-green-900">
+      <form action={formAction} className="mt-7 rounded-2xl border border-green-100 bg-white p-7 shadow-sm md:p-8">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="block text-lg font-semibold text-green-900 md:text-xl">
             ชื่อผู้จอง
-            <input name="customerName" minLength={2} maxLength={100} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100" placeholder="ชื่อที่ใช้จอง" />
+            <input name="customerName" minLength={2} maxLength={100} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-lg font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-xl" placeholder="ชื่อที่ใช้จอง" />
           </label>
-          <label className="block text-sm font-semibold text-green-900">
+          <label className="block text-lg font-semibold text-green-900 md:text-xl">
             เบอร์โทรศัพท์
-            <input name="customerPhone" inputMode="tel" maxLength={20} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100" placeholder="เบอร์ที่ใช้จอง" />
+            <input name="customerPhone" inputMode="tel" maxLength={20} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-lg font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-xl" placeholder="เบอร์ที่ใช้จอง" />
           </label>
         </div>
-        <p className="mt-3 text-xs text-slate-500">กรอกชื่อหรือเบอร์โทรศัพท์อย่างน้อยหนึ่งช่อง — ใส่ทั้งสองช่องเพื่อให้ผลลัพธ์แม่นยำขึ้น</p>
-        {state?.error && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p>}
-        <button disabled={pending} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-5 py-3 text-sm font-bold text-yellow-300 transition hover:bg-green-900 disabled:opacity-60">
-          <Search className="size-4" /> {pending ? "กำลังค้นหา..." : "ค้นหารายการจอง"}
+        <p className="mt-4 text-base text-slate-500 md:text-lg">กรอกชื่อหรือเบอร์โทรศัพท์อย่างน้อยหนึ่งช่อง — ใส่ทั้งสองช่องเพื่อให้ผลลัพธ์แม่นยำขึ้น</p>
+        {state?.error && <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-lg text-red-700">{state.error}</p>}
+        <button disabled={pending} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-6 py-3.5 text-lg font-bold text-yellow-300 transition hover:bg-green-900 disabled:opacity-60 md:py-4 md:text-xl">
+          <Search className="size-5" /> {pending ? "กำลังค้นหา..." : "ค้นหารายการจอง"}
         </button>
       </form>
 

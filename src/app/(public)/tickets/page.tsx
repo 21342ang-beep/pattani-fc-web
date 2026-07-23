@@ -60,10 +60,10 @@ export default async function TicketsPage() {
       {/* 1) เลือกโซนที่นั่ง + แผนผังสนาม (อยู่บน) */}
       {onSaleMatches.length > 0 && (
         <section id="matches" className="mx-auto max-w-6xl px-4 pt-12 md:pt-16 scroll-mt-24">
-          <div className="mb-4">
-            <p className="text-sm font-bold uppercase tracking-widest text-emerald-700">Book now</p>
-            <h2 className="mt-1 text-3xl font-black text-green-900 md:text-4xl">โปรแกรมที่เปิดจอง</h2>
-            <p className="mt-1 text-slate-600">เลือกแมตช์ที่ต้องการ แล้วจองตั๋วได้ทันที</p>
+          <div className="mb-6">
+            <p className="text-base font-bold uppercase tracking-widest text-emerald-700 md:text-lg">Book now</p>
+            <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">โปรแกรมที่เปิดจอง</h2>
+            <p className="mt-2 text-lg text-slate-600 md:text-xl lg:text-2xl">เลือกแมตช์ที่ต้องการ แล้วจองตั๋วได้ทันที</p>
           </div>
           <div className="space-y-4">{onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} showBookingButton={false} />)}</div>
         </section>
@@ -71,14 +71,14 @@ export default async function TicketsPage() {
 
       <section className="mx-auto max-w-6xl px-4 pt-12 md:pt-16">
         <div className="mb-6 text-center">
-          <p className="inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-widest text-yellow-600">
-            <MapPin className="size-4" />
+          <p className="inline-flex items-center gap-2 text-lg font-bold uppercase tracking-widest text-yellow-600 md:text-xl">
+            <MapPin className="size-5" />
             โซนที่นั่ง
           </p>
-          <h2 className="mt-1.5 text-3xl font-black text-green-900 md:text-4xl">
+          <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">
             เลือกโซนที่นั่งของคุณ
           </h2>
-          <p className="mt-2 text-base text-slate-600">
+          <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">
             Rainbow Stadium · ปัตตานี — ความจุ 10,700 ที่นั่ง · ราคา 100–200 บาท
           </p>
         </div>
@@ -94,12 +94,12 @@ export default async function TicketsPage() {
               className="object-contain"
             />
         </div>
-        <p className="mt-3 text-center text-xs text-slate-500">
+        <p className="mt-5 text-center text-xl leading-relaxed text-slate-500 md:text-2xl lg:text-3xl">
           ดูมุมมองที่คุณต้องการก่อน แล้วเลือกโซนจากตารางด้านล่าง
         </p>
 
         {/* ตารางราคาแยกตามโซน — ต่อจากแผนผัง */}
-        <p className="mb-6 mt-10 text-center text-sm font-medium text-slate-500">
+        <p className="mb-10 mt-14 text-center text-xl font-medium leading-relaxed text-slate-500 md:text-2xl lg:text-3xl">
           สีของแต่ละโซนอ้างอิงจากแผนผังสนามด้านบน — กดที่โซนเพื่อเลือกแมตช์
         </p>
         <ul id="zones" className="grid scroll-mt-24 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
@@ -116,18 +116,18 @@ export default async function TicketsPage() {
           ))}
         </ul>
 
-        <p className="mt-4 text-center text-xs text-slate-500">
+        <p className="mt-6 text-center text-lg leading-relaxed text-slate-500 md:text-xl lg:text-2xl">
           * ราคาข้างต้นเป็นราคามาตรฐาน อาจปรับตามแมตช์/คู่แข่ง — Logic การเลือกที่นั่งจริงจะเปิดในขั้นตอนถัดไป
         </p>
       </section>
 
       {/* 2) ขั้นตอนการจอง — คั่นกลาง */}
-      <div className="mx-auto max-w-4xl space-y-6 px-4 py-12 md:py-16">
-        <section className="rounded-2xl border border-green-100 bg-white p-7 shadow-sm md:p-9">
-          <h2 className="text-2xl font-black text-green-900 md:text-3xl">
+      <div className="mx-auto max-w-4xl space-y-7 px-4 py-12 md:py-16">
+        <section className="rounded-2xl border border-green-100 bg-white p-7 shadow-sm md:p-10 lg:p-12">
+          <h2 className="text-3xl font-black text-green-900 md:text-4xl lg:text-5xl">
             ขั้นตอนการจอง
           </h2>
-          <ol className="mt-5 space-y-3 text-base text-slate-700">
+          <ol className="mt-7 space-y-5 text-lg text-slate-700 md:text-xl lg:text-2xl">
             <Step n={1}>เลือกแมตช์ที่ต้องการจากตารางโปรแกรมการแข่งขัน</Step>
             <Step n={2}>กรอกข้อมูลผู้จองและจำนวนใบที่ต้องการ (สูงสุด 10 ใบ/รายการ)</Step>
             <Step n={3}>ดำเนินการชำระเงินผ่าน PromptPay / Mobile Banking / Credit Card</Step>
@@ -135,16 +135,16 @@ export default async function TicketsPage() {
           </ol>
         </section>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-4">
           <Link
             href="/matches"
-            className="rounded-full bg-green-800 px-6 py-3 text-base font-semibold text-yellow-300 transition hover:bg-green-900"
+            className="rounded-full bg-green-800 px-7 py-3.5 text-lg font-semibold text-yellow-300 transition hover:bg-green-900 md:px-8 md:py-4 md:text-xl"
           >
             ดูโปรแกรมการแข่งขัน
           </Link>
           <Link
             href="/bookings/search"
-            className="rounded-full border border-green-200 bg-white px-6 py-3 text-base font-medium text-green-900 transition hover:bg-green-50"
+            className="rounded-full border border-green-200 bg-white px-7 py-3.5 text-lg font-medium text-green-900 transition hover:bg-green-50 md:px-8 md:py-4 md:text-xl"
           >
             ตรวจสอบการจอง
           </Link>
@@ -156,8 +156,8 @@ export default async function TicketsPage() {
 
 function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
-    <li className="flex items-start gap-3">
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-sm font-bold text-green-950">
+    <li className="flex items-start gap-4 md:gap-5">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-base font-bold text-green-950 md:size-10 md:text-lg lg:size-11 lg:text-xl">
         {n}
       </span>
       <span className="leading-relaxed">{children}</span>
@@ -221,36 +221,36 @@ function ZoneCard({ zone }: { zone: StadiumZone }) {
       className={`flex h-full flex-col overflow-hidden rounded-2xl border-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${s.wrap}`}
     >
       {/* หัวการ์ดสี — เด่นตามแผนผังสนาม */}
-      <div className={`px-4 pb-4 pt-3 ${s.header}`}>
+      <div className={`px-5 pb-5 pt-4 ${s.header}`}>
         <span
-          className={`text-sm font-bold uppercase tracking-widest ${s.headerText} opacity-80`}
+          className={`text-xl font-bold uppercase tracking-widest ${s.headerText} opacity-80 md:text-2xl`}
         >
           โซน
         </span>
         <span
-          className={`mt-0.5 block text-4xl font-black leading-none ${s.headerText}`}
+          className={`mt-1 block text-5xl font-black leading-none ${s.headerText}`}
         >
           {zone.code}
         </span>
       </div>
 
       {/* เนื้อการ์ด */}
-      <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
-        <span className="text-base font-semibold text-slate-700">
+      <div className="flex flex-1 flex-col px-5 pb-5 pt-4">
+        <span className="text-xl font-bold leading-tight text-slate-700">
           {zone.label}
         </span>
-        <span className={`mt-2 text-2xl font-black ${s.price}`}>
+        <span className={`mt-3 text-3xl font-black ${s.price}`}>
           {zone.priceBaht.toLocaleString("th-TH")}
-          <span className="ml-1 text-sm font-medium text-slate-500">บาท</span>
+          <span className="ml-1 text-base font-medium text-slate-500">บาท</span>
         </span>
-        <span className="mt-1 text-sm font-medium text-slate-500">
+        <span className="mt-3 text-xl font-semibold leading-tight text-slate-500 md:text-2xl">
           {zone.capacity == null ? "ยังไม่เปิดขาย" : `${zone.capacity.toLocaleString("th-TH")} ที่นั่งเปิดขาย`}
         </span>
         {zone.note && (
           <span
-            className={`mt-3 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-bold ${s.pill}`}
+            className={`mt-4 inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-bold ${s.pill}`}
           >
-            <Users className="size-3.5" /> {zone.note}
+            <Users className="size-4" /> {zone.note}
           </span>
         )}
       </div>

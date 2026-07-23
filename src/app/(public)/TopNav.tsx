@@ -230,27 +230,26 @@ export default function TopNav({
       >
         {/* โลโก้กลาง — ลูกของกล่องแถบแบรนด์+เมนู จึงอยู่ในช่วงสองแถบนี้เสมอ
             ย่อตอน scroll เพราะแถบแบรนด์เตี้ยลง (motto หุบ) */}
-        <div className="animate-back-in-down absolute left-1/2 top-1/2 z-50 hidden xl:block">
-          <motion.div
-            style={{ x: "-50%", y: "-50%" }}
-            animate={{ scale: scrolled ? 0.82 : 1 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
+        <motion.div
+          style={{ x: "-50%", y: "-50%" }}
+          animate={{ scale: scrolled ? 0.82 : 1 }}
+          transition={{ duration: 0.25, ease: "easeInOut" }}
+          className="absolute left-1/2 top-1/2 z-50 hidden xl:block"
+        >
+          <Link
+            href="/"
+            aria-label="Pattani FC"
+            className="flex size-32 items-center justify-center transition-transform hover:scale-105"
           >
-            <Link
-              href="/"
-              aria-label="Pattani FC"
-              className="flex size-32 items-center justify-center transition-transform hover:scale-105"
-            >
-              <Image
-                src="/logo-pattani-fc.png"
-                alt=""
-                width={128}
-                height={128}
-                className="size-full object-contain drop-shadow-lg"
-              />
-            </Link>
-          </motion.div>
-        </div>
+            <Image
+              src="/logo-pattani-fc.png"
+              alt=""
+              width={128}
+              height={128}
+              className="size-full object-contain drop-shadow-lg"
+            />
+          </Link>
+        </motion.div>
         <motion.div
           animate={{ paddingTop: scrolled ? 8 : 12, paddingBottom: scrolled ? 8 : 12 }}
           transition={{ duration: 0.25 }}
@@ -346,27 +345,11 @@ export default function TopNav({
         <nav className="hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
           <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)] items-center px-2 py-2.5">
             <div className="flex items-center justify-end gap-2 pr-4">
-              {items.slice(0, 4).map((item, index) => (
-                <div
-                  key={item.label}
-                  className="animate-slide-in-left"
-                  style={{ animationDelay: `${index * 80}ms` }}
-                >
-                  {renderDesktopItem(item)}
-                </div>
-              ))}
+              {items.slice(0, 4).map(renderDesktopItem)}
             </div>
             <div aria-hidden />
             <div className="flex items-center justify-start gap-2 pl-4">
-              {items.slice(4).map((item, index) => (
-                <div
-                  key={item.label}
-                  className="animate-slide-in-right"
-                  style={{ animationDelay: `${index * 80}ms` }}
-                >
-                  {renderDesktopItem(item)}
-                </div>
-              ))}
+              {items.slice(4).map(renderDesktopItem)}
             </div>
           </div>
         </nav>

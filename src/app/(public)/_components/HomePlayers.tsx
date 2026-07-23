@@ -53,7 +53,7 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
   const visiblePlayers = slides[activeSlide] ?? [];
 
   return (
-    <section className="animate-slide-in-right rounded-3xl border border-green-100 bg-white px-5 py-8 shadow-sm sm:px-8 sm:py-10">
+    <section className="rounded-3xl border border-green-100 bg-white px-5 py-8 shadow-sm sm:px-8 sm:py-10">
       <div>
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>

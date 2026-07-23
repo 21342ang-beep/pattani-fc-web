@@ -37,7 +37,7 @@ export default function HomeHero({
     );
 
   return (
-    <section className="animate-fade-in-top-left relative isolate overflow-hidden bg-green-950">
+    <section className="relative isolate overflow-hidden bg-green-950">
       {mediaSlides.length > 0 ? (
         <HomeHeroCarousel slides={mediaSlides} />
       ) : (

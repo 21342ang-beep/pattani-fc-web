@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { Calendar, MapPin, ArrowRight, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,26 +66,11 @@ export default function FeaturedMatches({
 
   return (
     <ul className="grid gap-4 md:grid-cols-2">
-      {matches.map((m, i) => {
+      {matches.map((m) => {
         const isOnSale = m.status === "ON_SALE";
         const isPattaniHomeMatch = isPattaniHomeTeam(m.homeTeam);
         return (
-          <motion.li
-            key={m.id}
-            initial={{ opacity: 0, y: 1200, scale: 0.7 }}
-            whileInView={{
-              opacity: [0, 0.7, 1],
-              y: [1200, 0, 0],
-              scale: [0.7, 0.7, 1],
-            }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{
-              duration: 1,
-              delay: i * 0.2,
-              times: [0, 0.8, 1],
-              ease: "easeOut",
-            }}
-          >
+          <li key={m.id}>
             <Card className="group h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <Badge
@@ -141,7 +125,7 @@ export default function FeaturedMatches({
                 </CardFooter>
               )}
             </Card>
-          </motion.li>
+          </li>
         );
       })}
     </ul>
