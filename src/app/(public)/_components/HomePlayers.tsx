@@ -29,8 +29,13 @@ const positionTone: Record<HomePlayer["position"], string> = {
 };
 
 export default function HomePlayers({ players }: { players: HomePlayer[] }) {
-  const [activeIndex, setActiveIndex] = useState(() => Math.min(1, Math.max(0, players.length - 1)));
-  const hasCarousel = players.length > 3;
+  const playersPerSlide = 4;
+  const slides = Array.from(
+    { length: Math.ceil(players.length / playersPerSlide) },
+    (_, index) => players.slice(index * playersPerSlide, (index + 1) * playersPerSlide),
+  );
+  const [activeSlide, setActiveSlide] = useState(0);
+  const hasCarousel = slides.length > 1;
 
   useEffect(() => {
     if (!hasCarousel || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -38,17 +43,14 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
     }
 
     const interval = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % players.length);
-    }, 3000);
+      setActiveSlide((current) => (current + 1) % slides.length);
+    }, 5000);
 
     return () => window.clearInterval(interval);
-  }, [hasCarousel, players.length]);
+  }, [hasCarousel, slides.length]);
 
   if (players.length === 0) return null;
-  const visiblePlayers = hasCarousel
-    ? [-1, 0, 1].map((offset) => players[(activeIndex + offset + players.length) % players.length])
-    : players;
-  const centerCardIndex = hasCarousel ? 1 : Math.floor((visiblePlayers.length - 1) / 2);
+  const visiblePlayers = slides[activeSlide] ?? [];
 
   return (
     <section className="rounded-3xl border border-green-100 bg-white px-5 py-8 shadow-sm sm:px-8 sm:py-10">
@@ -66,19 +68,19 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
           </Link>
         </div>
 
-        <div className="mx-auto max-w-4xl overflow-hidden px-2 py-6">
+        <div className="mx-auto max-w-6xl overflow-hidden px-2 py-6">
           <AnimatePresence mode="wait" initial={false}>
             <motion.ul
-              key={String(activeIndex)}
-              initial={{ opacity: 0, x: 72 }}
+              key={String(activeSlide)}
+              initial={{ opacity: 0, x: -96 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -72 }}
+              exit={{ opacity: 0, x: 96 }}
               transition={{ duration: 0.45, ease: "easeOut" }}
-              className="grid grid-cols-3 items-center gap-3 sm:gap-5"
+              className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
             >
-              {visiblePlayers.map((player, index) => (
+              {visiblePlayers.map((player) => (
                 <li key={String(player.id)}>
-                  <PlayerSpotlight player={player} featured={index === centerCardIndex} />
+                  <PlayerSpotlight player={player} />
                 </li>
               ))}
             </motion.ul>
@@ -87,15 +89,15 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
 
         {hasCarousel && (
           <div className="mt-4 flex justify-center gap-2" aria-label="เลือกผู้เล่น">
-            {players.map((player, index) => (
+            {slides.map((slide, index) => (
               <button
-                key={String(player.id)}
+                key={slide.map((player) => player.id).join("-")}
                 type="button"
-                onClick={() => setActiveIndex(index)}
-                aria-label={`แสดง ${player.name}`}
-                aria-current={index === activeIndex}
+                onClick={() => setActiveSlide(index)}
+                aria-label={`แสดงผู้เล่นชุดที่ ${index + 1}`}
+                aria-current={index === activeSlide}
                 className={`h-2 rounded-full transition-all ${
-                  index === activeIndex ? "w-6 bg-green-800" : "w-2 bg-green-200 hover:bg-green-400"
+                  index === activeSlide ? "w-6 bg-green-800" : "w-2 bg-green-200 hover:bg-green-400"
                 }`}
               />
             ))}
@@ -106,14 +108,12 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
   );
 }
 
-function PlayerSpotlight({ player, featured }: { player: HomePlayer; featured: boolean }) {
+function PlayerSpotlight({ player }: { player: HomePlayer }) {
   const photoUrl = mediaUrl(player.photo);
   const number = player.jerseyNumber?.toString().padStart(2, "0") ?? "--";
 
   return (
-    <article className={`group relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-green-800 to-green-950 transition duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/40 ${
-      featured ? "-translate-y-4 scale-105 shadow-2xl shadow-green-950/30" : "scale-95 opacity-85 shadow-md"
-    }`}>
+    <article className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-green-800 to-green-950 shadow-md">
       <div aria-hidden className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${positionTone[player.position]}`} />
       <span aria-hidden className="absolute -right-2 top-1 select-none text-7xl font-black leading-none text-white/[0.08] sm:text-8xl">
         {number}
@@ -142,7 +142,7 @@ function PlayerSpotlight({ player, featured }: { player: HomePlayer; featured: b
 
       <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-green-900 px-3 py-2.5">
         <span className="text-4xl font-black text-yellow-300">{number}</span>
-        <h3 className="line-clamp-1 text-lg font-black sm:text-xl">{player.name}</h3>
+        <h3 className="line-clamp-1 text-lg font-black text-white sm:text-xl">{player.name}</h3>
       </div>
     </article>
   );

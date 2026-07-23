@@ -162,7 +162,10 @@ export async function scanBooking(bookingCode: string): Promise<BookingScanResul
     };
   });
 
-  if (response.ok && response.outcome === "SCANNED") revalidatePath("/admin/bookings");
+  if (response.ok && response.outcome === "SCANNED") {
+    revalidatePath("/admin/bookings");
+    revalidatePath("/admin/bookings/check");
+  }
   return response;
 }
 

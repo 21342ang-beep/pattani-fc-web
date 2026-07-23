@@ -145,10 +145,14 @@ export async function consumeOAuthState(
   return state;
 }
 
-// URL ปลายทางเมื่อ login/register สำเร็จ หรือมี error
-// notice = โน้ตให้หน้า /member แสดง banner (เช่น อีเมลถูกยึดตาม provider)
-export function successRedirectUrl(notice?: string, returnTo?: string): URL {
-  const url = new URL(getSafeReturnTo(returnTo) ?? "/member", requireAppUrl());
+// URL ปลายทางเมื่อ login/register สำเร็จ
+// notice = โน้ตให้หน้าแสดง banner (เช่น อีเมลถูกยึดตาม provider)
+export function successRedirectUrl(
+  notice?: string,
+  returnTo?: string,
+  fallbackPath = "/member",
+): URL {
+  const url = new URL(getSafeReturnTo(returnTo) ?? fallbackPath, requireAppUrl());
   if (notice) url.searchParams.set("notice", notice);
   return url;
 }

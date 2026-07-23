@@ -115,7 +115,7 @@ export default function RegisterForm({
           />
         </div>
         <div className="rounded-lg border border-green-100 bg-green-50/40 p-4">
-          <p className="text-sm font-bold text-green-900">ที่อยู่สำหรับจัดส่ง</p>
+          <p className="text-sm font-bold text-green-900">ที่อยู่ตามบัตรประชาชน</p>
           <div className="mt-3 space-y-3">
             <Field
               label="ที่อยู่"

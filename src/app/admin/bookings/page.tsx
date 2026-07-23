@@ -54,7 +54,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
             href="/admin/bookings/check"
             className="rounded-md border border-green-200 bg-white px-3 py-1.5 text-sm font-medium text-green-900 hover:bg-green-50"
           >
-            🔍 ตรวจสอบการจอง
+            🎫 สแกนและประวัติการใช้งานบัตร
           </Link>
           <a
             href="/api/admin/bookings/export"

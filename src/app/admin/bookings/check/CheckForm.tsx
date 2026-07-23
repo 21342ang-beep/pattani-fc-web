@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -34,6 +35,7 @@ export default function CheckForm() {
   const [history, setHistory] = useState<ScanRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const scanningCodes = useRef(new Set<string>());
 
@@ -57,6 +59,7 @@ export default function CheckForm() {
             receivedAt: new Date().toISOString(),
           };
           setHistory((current) => [record, ...current].slice(0, MAX_HISTORY));
+          router.refresh();
         } catch {
           setError("ไม่สามารถบันทึกการสแกนได้ กรุณาลองอีกครั้ง");
         } finally {
@@ -66,7 +69,7 @@ export default function CheckForm() {
         }
       });
     },
-    [startTransition],
+    [router, startTransition],
   );
 
   // เครื่องสแกนส่วนใหญ่ส่ง Enter ปิดท้าย แต่รองรับการยิงโดยไม่มี Enter ด้วย

@@ -182,7 +182,7 @@ export async function registerCustomer(
     return { error: "เกิดข้อผิดพลาดในการสมัคร กรุณาลองใหม่อีกครั้ง" };
   }
 
-  redirect(returnTo ?? "/member");
+  redirect(returnTo ?? "/tickets/season");
 }
 
 export async function loginCustomer(

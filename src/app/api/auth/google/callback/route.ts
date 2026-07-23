@@ -58,6 +58,10 @@ export async function GET(req: Request) {
     );
   }
   return NextResponse.redirect(
-    successRedirectUrl(result.emailChanged ? "email_from_google" : undefined, stateData.returnTo),
+    successRedirectUrl(
+      result.emailChanged ? "email_from_google" : undefined,
+      stateData.returnTo,
+      stateData.intent === "register" ? "/tickets/season" : "/member",
+    ),
   );
 }
