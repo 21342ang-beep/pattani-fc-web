@@ -19,9 +19,10 @@ export async function reportMatchResult(matchId: string, formData: FormData) {
   });
   if (!parsed.success) throw new Error("กรุณากรอกสกอร์เป็นตัวเลขตั้งแต่ 0 ถึง 99");
 
-  await prisma.match.update({
+  const match = await prisma.match.update({
     where: { id: matchId },
     data: { ...parsed.data, status: "FINISHED" },
+    select: { competitionType: true },
   });
 
   revalidatePath("/");
@@ -30,5 +31,5 @@ export async function reportMatchResult(matchId: string, formData: FormData) {
   revalidatePath("/admin/matches");
   revalidatePath("/admin/results");
   revalidateTag("matches", { expire: 0 });
-  redirect("/admin/results");
+  redirect(`/admin/results?competition=${match.competitionType}`);
 }

@@ -1,14 +1,18 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import MatchForm from "../MatchForm";
 import { createMatch } from "@/app/actions/matches";
-import { verifyPermission } from "@/lib/dal";
+import { getAdminUser, hasPermission } from "@/lib/dal";
 
 export const metadata = { title: "เพิ่มแมตช์ — Admin" };
 
 export default async function NewMatchPage(props: {
   searchParams: Promise<{ competition?: string }>;
 }) {
-  await verifyPermission("MATCHES");
+  const user = await getAdminUser();
+  if (!hasPermission(user, "MATCHES") && !hasPermission(user, "MATCH_RESULTS")) {
+    redirect("/admin");
+  }
   const { competition: rawCompetition } = await props.searchParams;
   const competition = rawCompetition === "CUP" || rawCompetition === "LEAGUE"
     ? rawCompetition

@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { matchCreateSchema, matchUpdateSchema } from "@/lib/validations";
-import { verifyPermission } from "@/lib/dal";
+import { getAdminUser, hasPermission, verifyPermission } from "@/lib/dal";
 import { saveTeamLogo, deleteTeamLogo, UploadError } from "@/lib/upload";
 
 export type MatchFormState = {
@@ -116,7 +116,10 @@ export async function createMatch(
   _prev: MatchFormState,
   formData: FormData
 ): Promise<MatchFormState> {
-  await verifyPermission("MATCHES");
+  const user = await getAdminUser();
+  if (!hasPermission(user, "MATCHES") && !hasPermission(user, "MATCH_RESULTS")) {
+    redirect("/admin");
+  }
 
   let parsedForm;
   try {
