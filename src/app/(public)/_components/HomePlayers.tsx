@@ -118,7 +118,7 @@ function PlayerSpotlight({ player }: { player: HomePlayer }) {
       <span aria-hidden className="absolute -right-2 top-1 select-none text-7xl font-black leading-none text-white/[0.08] sm:text-8xl">
         {number}
       </span>
-      <span className="absolute left-3 top-4 rounded-full bg-black/25 px-2 py-1 text-sm font-bold uppercase tracking-widest text-yellow-200 backdrop-blur-sm sm:text-base">
+      <span className="absolute left-3 top-2 rounded-full bg-black/25 px-2 py-1 text-sm font-bold uppercase tracking-widest text-yellow-200 backdrop-blur-sm sm:text-base">
         {positionLabel[player.position]}
       </span>
 
