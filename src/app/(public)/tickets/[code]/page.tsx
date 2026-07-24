@@ -2,25 +2,19 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import bwipjs from "bwip-js/node";
 import { prisma } from "@/lib/prisma";
+import { getVerifiedBookingSearchOtp } from "@/lib/booking-search-otp";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import TicketCard from "./TicketCard";
 import PhoneGate from "./EmailGate";
 
 export const dynamic = "force-dynamic";
 
-function normalizePhone(p: string): string {
-  return p.replace(/\D/g, "");
-}
-
 export default async function TicketPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ phone?: string }>;
 }) {
   const { code } = await params;
-  const { phone } = await searchParams;
 
   if (!code || !/^[a-z0-9]+$/i.test(code)) notFound();
 
@@ -52,8 +46,9 @@ export default async function TicketPage({
 
   if (!booking) notFound();
 
-  if (!phone || normalizePhone(booking.customerPhone) !== normalizePhone(phone)) {
-    return <PhoneGate code={code} />;
+  const verifiedOtp = await getVerifiedBookingSearchOtp(booking.customerPhone);
+  if (!verifiedOtp) {
+    return <PhoneGate />;
   }
 
   if (booking.status !== "CONFIRMED") {
@@ -64,7 +59,7 @@ export default async function TicketPage({
           การจองนี้ยังไม่ได้ชำระเงิน หรือถูกยกเลิกแล้ว
         </p>
         <Link
-          href={`/checkout/${code}?phone=${encodeURIComponent(phone)}`}
+          href={`/checkout/${code}`}
           className="mt-6 inline-flex rounded-full bg-yellow-400 px-6 py-3 text-base font-bold text-green-950 hover:bg-yellow-300"
         >
           ไปยังหน้าชำระเงิน

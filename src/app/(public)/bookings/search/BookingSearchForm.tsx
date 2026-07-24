@@ -1,67 +1,144 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
-import { Search, Ticket } from "lucide-react";
-import { findBookingsByCustomer, type BookingSearchState } from "@/app/actions/find-bookings";
+import { useActionState, useState } from "react";
+import { Search, ShieldCheck, Ticket } from "lucide-react";
+import {
+  requestBookingSearchOtp,
+  type RequestBookingSearchOtpState,
+  type VerifyBookingSearchOtpState,
+  verifyBookingSearchOtp,
+} from "@/app/actions/booking-search-otp";
 import { formatBaht, formatDateTime } from "@/lib/format";
 
 export default function BookingSearchForm() {
-  const [state, formAction, pending] = useActionState<BookingSearchState, FormData>(findBookingsByCustomer, undefined);
+  const [requestState, requestAction, requesting] = useActionState<
+    RequestBookingSearchOtpState,
+    FormData
+  >(requestBookingSearchOtp, undefined);
+  const [verifyState, verifyAction, verifying] = useActionState<
+    VerifyBookingSearchOtpState,
+    FormData
+  >(verifyBookingSearchOtp, undefined);
+  const [startOver, setStartOver] = useState(false);
+
+  const request = !startOver && requestState && "requested" in requestState
+    ? requestState
+    : null;
+  const results = verifyState && "results" in verifyState ? verifyState.results : null;
+
+  if (results) return <BookingResults results={results} onStartOver={() => setStartOver(true)} />;
+
+  if (request) {
+    return (
+      <section className="mt-7 rounded-2xl border border-green-100 bg-white p-7 shadow-sm md:p-8">
+        <div className="flex items-start gap-3 rounded-xl bg-green-50 p-4 text-green-900">
+          <ShieldCheck className="mt-0.5 size-6 shrink-0" />
+          <div>
+            <h2 className="text-xl font-black md:text-2xl">ยืนยันรหัส OTP</h2>
+            <p className="mt-1 text-base text-green-800 md:text-lg">
+              ส่งรหัสไปยัง {maskPhone(request.phone)} แล้ว
+              {request.reference ? ` · Ref: ${request.reference}` : ""}
+            </p>
+          </div>
+        </div>
+
+        <form action={verifyAction} className="mt-6 space-y-5">
+          <input type="hidden" name="customerName" value={request.customerName} />
+          <label className="block text-lg font-semibold text-green-900 md:text-xl">
+            รหัส OTP
+            <input
+              name="pin"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              minLength={4}
+              maxLength={8}
+              required
+              autoFocus
+              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-center text-xl font-bold tracking-[0.4em] outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-2xl"
+              placeholder="••••••"
+            />
+          </label>
+          {verifyState && "error" in verifyState && (
+            <p className="rounded-lg bg-red-50 px-4 py-3 text-base text-red-700 md:text-lg">{verifyState.error}</p>
+          )}
+          <button disabled={verifying} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-6 py-3.5 text-lg font-bold text-yellow-300 transition hover:bg-green-900 disabled:opacity-60 md:py-4 md:text-xl">
+            <ShieldCheck className="size-5" /> {verifying ? "กำลังยืนยัน..." : "ยืนยันและค้นหารายการจอง"}
+          </button>
+        </form>
+        <button type="button" onClick={() => setStartOver(true)} className="mt-4 w-full text-base font-semibold text-green-800 underline hover:text-green-900 md:text-lg">
+          ใช้เบอร์โทรศัพท์อื่น / ส่งรหัสใหม่
+        </button>
+      </section>
+    );
+  }
 
   return (
-    <>
-      <form action={formAction} className="mt-7 rounded-2xl border border-green-100 bg-white p-7 shadow-sm md:p-8">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <label className="block text-lg font-semibold text-green-900 md:text-xl">
-            ชื่อผู้จอง
-            <input name="customerName" minLength={2} maxLength={100} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-lg font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-xl" placeholder="ชื่อที่ใช้จอง" />
-          </label>
-          <label className="block text-lg font-semibold text-green-900 md:text-xl">
-            เบอร์โทรศัพท์
-            <input name="customerPhone" inputMode="tel" maxLength={20} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-lg font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-xl" placeholder="เบอร์ที่ใช้จอง" />
-          </label>
-        </div>
-        <p className="mt-4 text-base text-slate-500 md:text-lg">กรอกเบอร์โทรศัพท์ที่ใช้จองเพื่อค้นหารายการ และใส่ชื่อผู้จองเพิ่มเติมได้เพื่อให้ผลลัพธ์แม่นยำขึ้น</p>
-        {state?.error && <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-lg text-red-700">{state.error}</p>}
-        <button disabled={pending} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-6 py-3.5 text-lg font-bold text-yellow-300 transition hover:bg-green-900 disabled:opacity-60 md:py-4 md:text-xl">
-          <Search className="size-5" /> {pending ? "กำลังค้นหา..." : "ค้นหารายการจอง"}
-        </button>
-      </form>
-
-      {state?.results && (
-        <section className="mt-6">
-          <h2 className="text-xl font-black text-green-900">ผลการค้นหา ({state.results.length})</h2>
-          {state.results.length === 0 ? (
-            <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-600">ไม่พบรายการที่ตรงกับข้อมูลที่ระบุ</p>
-          ) : (
-            <div className="mt-3 space-y-3">
-              {state.results.map((booking) => {
-                // ค้นด้วยชื่ออย่างเดียว = ไม่มีเบอร์ให้ส่งต่อ → หน้าปลายทางจะถามเบอร์เอง
-                const base = booking.status === "PENDING" ? "/checkout" : "/tickets";
-                const href = state.phone
-                  ? `${base}/${booking.bookingCode}?phone=${encodeURIComponent(state.phone)}`
-                  : `${base}/${booking.bookingCode}`;
-                return (
-                  <div key={booking.bookingCode} className="rounded-xl border border-green-100 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-bold text-green-900">{booking.match.homeTeam} vs {booking.match.awayTeam}</p>
-                        <p className="mt-1 text-sm text-slate-600">{booking.match.kickoffAt ? formatDateTime(booking.match.kickoffAt) : "ยังไม่กำหนดวันแข่ง"}</p>
-                        <p className="mt-2 font-mono text-xs text-slate-500">{booking.bookingCode}</p>
-                      </div>
-                      <p className="font-black text-green-900">{formatBaht(booking.totalAmount)}</p>
-                    </div>
-                    <Link href={href} className="mt-4 inline-flex items-center gap-2 rounded-full bg-green-800 px-4 py-2 text-sm font-bold text-yellow-300 hover:bg-green-900">
-                      <Ticket className="size-4" /> {booking.status === "PENDING" ? "ไปชำระเงิน" : "เปิด E-ticket"}
-                    </Link>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+    <form action={requestAction} onSubmit={() => setStartOver(false)} className="mt-7 rounded-2xl border border-green-100 bg-white p-7 shadow-sm md:p-8">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <label className="block text-lg font-semibold text-green-900 md:text-xl">
+          ชื่อผู้จอง <span className="font-normal text-slate-500">(ไม่บังคับ)</span>
+          <input name="customerName" minLength={2} maxLength={100} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-lg font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-xl" placeholder="ชื่อที่ใช้จอง" />
+        </label>
+        <label className="block text-lg font-semibold text-green-900 md:text-xl">
+          เบอร์โทรศัพท์
+          <input name="customerPhone" inputMode="tel" autoComplete="tel" maxLength={20} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-lg font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-xl" placeholder="เบอร์ที่ใช้จอง" />
+        </label>
+      </div>
+      <p className="mt-4 text-base text-slate-500 md:text-lg">ระบบจะส่งรหัส OTP ไปยังเบอร์โทรศัพท์ที่ใช้จองก่อนแสดงรายการของคุณ</p>
+      {requestState && "error" in requestState && (
+        <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-lg text-red-700">{requestState.error}</p>
       )}
-    </>
+      <button disabled={requesting} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-6 py-3.5 text-lg font-bold text-yellow-300 transition hover:bg-green-900 disabled:opacity-60 md:py-4 md:text-xl">
+        <Search className="size-5" /> {requesting ? "กำลังส่งรหัส..." : "ส่งรหัส OTP"}
+      </button>
+    </form>
   );
+}
+
+function BookingResults({
+  results,
+  onStartOver,
+}: {
+  results: NonNullable<Extract<VerifyBookingSearchOtpState, { verified: true }>>["results"];
+  onStartOver: () => void;
+}) {
+  return (
+    <section className="mt-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-black text-green-900 md:text-2xl">ผลการค้นหา ({results.length})</h2>
+        <button type="button" onClick={onStartOver} className="text-base font-semibold text-green-800 underline hover:text-green-900">ค้นหาเบอร์อื่น</button>
+      </div>
+      {results.length === 0 ? (
+        <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-base text-slate-600 md:text-lg">ไม่พบรายการที่ตรงกับข้อมูลที่ระบุ</p>
+      ) : (
+        <div className="mt-3 space-y-3">
+          {results.map((booking) => {
+            const base = booking.status === "PENDING" ? "/checkout" : "/tickets";
+            return (
+              <div key={booking.bookingCode} className="rounded-xl border border-green-100 bg-white p-5 shadow-sm md:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-bold text-green-900 md:text-xl">{booking.match.homeTeam} vs {booking.match.awayTeam}</p>
+                    <p className="mt-1 text-base text-slate-600 md:text-lg">{booking.match.kickoffAt ? formatDateTime(booking.match.kickoffAt) : "ยังไม่ระบุวันแข่งขัน"}</p>
+                    <p className="mt-2 font-mono text-sm text-slate-500">{booking.bookingCode}</p>
+                  </div>
+                  <p className="text-xl font-black text-green-900 md:text-2xl">{formatBaht(booking.totalAmount)}</p>
+                </div>
+                <Link href={`${base}/${booking.bookingCode}`} className="mt-4 inline-flex items-center gap-2 rounded-full bg-green-800 px-5 py-2.5 text-base font-bold text-yellow-300 hover:bg-green-900 md:text-lg">
+                  <Ticket className="size-5" /> {booking.status === "PENDING" ? "ไปชำระเงิน" : "เปิด E-ticket"}
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function maskPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length >= 7 ? `${digits.slice(0, 3)}-***-${digits.slice(-4)}` : phone;
 }

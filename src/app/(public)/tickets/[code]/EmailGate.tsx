@@ -1,45 +1,16 @@
-"use client";
+import Link from "next/link";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-
-// gate ด้วยเบอร์โทร — universal สำหรับทั้ง guest และ member
-export default function PhoneGate({ code }: { code: string }) {
-  const router = useRouter();
-  const [phone, setPhone] = useState("");
-
+export default function PhoneGate() {
   return (
     <div className="mx-auto max-w-md px-4 py-16">
       <div className="rounded-2xl border border-green-100 bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-black text-green-900">ยืนยันตัวตน</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          กรอกเบอร์โทรที่ใช้ตอนจองตั๋วเพื่อดู E-Ticket
+        <p className="mt-2 text-base leading-relaxed text-slate-600">
+          เพื่อความปลอดภัย กรุณายืนยันรหัส OTP จากเบอร์โทรศัพท์ที่ใช้จองก่อนเปิด E-Ticket
         </p>
-        <form
-          className="mt-5 space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!phone.trim()) return;
-            router.push(`/tickets/${code}?phone=${encodeURIComponent(phone.trim())}`);
-          }}
-        >
-          <input
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            required
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="เช่น 081-234-5678"
-            className="w-full rounded-md border border-slate-300 px-3.5 py-2.5 text-base outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-full bg-green-800 px-5 py-3 text-base font-semibold text-yellow-300 transition hover:bg-green-900"
-          >
-            ดู E-Ticket
-          </button>
-        </form>
+        <Link href="/bookings/search" className="mt-5 inline-flex w-full justify-center rounded-full bg-green-800 px-5 py-3 text-base font-semibold text-yellow-300 transition hover:bg-green-900">
+          ยืนยัน OTP และค้นหารายการจอง
+        </Link>
       </div>
     </div>
   );

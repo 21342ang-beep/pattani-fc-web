@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getVerifiedBookingSearchOtp } from "@/lib/booking-search-otp";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { buildPromptPayPayload } from "@/lib/promptpay";
 import QRCode from "qrcode";
@@ -10,20 +11,12 @@ export const dynamic = "force-dynamic";
 
 const CLUB_PROMPTPAY = "0812345678";
 
-// ตัด non-digit → ทนต่อรูปแบบเบอร์ที่ต่างกัน (081-234-5678 vs 0812345678)
-function normalizePhone(p: string): string {
-  return p.replace(/\D/g, "");
-}
-
 export default async function CheckoutPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ phone?: string }>;
 }) {
   const { code } = await params;
-  const { phone } = await searchParams;
 
   if (!code || !/^[a-z0-9]+$/i.test(code)) notFound();
 
@@ -43,13 +36,14 @@ export default async function CheckoutPage({
 
   if (!booking) notFound();
 
-  // gate ด้วยเบอร์ (universal — รองรับทั้ง member + guest)
-  if (!phone || normalizePhone(booking.customerPhone) !== normalizePhone(phone)) {
-    return <PhoneGate code={code} />;
+  // ต้องยืนยัน OTP จากหน้าค้นหาการจองก่อน จึงเปิดหน้าชำระเงินได้
+  const verifiedOtp = await getVerifiedBookingSearchOtp(booking.customerPhone);
+  if (!verifiedOtp) {
+    return <PhoneGate />;
   }
 
   if (booking.status === "CONFIRMED") {
-    redirect(`/tickets/${code}?phone=${encodeURIComponent(phone)}`);
+    redirect(`/tickets/${code}`);
   }
 
   if (booking.status === "CANCELLED" || booking.status === "REFUNDED") {

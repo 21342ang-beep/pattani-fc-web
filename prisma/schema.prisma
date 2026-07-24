@@ -181,6 +181,22 @@ model Booking {
   @@index([scannedAt])
 }
 
+// OTP สำหรับยืนยันเบอร์โทรก่อนแสดงรายการจองและ E-Ticket
+// providerToken เก็บเฉพาะฝั่งเซิร์ฟเวอร์ ส่วนเบราว์เซอร์เก็บเพียง id ใน httpOnly cookie
+model BookingSearchOtp {
+  id            String    @id @default(cuid())
+  phone         String
+  providerToken String
+  reference     String?
+  attempts      Int       @default(0)
+  verifiedAt    DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  @@index([phone, createdAt])
+  @@index([expiresAt])
+}
+
 // หนึ่ง booking อาจมีหลายใบ จึงบันทึกการผ่านประตูแยกเป็นรายครั้ง
 // เพื่ออนุญาตการสแกนได้สูงสุดเท่ากับ quantity ของการจองนั้น
 model BookingGateScan {
