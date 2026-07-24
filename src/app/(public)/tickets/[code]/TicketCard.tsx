@@ -107,6 +107,33 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
     }
   }
 
+  async function downloadTicket() {
+    if (!ticketRef.current || isSaving) return;
+    setIsSaving(true);
+    setSaveMessage("");
+    try {
+      const ticketImages = Array.from(ticketRef.current.querySelectorAll("img"));
+      await Promise.all(ticketImages.map(waitForImage));
+      await document.fonts?.ready;
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      const dataUrl = await toPng(ticketRef.current, {
+        backgroundColor: "#0a1e15",
+        pixelRatio: 2,
+      });
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `pattanifc-eticket-${booking.bookingCode}.png`;
+      link.click();
+      setSaveMessage("ดาวน์โหลด E-ticket แล้ว");
+    } catch {
+      setSaveMessage("ไม่สามารถดาวน์โหลด E-ticket ได้ กรุณาลองใหม่");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <div className="min-h-[100svh] bg-slate-100 py-0 print:min-h-0 print:bg-white print:py-0 sm:py-8 md:py-12">
       <div className="mx-auto max-w-2xl px-0 print:max-w-none print:px-0 sm:px-4">
@@ -125,9 +152,17 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
               type="button"
               onClick={saveTicket}
               disabled={isSaving}
-              className="inline-flex items-center gap-1.5 rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-green-950 transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70"
+              className="inline-flex items-center gap-1.5 rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-green-950 transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70 sm:hidden"
             >
               <Download className="size-3.5" /> {isSaving ? "กำลังบันทึก..." : <><span className="sm:hidden">บันทึก E-ticket</span><span className="hidden sm:inline">บันทึกตั๋ว</span></>}
+            </button>
+            <button
+              type="button"
+              onClick={downloadTicket}
+              disabled={isSaving}
+              className="hidden items-center gap-1.5 rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-green-950 transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70 sm:inline-flex"
+            >
+              <Download className="size-3.5" /> {isSaving ? "กำลังดาวน์โหลด..." : "ดาวน์โหลดตั๋ว"}
             </button>
             <button
               onClick={() => window.print()}

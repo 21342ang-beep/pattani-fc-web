@@ -31,40 +31,40 @@ export default function BookingForm({
   );
 
   return (
-    <form action={formAction} className="mt-6 space-y-4 rounded-lg border bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold">จองตั๋ว</h2>
+    <form action={formAction} className="mt-6 space-y-5 rounded-lg border bg-white p-7 shadow-sm md:space-y-6 md:p-8">
+      <h2 className="text-2xl font-semibold text-green-900 md:text-3xl">จองตั๋ว</h2>
       <input type="hidden" name="matchId" value={matchId} />
       {zone && <input type="hidden" name="zone" value={zone} />}
 
       {/* แสดง mode: member (จองในนามบัญชี) vs guest (จองในนามแขก) */}
       {isGuest ? (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-          <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <User className="size-3.5" /> จองในนามแขก (ไม่ต้องสมัครสมาชิก)
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-base md:text-lg">
+          <span className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-500 md:text-base">
+            <User className="size-4" /> จองในนามแขก (ไม่ต้องสมัครสมาชิก)
           </span>
-          <p className="mt-0.5 text-xs text-slate-600">
+          <p className="mt-1 text-base leading-relaxed text-slate-600 md:text-lg">
             ใช้รหัสการจอง + เบอร์โทรในการตรวจสอบสถานะภายหลัง — หรือ{" "}
             <Link
               href="/register"
               className="inline-flex items-center gap-1 font-bold text-green-800 underline hover:text-green-900"
             >
-              <UserPlus className="size-3" /> สมัครสมาชิกฟรี
+              <UserPlus className="size-4" /> สมัครสมาชิกฟรี
             </Link>
             {" "}เพื่อรับสิทธิประโยชน์เพิ่ม
           </p>
         </div>
       ) : (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm">
-          <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-700">
-            <Mail className="size-3.5" /> จองในนามบัญชี
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-base md:text-lg">
+          <span className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-emerald-700 md:text-base">
+            <Mail className="size-4" /> จองในนามบัญชี
           </span>
           <p className="mt-0.5 font-medium text-emerald-900">{customerEmail}</p>
         </div>
       )}
 
       {zone && (
-        <div className="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-yellow-700">
+        <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-base md:text-lg">
+          <span className="text-sm font-semibold uppercase tracking-wider text-yellow-700 md:text-base">
             โซนที่เลือก
           </span>
           <p className="mt-0.5 font-bold text-yellow-900">{zone}</p>
@@ -87,7 +87,7 @@ export default function BookingForm({
       />
 
       <div>
-        <label className="block text-sm font-medium">จำนวน (สูงสุด {maxQuantity})</label>
+        <label className="block text-base font-medium md:text-lg">จำนวน (สูงสุด {maxQuantity})</label>
         <input
           name="quantity"
           type="number"
@@ -95,28 +95,28 @@ export default function BookingForm({
           max={maxQuantity}
           defaultValue={1}
           required
-          className="mt-1 w-full rounded-md border px-3 py-2"
+          className="mt-2 w-full rounded-md border px-4 py-3 text-base md:text-lg"
         />
         {state?.fieldErrors?.quantity && (
-          <p className="mt-1 text-xs text-red-600">{state.fieldErrors.quantity[0]}</p>
+          <p className="mt-1 text-sm text-red-600 md:text-base">{state.fieldErrors.quantity[0]}</p>
         )}
       </div>
 
       <div>
-        <label className="block text-sm font-medium">หมายเหตุ (ถ้ามี)</label>
-        <textarea name="notes" rows={2} className="mt-1 w-full rounded-md border px-3 py-2" />
+        <label className="block text-base font-medium md:text-lg">หมายเหตุ (ถ้ามี)</label>
+        <textarea name="notes" rows={2} className="mt-2 w-full rounded-md border px-4 py-3 text-base md:text-lg" />
       </div>
 
-      <p className="text-sm text-slate-600">ราคา {formatBaht(pricePerSeat)}/ใบ</p>
+      <p className="text-base text-slate-600 md:text-lg">ราคา {formatBaht(pricePerSeat)}/ใบ</p>
 
       {state?.error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p>
+        <p className="rounded-md bg-red-50 px-4 py-3 text-base text-red-700 md:text-lg">{state.error}</p>
       )}
 
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:bg-slate-400"
+        className="w-full rounded-md bg-slate-900 px-5 py-3.5 text-base font-medium text-white hover:bg-slate-700 disabled:bg-slate-400 md:text-lg"
       >
         {pending ? "กำลังจอง..." : "จองและชำระเงิน"}
       </button>
@@ -141,15 +141,15 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium">{label}</label>
+      <label className="block text-base font-medium md:text-lg">{label}</label>
       <input
         name={name}
         type={type}
         required={required}
         defaultValue={defaultValue}
-        className="mt-1 w-full rounded-md border px-3 py-2"
+        className="mt-2 w-full rounded-md border px-4 py-3 text-base md:text-lg"
       />
-      {errors && <p className="mt-1 text-xs text-red-600">{errors[0]}</p>}
+      {errors && <p className="mt-1 text-sm text-red-600 md:text-base">{errors[0]}</p>}
     </div>
   );
 }

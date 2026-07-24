@@ -13,10 +13,8 @@ const searchSchema = z
     customerPhone: z
       .string()
       .trim()
-      .regex(/^[0-9+\-\s()]{6,20}$/)
-      .optional(),
-  })
-  .refine((v) => Boolean(v.customerName || v.customerPhone));
+      .regex(/^[0-9+\-\s()]{6,20}$/),
+  });
 
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
@@ -54,7 +52,7 @@ export async function findBookingsByCustomer(
     customerPhone: optionalField(formData.get("customerPhone")),
   });
   if (!parsed.success) {
-    return { error: "กรุณากรอกชื่อผู้จอง หรือเบอร์โทรศัพท์ที่ใช้จองอย่างน้อยหนึ่งช่อง" };
+    return { error: "กรุณากรอกเบอร์โทรศัพท์ที่ใช้จองให้ถูกต้อง" };
   }
 
   const { customerName, customerPhone } = parsed.data;
@@ -132,7 +130,7 @@ export async function findSeasonPassesByCustomer(
     customerPhone: optionalField(formData.get("customerPhone")),
   });
   if (!parsed.success) {
-    return { error: "กรุณากรอกชื่อผู้สมัคร หรือเบอร์โทรศัพท์ที่ใช้สมัครอย่างน้อยหนึ่งช่อง" };
+    return { error: "กรุณากรอกเบอร์โทรศัพท์ที่ใช้สมัครให้ถูกต้อง" };
   }
 
   const { customerName, customerPhone } = parsed.data;

@@ -27,10 +27,10 @@ export default async function NewsPage() {
         title="ข่าวสาร"
         subtitle="ข่าวสารและความเคลื่อนไหวล่าสุดของสโมสรปัตตานี เอฟซี"
       />
-      <div className="mx-auto max-w-6xl px-4 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
         {docs.length === 0 ? (
           <Card className="border-dashed">
-            <CardContent className="py-12 text-center text-muted-foreground">
+            <CardContent className="py-12 text-center text-lg text-muted-foreground md:text-xl">
               ยังไม่มีข่าวสารที่เผยแพร่
             </CardContent>
           </Card>
@@ -56,24 +56,24 @@ export default async function NewsPage() {
                     ) : (
                       <div className="aspect-video bg-gradient-to-br from-green-800 to-green-950" />
                     )}
-                    <CardContent className="space-y-2 p-5">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Calendar className="size-3.5" />
+                    <CardContent className="space-y-3 p-6 md:p-7">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground md:text-base">
+                        <Calendar className="size-4" />
                         {item.publishedAt
                           ? formatDateTime(item.publishedAt)
                           : "ยังไม่ระบุวันที่"}
                       </div>
-                      <h3 className="line-clamp-2 text-lg font-semibold text-green-900">
+                      <h3 className="line-clamp-2 text-xl font-semibold leading-snug text-green-900 md:text-2xl">
                         {item.title}
                       </h3>
                       {item.summary && (
-                        <p className="line-clamp-3 text-sm text-muted-foreground">
+                        <p className="line-clamp-3 text-base leading-relaxed text-muted-foreground md:text-lg">
                           {item.summary}
                         </p>
                       )}
                       <Link
                         href={`/news/${encodeURIComponent(item.slug)}`}
-                        className="inline-flex pt-1 text-sm font-medium text-green-800 hover:underline"
+                        className="inline-flex pt-1 text-base font-medium text-green-800 hover:underline md:text-lg"
                       >
                         อ่านต่อ →
                       </Link>

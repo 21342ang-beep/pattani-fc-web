@@ -19,10 +19,10 @@ export default function BookingSearchForm() {
           </label>
           <label className="block text-lg font-semibold text-green-900 md:text-xl">
             เบอร์โทรศัพท์
-            <input name="customerPhone" inputMode="tel" maxLength={20} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-lg font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-xl" placeholder="เบอร์ที่ใช้จอง" />
+            <input name="customerPhone" inputMode="tel" maxLength={20} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-lg font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-xl" placeholder="เบอร์ที่ใช้จอง" />
           </label>
         </div>
-        <p className="mt-4 text-base text-slate-500 md:text-lg">กรอกชื่อหรือเบอร์โทรศัพท์อย่างน้อยหนึ่งช่อง — ใส่ทั้งสองช่องเพื่อให้ผลลัพธ์แม่นยำขึ้น</p>
+        <p className="mt-4 text-base text-slate-500 md:text-lg">กรอกเบอร์โทรศัพท์ที่ใช้จองเพื่อค้นหารายการ และใส่ชื่อผู้จองเพิ่มเติมได้เพื่อให้ผลลัพธ์แม่นยำขึ้น</p>
         {state?.error && <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-lg text-red-700">{state.error}</p>}
         <button disabled={pending} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-6 py-3.5 text-lg font-bold text-yellow-300 transition hover:bg-green-900 disabled:opacity-60 md:py-4 md:text-xl">
           <Search className="size-5" /> {pending ? "กำลังค้นหา..." : "ค้นหารายการจอง"}

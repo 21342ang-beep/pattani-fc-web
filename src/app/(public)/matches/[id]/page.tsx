@@ -58,26 +58,26 @@ export default async function MatchDetailPage(props: {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <Link href="/matches" className="text-sm text-slate-500 hover:text-slate-900">
+      <Link href="/matches" className="text-base text-slate-500 hover:text-slate-900 md:text-lg">
         ← กลับตารางแข่งขัน
       </Link>
 
-      <article className="mt-4 rounded-lg border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold">
+      <article className="mt-4 rounded-lg border bg-white p-7 shadow-sm md:p-8">
+        <h1 className="text-3xl font-bold leading-tight md:text-4xl">
           {match.homeTeam} <span className="text-slate-400">vs</span> {match.awayTeam}
         </h1>
         {zone && (
-          <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-900">
+          <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-yellow-100 px-4 py-1.5 text-base font-bold text-yellow-900 md:text-lg">
             โซนที่เลือก: {zone}
           </p>
         )}
-        <dl className="mt-4 grid gap-2 text-sm">
-          <div className="flex gap-2">
-            <dt className="w-20 text-slate-500">สนาม</dt>
+        <dl className="mt-5 grid gap-3 text-base md:text-lg">
+          <div className="flex gap-3">
+            <dt className="w-24 shrink-0 text-slate-500">สนาม</dt>
             <dd>{match.venue ?? <span className="text-slate-400">ยังไม่กำหนด</span>}</dd>
           </div>
-          <div className="flex gap-2">
-            <dt className="w-20 text-slate-500">เวลา</dt>
+          <div className="flex gap-3">
+            <dt className="w-24 shrink-0 text-slate-500">เวลา</dt>
             <dd>
               {match.kickoffAt ? (
                 formatDateTime(match.kickoffAt)
@@ -86,8 +86,8 @@ export default async function MatchDetailPage(props: {
               )}
             </dd>
           </div>
-          <div className="flex gap-2">
-            <dt className="w-20 text-slate-500">ราคา</dt>
+          <div className="flex gap-3">
+            <dt className="w-24 shrink-0 text-slate-500">ราคา</dt>
             <dd>
               {selectedZone ? (
                 `${formatBaht(selectedZone.priceSatang)} / ใบ`
@@ -96,8 +96,8 @@ export default async function MatchDetailPage(props: {
               )}
             </dd>
           </div>
-          <div className="flex gap-2">
-            <dt className="w-20 text-slate-500">เหลือ</dt>
+          <div className="flex gap-3">
+            <dt className="w-24 shrink-0 text-slate-500">เหลือ</dt>
             <dd>
               {capacity != null
                 ? `${remaining.toLocaleString("th-TH")} ที่นั่ง`
@@ -106,16 +106,16 @@ export default async function MatchDetailPage(props: {
           </div>
         </dl>
         {match.description && (
-          <p className="mt-4 text-sm text-slate-700">{match.description}</p>
+          <p className="mt-5 text-base leading-relaxed text-slate-700 md:text-lg">{match.description}</p>
         )}
       </article>
 
       {!selectedZone ? (
-        <div className="mt-6 rounded-lg border bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="mt-6 rounded-lg border bg-amber-50 p-5 text-base text-amber-800 md:text-lg">
           กรุณาเลือกโซนที่นั่งก่อนจอง <Link href="/tickets" className="font-semibold underline">เลือกโซน</Link>
         </div>
       ) : !canBook ? (
-        <div className="mt-6 rounded-lg border bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="mt-6 rounded-lg border bg-amber-50 p-5 text-base text-amber-800 md:text-lg">
           ขณะนี้ยังไม่เปิดจอง หรือที่นั่งเต็มแล้ว
         </div>
       ) : (

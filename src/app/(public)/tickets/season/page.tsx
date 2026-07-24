@@ -44,9 +44,9 @@ export default async function SeasonTicketsPage() {
             <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">แผนผังสนาม</h2>
             <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">ตรวจสอบโซนที่นั่งก่อนเลือกแพ็กเกจสมาชิก</p>
           </div>
-          <div className="relative aspect-[1553/1053] w-full">
+          <div className="relative aspect-[1553/1058] w-full">
               <Image
-                src="/stadium-zones-season-2026-27.png"
+                src="/stadium-zones-season-2026-27-v2.png"
                 alt="แผนผังโซนที่นั่ง Rainbow Stadium — Pattani FC"
                 fill
                 sizes="(max-width: 768px) 100vw, 1152px"

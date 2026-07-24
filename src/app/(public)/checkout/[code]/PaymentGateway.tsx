@@ -31,6 +31,10 @@ const METHODS: {
   { id: "banking", label: "Mobile Banking", sublabel: "เปิดแอปธนาคารโดยตรง", Icon: Smartphone },
 ];
 
+const DISPLAY_METHODS = [...METHODS].sort((a, b) =>
+  a.id === "promptpay" ? -1 : b.id === "promptpay" ? 1 : 0
+);
+
 export default function PaymentGateway({
   bookingCode,
   phone,
@@ -44,7 +48,7 @@ export default function PaymentGateway({
   qrSvg: string;
   promptpay: string;
 }) {
-  const [method, setMethod] = useState<Method>("card");
+  const [method, setMethod] = useState<Method>("promptpay");
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ConfirmPaymentState, FormData>(
     confirmPayment,
@@ -64,7 +68,7 @@ export default function PaymentGateway({
           เลือกวิธีชำระเงิน
         </p>
         <div className="grid gap-2 sm:grid-cols-3">
-          {METHODS.map((m) => {
+          {DISPLAY_METHODS.map((m) => {
             const active = method === m.id;
             return (
               <button
