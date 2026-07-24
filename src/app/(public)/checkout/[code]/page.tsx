@@ -1,11 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getVerifiedBookingSearchOtp } from "@/lib/booking-search-otp";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { buildPromptPayPayload } from "@/lib/promptpay";
 import QRCode from "qrcode";
 import PaymentGateway from "./PaymentGateway";
-import PhoneGate from "./EmailGate";
 
 export const dynamic = "force-dynamic";
 
@@ -35,12 +33,6 @@ export default async function CheckoutPage({
   });
 
   if (!booking) notFound();
-
-  // ต้องยืนยัน OTP จากหน้าค้นหาการจองก่อน จึงเปิดหน้าชำระเงินได้
-  const verifiedOtp = await getVerifiedBookingSearchOtp(booking.customerPhone);
-  if (!verifiedOtp) {
-    return <PhoneGate />;
-  }
 
   if (booking.status === "CONFIRMED") {
     redirect(`/tickets/${code}`);

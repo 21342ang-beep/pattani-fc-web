@@ -22,14 +22,25 @@ export type BookingSearchResult = {
   match: { homeTeam: string; awayTeam: string; kickoffAt: string | null };
 };
 
+export type SeasonPassSearchResult = {
+  passCode: string;
+  status: string;
+  tierId: string;
+  priceBaht: number;
+  createdAt: string;
+};
+
+type SearchTarget = "match" | "season";
+
 export type RequestBookingSearchOtpState =
   | { error: string }
-  | { requested: true; phone: string; customerName: string; reference: string | null }
+  | { requested: true; phone: string; customerName: string; reference: string | null; target: SearchTarget }
   | undefined;
 
 export type VerifyBookingSearchOtpState =
   | { error: string }
-  | { verified: true; results: BookingSearchResult[] }
+  | { verified: true; target: "match"; results: BookingSearchResult[] }
+  | { verified: true; target: "season"; results: SeasonPassSearchResult[] }
   | undefined;
 
 function getCredentials() {
@@ -96,6 +107,40 @@ async function findBookings(phone: string, customerName: string): Promise<Bookin
   }));
 }
 
+async function findSeasonPasses(phone: string, customerName: string): Promise<SeasonPassSearchResult[]> {
+  const orderRows = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "SeasonPassOrder"
+    WHERE regexp_replace("customerPhone", '\\D', '', 'g') = ${phone}
+  `;
+  if (orderRows.length === 0) return [];
+
+  const orders = await prisma.seasonPassOrder.findMany({
+    where: {
+      id: { in: orderRows.map((row) => row.id) },
+      ...(customerName
+        ? { customerName: { contains: customerName, mode: "insensitive" } }
+        : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: {
+      passCode: true,
+      status: true,
+      tierId: true,
+      priceBaht: true,
+      createdAt: true,
+    },
+  });
+
+  return orders.map((order) => ({
+    passCode: order.passCode,
+    status: order.status,
+    tierId: order.tierId,
+    priceBaht: order.priceBaht,
+    createdAt: order.createdAt.toISOString(),
+  }));
+}
+
 export async function requestBookingSearchOtp(
   _prev: RequestBookingSearchOtpState,
   formData: FormData,
@@ -112,6 +157,7 @@ export async function requestBookingSearchOtp(
   if (!parsedPhone.success) {
     return { error: "กรุณากรอกเบอร์โทรศัพท์ที่ใช้จองให้ถูกต้อง" };
   }
+  const target: SearchTarget = formData.get("target") === "season" ? "season" : "match";
   const credentials = getCredentials();
   if (!credentials) {
     return { error: "ระบบยืนยัน OTP ยังไม่ได้ตั้งค่า" };
@@ -160,6 +206,7 @@ export async function requestBookingSearchOtp(
       phone: parsedPhone.data,
       customerName: String(formData.get("customerName") ?? "").trim(),
       reference,
+      target,
     };
   } catch {
     return { error: "ไม่สามารถเชื่อมต่อระบบ OTP ได้ กรุณาลองใหม่" };
@@ -227,8 +274,11 @@ export async function verifyBookingSearchOtp(
       WHERE "id" = ${request.id}
     `;
     const customerName = String(formData.get("customerName") ?? "").trim();
-    const results = await findBookings(request.phone, customerName);
-    return { verified: true, results };
+    const target: SearchTarget = formData.get("target") === "season" ? "season" : "match";
+    if (target === "season") {
+      return { verified: true, target, results: await findSeasonPasses(request.phone, customerName) };
+    }
+    return { verified: true, target, results: await findBookings(request.phone, customerName) };
   } catch {
     return { error: "ไม่สามารถยืนยันรหัส OTP ได้ กรุณาลองใหม่" };
   }

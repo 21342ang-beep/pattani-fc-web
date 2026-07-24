@@ -2,10 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import bwipjs from "bwip-js/node";
 import { prisma } from "@/lib/prisma";
-import { getVerifiedBookingSearchOtp } from "@/lib/booking-search-otp";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import TicketCard from "./TicketCard";
-import PhoneGate from "./EmailGate";
 
 export const dynamic = "force-dynamic";
 
@@ -45,11 +43,6 @@ export default async function TicketPage({
   });
 
   if (!booking) notFound();
-
-  const verifiedOtp = await getVerifiedBookingSearchOtp(booking.customerPhone);
-  if (!verifiedOtp) {
-    return <PhoneGate />;
-  }
 
   if (booking.status !== "CONFIRMED") {
     return (

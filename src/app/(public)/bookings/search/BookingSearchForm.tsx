@@ -25,7 +25,9 @@ export default function BookingSearchForm() {
   const request = !startOver && requestState && "requested" in requestState
     ? requestState
     : null;
-  const results = verifyState && "results" in verifyState ? verifyState.results : null;
+  const results = verifyState && "results" in verifyState && verifyState.target === "match"
+    ? verifyState.results
+    : null;
 
   if (results) return <BookingResults results={results} onStartOver={() => setStartOver(true)} />;
 
@@ -45,6 +47,7 @@ export default function BookingSearchForm() {
 
         <form action={verifyAction} className="mt-6 space-y-5">
           <input type="hidden" name="customerName" value={request.customerName} />
+          <input type="hidden" name="target" value="match" />
           <label className="block text-lg font-semibold text-green-900 md:text-xl">
             รหัส OTP
             <input
@@ -76,6 +79,7 @@ export default function BookingSearchForm() {
 
   return (
     <form action={requestAction} onSubmit={() => setStartOver(false)} className="mt-7 rounded-2xl border border-green-100 bg-white p-7 shadow-sm md:p-8">
+      <input type="hidden" name="target" value="match" />
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="block text-lg font-semibold text-green-900 md:text-xl">
           ชื่อผู้จอง <span className="font-normal text-slate-500">(ไม่บังคับ)</span>
@@ -101,7 +105,7 @@ function BookingResults({
   results,
   onStartOver,
 }: {
-  results: NonNullable<Extract<VerifyBookingSearchOtpState, { verified: true }>>["results"];
+  results: Extract<VerifyBookingSearchOtpState, { verified: true; target: "match" }>["results"];
   onStartOver: () => void;
 }) {
   return (
