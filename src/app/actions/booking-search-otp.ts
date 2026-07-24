@@ -118,9 +118,12 @@ export async function requestBookingSearchOtp(
   }
 
   const phone = normalizeBookingSearchPhone(parsedPhone.data);
-  const recentForPhone = await prisma.bookingSearchOtp.count({
-    where: { phone, createdAt: { gt: new Date(Date.now() - 15 * 60_000) } },
-  });
+  const recentRows = await prisma.$queryRaw<{ count: number }[]>`
+    SELECT COUNT(*)::int AS "count" FROM "BookingSearchOtp"
+    WHERE "phone" = ${phone}
+      AND "createdAt" > ${new Date(Date.now() - 15 * 60_000)}
+  `;
+  const recentForPhone = recentRows[0]?.count ?? 0;
   if (recentForPhone >= 3) {
     return { error: "ส่งรหัสไปยังเบอร์นี้บ่อยเกินไป กรุณาลองใหม่ภายหลัง" };
   }
@@ -137,16 +140,14 @@ export async function requestBookingSearchOtp(
     }
 
     const reference = responseValue(data, "refno");
-    const request = await prisma.bookingSearchOtp.create({
-      data: {
-        phone,
-        providerToken: token,
-        reference,
-        expiresAt: new Date(Date.now() + OTP_TTL_MS),
-      },
-    });
+    const requestId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+    await prisma.$executeRaw`
+      INSERT INTO "BookingSearchOtp" ("id", "phone", "providerToken", "reference", "expiresAt")
+      VALUES (${requestId}, ${phone}, ${token}, ${reference}, ${expiresAt})
+    `;
     const cookieStore = await cookies();
-    cookieStore.set(BOOKING_SEARCH_OTP_COOKIE, request.id, {
+    cookieStore.set(BOOKING_SEARCH_OTP_COOKIE, requestId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -186,16 +187,28 @@ export async function verifyBookingSearchOtp(
   const requestId = cookieStore.get(BOOKING_SEARCH_OTP_COOKIE)?.value;
   if (!requestId) return { error: "ไม่พบคำขอ OTP กรุณาส่งรหัสใหม่" };
 
-  const request = await prisma.bookingSearchOtp.findFirst({
-    where: { id: requestId, expiresAt: { gt: new Date() }, verifiedAt: null },
-  });
+  const requests = await prisma.$queryRaw<{
+    id: string;
+    phone: string;
+    providerToken: string;
+    attempts: number;
+  }[]>`
+    SELECT "id", "phone", "providerToken", "attempts"
+    FROM "BookingSearchOtp"
+    WHERE "id" = ${requestId}
+      AND "expiresAt" > NOW()
+      AND "verifiedAt" IS NULL
+    LIMIT 1
+  `;
+  const request = requests[0];
   if (!request) return { error: "รหัส OTP หมดอายุ กรุณาส่งรหัสใหม่" };
   if (request.attempts >= 5) return { error: "กรอกรหัสไม่ถูกต้องหลายครั้ง กรุณาส่งรหัสใหม่" };
 
-  await prisma.bookingSearchOtp.update({
-    where: { id: request.id },
-    data: { attempts: { increment: 1 } },
-  });
+  await prisma.$executeRaw`
+    UPDATE "BookingSearchOtp"
+    SET "attempts" = "attempts" + 1
+    WHERE "id" = ${request.id}
+  `;
 
   try {
     const { ok, data } = await thaiBulkSmsRequest("/v2/otp/verify", {
@@ -208,10 +221,11 @@ export async function verifyBookingSearchOtp(
       return { error: "รหัส OTP ไม่ถูกต้องหรือหมดอายุ" };
     }
 
-    await prisma.bookingSearchOtp.update({
-      where: { id: request.id },
-      data: { verifiedAt: new Date() },
-    });
+    await prisma.$executeRaw`
+      UPDATE "BookingSearchOtp"
+      SET "verifiedAt" = NOW()
+      WHERE "id" = ${request.id}
+    `;
     const customerName = String(formData.get("customerName") ?? "").trim();
     const results = await findBookings(request.phone, customerName);
     return { verified: true, results };

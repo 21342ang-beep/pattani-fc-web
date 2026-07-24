@@ -14,13 +14,13 @@ export async function getVerifiedBookingSearchOtp(phone: string) {
   const otpId = cookieStore.get(BOOKING_SEARCH_OTP_COOKIE)?.value;
   if (!otpId) return null;
 
-  return prisma.bookingSearchOtp.findFirst({
-    where: {
-      id: otpId,
-      phone: normalizeBookingSearchPhone(phone),
-      verifiedAt: { not: null },
-      expiresAt: { gt: new Date() },
-    },
-    select: { id: true },
-  });
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT "id" FROM "BookingSearchOtp"
+    WHERE "id" = ${otpId}
+      AND "phone" = ${normalizeBookingSearchPhone(phone)}
+      AND "verifiedAt" IS NOT NULL
+      AND "expiresAt" > NOW()
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
 }
