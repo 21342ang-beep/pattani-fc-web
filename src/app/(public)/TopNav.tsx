@@ -161,7 +161,7 @@ export default function TopNav({
             aria-expanded={isOpen}
             aria-haspopup="menu"
             suppressHydrationWarning
-            className={`flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-3.5 text-xl tracking-[0.035em] [word-spacing:0.15em] transition-colors ${
+            className={`flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-3.5 text-xl tracking-[0.035em] [word-spacing:0.15em] transition-colors 2xl:text-2xl ${
               active || isOpen ? "font-black text-white" : "font-bold text-white hover:text-white"
             }`}
           >
@@ -171,7 +171,7 @@ export default function TopNav({
             </svg>
           </button>
           {isOpen && (
-            <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-xl shadow-xl backdrop-blur-md">
+            <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-80 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-xl shadow-xl backdrop-blur-md 2xl:text-2xl">
               {it.children.map((child) => {
                 const childActive = childIsActive(path, searchParams, child.href, it.children);
                 return <Link key={child.href} href={child.href} role="menuitem" onClick={closeNavigation} className={`block whitespace-nowrap px-5 py-2.5 transition-colors ${childActive ? "font-black text-white" : "font-semibold text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
@@ -183,7 +183,7 @@ export default function TopNav({
     }
     const active = isActive(path, it.href);
     return (
-    <Link key={it.href} href={it.href} onClick={closeNavigation} className={`whitespace-nowrap rounded-full px-5 py-3.5 text-xl tracking-[0.035em] [word-spacing:0.15em] transition-colors ${active ? "font-black text-white" : "font-bold text-white hover:text-white"}`}>
+    <Link key={it.href} href={it.href} onClick={closeNavigation} className={`whitespace-nowrap rounded-full px-5 py-3.5 text-xl tracking-[0.035em] [word-spacing:0.15em] transition-colors 2xl:text-2xl ${active ? "font-black text-white" : "font-bold text-white hover:text-white"}`}>
         <span>{it.label}</span>
       </Link>
     );
@@ -200,7 +200,7 @@ export default function TopNav({
         transition={{ duration: 0.25, ease: "easeInOut" }}
         className="hidden overflow-hidden bg-gradient-to-r from-yellow-400 via-yellow-300 to-green-700 xl:block"
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-end gap-6 px-4 py-2 text-lg font-bold text-green-950">
+        <div className="mx-auto flex max-w-7xl items-center justify-end gap-6 px-4 py-2.5 text-xl font-bold text-green-950 2xl:text-2xl">
           <Link href="/faq" className="hover:underline">
             {dict.util.faq}
           </Link>
@@ -211,9 +211,9 @@ export default function TopNav({
             href="/login"
             aria-label={dict.util.admin}
             title={dict.util.admin}
-            className="inline-flex size-7 items-center justify-center rounded-full transition hover:bg-green-950/10"
+            className="inline-flex size-8 items-center justify-center rounded-full transition hover:bg-green-950/10"
           >
-            <Shield className="size-4" aria-hidden />
+            <Shield className="size-5" aria-hidden />
           </Link>
         </div>
       </motion.div>
@@ -275,17 +275,17 @@ export default function TopNav({
               animate={{ opacity: scrolled ? 0.95 : 1 }}
               className="flex min-w-0 flex-col leading-tight"
             >
-              <span className="truncate text-xl font-black tracking-wide sm:text-3xl">
+              <span className="truncate text-2xl font-black tracking-wide sm:text-4xl 2xl:text-5xl">
                 <span className="bg-gradient-to-r from-yellow-300 to-yellow-200 bg-clip-text text-transparent">
                   {dict.brand.name}
                 </span>
-                <span className="ml-2 hidden text-base font-normal text-yellow-100/70 sm:inline sm:text-lg">
+                <span className="ml-2 hidden text-lg font-normal text-yellow-100/70 sm:inline sm:text-xl 2xl:text-2xl">
                   {dict.brand.suffix}
                 </span>
               </span>
               <motion.span
                 animate={{ height: scrolled ? 0 : "auto", opacity: scrolled ? 0 : 1 }}
-                className="hidden overflow-hidden text-xs uppercase tracking-widest text-green-200 sm:block"
+                className="hidden overflow-hidden text-sm uppercase tracking-widest text-green-200 sm:block 2xl:text-base"
               >
                 {dict.brand.motto}
               </motion.span>
@@ -298,9 +298,9 @@ export default function TopNav({
               <div className="hidden items-center gap-2 xl:flex">
                 <Link
                   href="/member"
-                  className="inline-flex items-center gap-2 rounded-full border border-yellow-300/30 bg-white/5 px-4 py-2 text-sm font-semibold text-yellow-100 backdrop-blur-sm transition hover:bg-white/10"
+                  className="inline-flex items-center gap-2 rounded-full border border-yellow-300/30 bg-white/5 px-5 py-2.5 text-base font-semibold text-yellow-100 backdrop-blur-sm transition hover:bg-white/10 2xl:text-lg"
                 >
-                  <span className="grid size-7 place-items-center rounded-full bg-yellow-400 text-sm font-black text-green-950">
+                  <span className="grid size-8 place-items-center rounded-full bg-yellow-400 text-base font-black text-green-950">
                     {customer.name.slice(0, 1).toUpperCase()}
                   </span>
                   <span className="max-w-[10rem] truncate">{customer.name}</span>
@@ -310,13 +310,13 @@ export default function TopNav({
               <div className="hidden items-center gap-2 xl:flex">
                 <Link
                   href="/member/login"
-                  className="rounded-full border border-yellow-300/40 px-5 py-2 text-sm font-semibold text-yellow-100 transition hover:bg-white/10"
+                  className="rounded-full border border-yellow-300/40 px-6 py-2.5 text-base font-semibold text-yellow-100 transition hover:bg-white/10 2xl:text-lg"
                 >
                   {dict.auth.login}
                 </Link>
                 <Link
                   href="/register"
-                  className="rounded-full bg-yellow-400 px-5 py-2 text-sm font-bold text-green-950 transition-all hover:scale-105 hover:bg-yellow-300 hover:shadow-lg hover:shadow-yellow-400/30"
+                  className="rounded-full bg-yellow-400 px-6 py-2.5 text-base font-bold text-green-950 transition-all hover:scale-105 hover:bg-yellow-300 hover:shadow-lg hover:shadow-yellow-400/30 2xl:text-lg"
                 >
                   {dict.auth.register}
                 </Link>
@@ -386,7 +386,7 @@ export default function TopNav({
                     width={36}
                     height={36}
                   />
-                  <span className="font-black tracking-wide text-yellow-300">
+                  <span className="text-lg font-black tracking-wide text-yellow-300">
                     {dict.brand.name}
                   </span>
                 </div>
@@ -422,13 +422,13 @@ export default function TopNav({
                   <div className="mb-4 grid grid-cols-2 gap-2">
                     <Link
                       href="/member/login"
-                      className="rounded-full border border-yellow-300/40 px-4 py-2.5 text-center text-sm font-semibold text-yellow-100"
+                      className="rounded-full border border-yellow-300/40 px-4 py-3 text-center text-base font-semibold text-yellow-100"
                     >
                       {dict.auth.login}
                     </Link>
                     <Link
                       href="/register"
-                      className="rounded-full bg-yellow-400 px-4 py-2.5 text-center text-sm font-bold text-green-950"
+                      className="rounded-full bg-yellow-400 px-4 py-3 text-center text-base font-bold text-green-950"
                     >
                       {dict.auth.register}
                     </Link>

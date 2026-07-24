@@ -70,16 +70,16 @@ export default async function CheckoutPage({
   });
 
   return (
-    <div className="bg-slate-50 py-10 md:py-14">
+    <div className="bg-slate-50 py-12 md:py-16">
       <div className="mx-auto max-w-5xl px-4">
         <div className="mb-6">
-          <p className="text-sm font-bold uppercase tracking-widest text-yellow-600">
+          <p className="text-base font-bold uppercase tracking-widest text-yellow-600 md:text-lg">
             ชำระเงิน
           </p>
-          <h1 className="mt-1 text-4xl font-black text-green-900 md:text-5xl">
+          <h1 className="mt-1 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">
             ดำเนินการชำระเงิน
           </h1>
-          <p className="mt-2 text-base text-slate-600">
+          <p className="mt-3 text-lg text-slate-600 md:text-xl">
             เลือกวิธีชำระเงินที่สะดวก — รับ E-Ticket ทันทีหลังชำระสำเร็จ
           </p>
         </div>
@@ -95,16 +95,16 @@ export default async function CheckoutPage({
             />
           </div>
 
-          <aside className="h-fit rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-widest text-green-700">
+          <aside className="h-fit rounded-2xl border border-green-100 bg-white p-7 shadow-sm md:p-8">
+            <p className="text-sm font-bold uppercase tracking-widest text-green-700 md:text-base">
               สรุปคำสั่งซื้อ
             </p>
-            <h3 className="mt-2 text-xl font-bold text-green-900">
+            <h3 className="mt-2 text-2xl font-bold text-green-900 md:text-3xl">
               {booking.match.homeTeam} <span className="text-slate-400">vs</span>{" "}
               {booking.match.awayTeam}
             </h3>
-            <p className="mt-1 text-sm text-slate-600">{booking.match.venue ?? "—"}</p>
-            <p className="text-sm text-slate-600">
+            <p className="mt-2 text-base text-slate-600 md:text-lg">{booking.match.venue ?? "—"}</p>
+            <p className="text-base text-slate-600 md:text-lg">
               {booking.match.kickoffAt ? formatDateTime(booking.match.kickoffAt) : "—"}
             </p>
 
@@ -117,8 +117,8 @@ export default async function CheckoutPage({
             <div className="my-4 border-t border-slate-200" />
 
             <div className="flex items-baseline justify-between">
-              <span className="text-base text-slate-600">ยอดที่ต้องชำระ</span>
-              <span className="text-3xl font-black text-green-900">
+              <span className="text-lg text-slate-600 md:text-xl">ยอดที่ต้องชำระ</span>
+              <span className="text-4xl font-black text-green-900 md:text-5xl">
                 {formatBaht(booking.totalAmount)}
               </span>
             </div>
@@ -131,9 +131,9 @@ export default async function CheckoutPage({
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-start justify-between gap-3 py-1.5 text-sm">
+    <div className="flex items-start justify-between gap-3 py-2 text-base md:text-lg">
       <span className="text-slate-500">{label}</span>
-      <span className={`text-right text-slate-900 ${mono ? "font-mono text-xs" : "font-medium"}`}>
+      <span className={`text-right text-slate-900 ${mono ? "font-mono text-sm md:text-base" : "font-medium"}`}>
         {value}
       </span>
     </div>

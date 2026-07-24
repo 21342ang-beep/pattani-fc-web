@@ -64,7 +64,7 @@ export default function PaymentGateway({
       <GatewayHeader />
 
       <div className="border-b border-slate-200 bg-slate-50/60 p-4 md:p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
+        <p className="mb-4 text-base font-semibold uppercase tracking-widest text-slate-500 md:text-lg">
           เลือกวิธีชำระเงิน
         </p>
         <div className="grid gap-2 sm:grid-cols-3">
@@ -90,10 +90,10 @@ export default function PaymentGateway({
                   <m.Icon className="size-5" />
                 </span>
                 <span className="min-w-0">
-                  <span className={`block text-sm font-semibold ${active ? "text-green-900" : "text-slate-800"}`}>
+                    <span className={`block text-base font-semibold ${active ? "text-green-900" : "text-slate-800"} md:text-lg`}>
                     {m.label}
                   </span>
-                  <span className="block truncate text-[11px] text-slate-500">{m.sublabel}</span>
+                  <span className="block truncate text-sm text-slate-500 md:text-base">{m.sublabel}</span>
                 </span>
               </button>
             );
@@ -103,7 +103,7 @@ export default function PaymentGateway({
 
       <div className="p-5 md:p-7">
         {state?.error && (
-          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-base text-red-700 md:text-lg">
             {state.error}
           </p>
         )}
@@ -152,14 +152,14 @@ function GatewayHeader() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <Lock className="size-4 text-yellow-300" />
-          <span className="text-sm font-bold tracking-wide">SECURE PAYMENT GATEWAY</span>
+          <span className="text-base font-bold tracking-wide md:text-lg">SECURE PAYMENT GATEWAY</span>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-yellow-300">
+        <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-yellow-300 md:text-sm">
           <span className="size-1.5 rounded-full bg-yellow-300" />
           Test mode
         </span>
       </div>
-      <p className="mt-1 text-[11px] text-white/70">
+      <p className="mt-2 text-sm text-white/70 md:text-base">
         โหมดจำลอง — ยังไม่ได้เชื่อมต่อ payment provider จริง ข้อมูลบัตรจะไม่ถูกบันทึกหรือส่งไปที่ระบบใด ๆ
       </p>
     </header>
@@ -168,7 +168,7 @@ function GatewayHeader() {
 
 function GatewayFooter() {
   return (
-    <footer className="border-t border-slate-200 bg-slate-50 px-5 py-3 text-[11px] text-slate-500">
+    <footer className="border-t border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-500 md:text-base">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5">
           <ShieldCheck className="size-3.5 text-green-700" />
@@ -257,9 +257,9 @@ function CardPanel({
               placeholder="4242 4242 4242 4242"
               value={formatCardNumber(cardNumber)}
               onChange={(e) => setCardNumber(e.target.value.slice(0, 23))}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 pr-16 font-mono text-base tracking-wider outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 pr-16 font-mono text-lg tracking-wider outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20 md:text-xl"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-600">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-slate-100 px-2 py-1 font-mono text-xs font-bold text-slate-600 md:text-sm">
               {brand}
             </span>
           </div>
@@ -272,7 +272,7 @@ function CardPanel({
             placeholder="SOMCHAI CHAIYO"
             value={holder}
             onChange={(e) => setHolder(e.target.value.toUpperCase().slice(0, 40))}
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 uppercase tracking-wider outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-lg uppercase tracking-wider outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20 md:text-xl"
           />
         </Field>
 
@@ -285,7 +285,7 @@ function CardPanel({
               placeholder="MM/YY"
               value={expiry}
               onChange={(e) => setExpiry(formatExpiry(e.target.value))}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-mono outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 font-mono text-lg outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20 md:text-xl"
             />
           </Field>
           <Field label="CVV" htmlFor="cc-cvv" hint="3 หลักด้านหลังบัตร">
@@ -296,13 +296,13 @@ function CardPanel({
               placeholder="•••"
               value={cvv}
               onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-mono tracking-widest outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 font-mono text-lg tracking-widest outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20 md:text-xl"
             />
           </Field>
         </div>
       </div>
 
-      <p className="flex items-start gap-2 rounded-md bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+      <p className="flex items-start gap-2 rounded-md bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-500 md:text-base">
         <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
         ข้อมูลบัตรจะไม่ถูกส่งไปที่เซิร์ฟเวอร์หรือบันทึกในระบบ — นี่เป็นโหมดจำลองสำหรับการพัฒนา
       </p>
@@ -330,29 +330,29 @@ function MockPreviewCard({
 }) {
   const masked = (digits.padEnd(16, "•").match(/.{1,4}/g) ?? []).slice(0, 4).join(" ");
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-900 via-green-800 to-emerald-700 p-5 text-white shadow-lg">
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-900 via-green-800 to-emerald-700 p-6 text-white shadow-lg">
       <div className="absolute -right-8 -top-8 size-40 rounded-full bg-yellow-300/10" />
       <div className="absolute -bottom-10 -left-6 size-32 rounded-full bg-yellow-300/10" />
       <div className="relative flex items-start justify-between">
-        <span className="text-xs font-bold uppercase tracking-widest text-yellow-300/80">
+        <span className="text-sm font-bold uppercase tracking-widest text-yellow-300/80 md:text-base">
           Pattani FC · Card
         </span>
-        <span className="rounded bg-white/10 px-2 py-0.5 font-mono text-[11px] font-bold text-yellow-200">
+        <span className="rounded bg-white/10 px-2 py-0.5 font-mono text-xs font-bold text-yellow-200 md:text-sm">
           {brand}
         </span>
       </div>
-      <div className="relative mt-8 font-mono text-lg tracking-[0.25em] text-white/95 md:text-xl">
+      <div className="relative mt-8 font-mono text-xl tracking-[0.25em] text-white/95 md:text-2xl">
         {masked}
       </div>
-      <div className="relative mt-4 flex items-end justify-between text-[11px] uppercase tracking-widest text-white/80">
+      <div className="relative mt-4 flex items-end justify-between text-sm uppercase tracking-widest text-white/80 md:text-base">
         <span>
-          <span className="block text-[9px] text-white/50">Cardholder</span>
+          <span className="block text-[11px] text-white/50 md:text-xs">Cardholder</span>
           <span className="font-semibold text-white">
             {holder || " "}
           </span>
         </span>
         <span>
-          <span className="block text-[9px] text-white/50">Expires</span>
+          <span className="block text-[11px] text-white/50 md:text-xs">Expires</span>
           <span className="font-mono font-semibold text-white">{expiry || "MM/YY"}</span>
         </span>
       </div>
@@ -383,7 +383,7 @@ function PayButton({
     <button
       type="submit"
       disabled={!canSubmit}
-      className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-3.5 text-base font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.005] hover:bg-yellow-300 disabled:opacity-50 disabled:hover:scale-100"
+      className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-4 text-lg font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.005] hover:bg-yellow-300 disabled:opacity-50 disabled:hover:scale-100 md:text-xl"
     >
       {(pending || stage) && <Loader2 className="size-4 animate-spin" />}
       {label}
@@ -414,8 +414,8 @@ function PromptPayPanel({
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-green-100 bg-green-50/50 p-4">
-        <p className="text-sm font-semibold text-green-900">วิธีชำระ</p>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
+        <p className="text-base font-semibold text-green-900 md:text-lg">วิธีชำระ</p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-base text-slate-700 md:text-lg">
           <li>เปิดแอปธนาคาร → สแกน QR Code ด้านล่าง</li>
           <li>ตรวจสอบยอด {amountBaht.toLocaleString("th-TH")} บาท แล้วยืนยันการโอน</li>
           <li>กดปุ่ม &quot;ฉันชำระเงินแล้ว&quot; เพื่อรับ E-Ticket</li>
@@ -427,10 +427,10 @@ function PromptPayPanel({
           className="rounded-xl border-2 border-green-800 bg-white p-4"
           dangerouslySetInnerHTML={{ __html: qrSvg }}
         />
-        <p className="text-sm text-slate-500">
+        <p className="text-base text-slate-500 md:text-lg">
           พร้อมเพย์: <span className="font-mono font-bold text-green-900">{promptpay}</span>
         </p>
-        <p className="text-2xl font-black text-green-900">
+        <p className="text-3xl font-black text-green-900 md:text-4xl">
           {amountBaht.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท
         </p>
       </div>
@@ -441,7 +441,7 @@ function PromptPayPanel({
         <button
           type="submit"
           disabled={pending}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-3.5 text-base font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.005] hover:bg-yellow-300 disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-4 text-lg font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.005] hover:bg-yellow-300 disabled:opacity-60 md:text-xl"
         >
           {pending && <Loader2 className="size-4 animate-spin" />}
           {pending ? "กำลังตรวจสอบการชำระ..." : "ฉันชำระเงินแล้ว"}
@@ -495,8 +495,8 @@ function BankingPanel({
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-semibold text-slate-800">เลือกธนาคารของคุณ</p>
-        <p className="mt-0.5 text-xs text-slate-500">
+        <p className="text-base font-semibold text-slate-800 md:text-lg">เลือกธนาคารของคุณ</p>
+        <p className="mt-0.5 text-sm text-slate-500 md:text-base">
           ระบบจะจำลองการเปิดแอปธนาคาร — ยอด {amountBaht.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท
         </p>
       </div>
@@ -516,12 +516,12 @@ function BankingPanel({
                   : "border-slate-200 bg-white hover:border-slate-300"
               }`}
             >
-              <span className={`grid size-10 shrink-0 place-items-center rounded-lg ${b.color} text-xs font-black text-white`}>
+              <span className={`grid size-10 shrink-0 place-items-center rounded-lg ${b.color} text-sm font-black text-white`}>
                 {b.brand.slice(0, 2)}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-slate-900">{b.name}</span>
-                <span className="block truncate text-[11px] text-slate-500">{b.brand}</span>
+                <span className="block truncate text-base font-semibold text-slate-900 md:text-lg">{b.name}</span>
+                <span className="block truncate text-sm text-slate-500 md:text-base">{b.brand}</span>
               </span>
             </button>
           );
@@ -531,12 +531,12 @@ function BankingPanel({
       {stage && selectedBank && (
         <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4">
           <Loader2 className="size-5 shrink-0 animate-spin text-green-800" />
-          <div className="min-w-0 text-sm">
+          <div className="min-w-0 text-base md:text-lg">
             <p className="font-semibold text-green-900">
               {stage === "opening" ? "กำลังเปิดแอป " : "รอการยืนยันจากแอป "}
               {selectedBank.name}...
             </p>
-            <p className="text-xs text-green-800/70">
+            <p className="text-sm text-green-800/70 md:text-base">
               โหมดจำลอง — ระบบจะยืนยันอัตโนมัติภายในไม่กี่วินาที
             </p>
           </div>
@@ -547,7 +547,7 @@ function BankingPanel({
         type="button"
         onClick={handleContinue}
         disabled={!selected || !!stage || pending}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-3.5 text-base font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.005] hover:bg-yellow-300 disabled:opacity-50 disabled:hover:scale-100"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-4 text-lg font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.005] hover:bg-yellow-300 disabled:opacity-50 disabled:hover:scale-100 md:text-xl"
       >
         {(stage || pending) && <Loader2 className="size-4 animate-spin" />}
         {stage || pending
@@ -576,9 +576,9 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1.5 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-600">
+      <label htmlFor={htmlFor} className="mb-1.5 flex items-center justify-between text-sm font-semibold uppercase tracking-wider text-slate-600 md:text-base">
         <span>{label}</span>
-        {hint && <span className="text-[10px] font-normal text-slate-400">{hint}</span>}
+        {hint && <span className="text-xs font-normal text-slate-400 md:text-sm">{hint}</span>}
       </label>
       {children}
     </div>
