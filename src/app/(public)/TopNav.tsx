@@ -267,7 +267,6 @@ export default function TopNav({
                 alt="Pattani FC"
                 width={56}
                 height={56}
-                priority
                 className="size-11 sm:size-14"
               />
             </motion.div>

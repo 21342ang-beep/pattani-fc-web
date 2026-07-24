@@ -42,7 +42,7 @@ export default function HomeHeroCarousel({ slides }: { slides: Slide[] }) {
             src={slide.url}
             alt="ภาพประชาสัมพันธ์ Pattani FC"
             fill
-            priority={index === 0}
+            fetchPriority={index === 0 ? "high" : "auto"}
             sizes="100vw"
             className={`object-cover transition-opacity duration-700 ${index === activeIndex ? "opacity-100" : "opacity-0"}`}
           />

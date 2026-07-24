@@ -46,7 +46,8 @@ export default function HomeHero({
           alt=""
           width={1584}
           height={672}
-          priority
+          loading="eager"
+          fetchPriority="high"
           sizes="100vw"
           className="pointer-events-none mx-auto h-auto w-full"
         />
