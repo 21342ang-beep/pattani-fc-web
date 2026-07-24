@@ -57,7 +57,6 @@ export default async function SeasonTicketsPage() {
                 fill
                 sizes="(max-width: 768px) 100vw, 1152px"
                 className="object-contain"
-                priority
               />
           </div>
         </section>

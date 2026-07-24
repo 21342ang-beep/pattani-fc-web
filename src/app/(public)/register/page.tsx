@@ -52,7 +52,6 @@ export default async function RegisterPage(props: {
             alt="Pattani FC"
             width={64}
             height={64}
-            priority
           />
           <h1 className="mt-3 text-2xl font-black text-green-900">
             สมัครสมาชิก

@@ -16,7 +16,6 @@ export default function LoginPage() {
               alt="Pattani FC"
               width={72}
               height={72}
-              priority
             />
             <span className="absolute -bottom-1 -right-1 grid size-7 place-items-center rounded-full bg-green-800 text-yellow-300 ring-2 ring-white">
               <Shield className="size-3.5" />

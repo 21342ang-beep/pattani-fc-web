@@ -89,7 +89,6 @@ export default async function TicketsPage() {
                 src="/stadium-zones-match-2026-27-v3.png"
               alt="แผนผังโซนที่นั่งของ Rainbow Stadium — Pattani FC (ความจุ 10,700)"
               fill
-              priority
               sizes="(min-width: 1024px) 1024px, 100vw"
               className="object-contain"
             />

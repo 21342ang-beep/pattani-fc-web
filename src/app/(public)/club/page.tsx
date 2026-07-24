@@ -99,7 +99,6 @@ export default function ClubPage() {
               alt="โลโก้สโมสรปัตตานี เอฟซี"
               width={360}
               height={360}
-              priority
               className="relative drop-shadow-[0_20px_60px_rgba(250,204,21,0.35)]"
             />
           </div>

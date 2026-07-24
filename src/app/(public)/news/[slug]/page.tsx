@@ -75,7 +75,6 @@ export default async function NewsDetailPage({ params }: { params: Params }) {
             unoptimized
             sizes="(min-width: 1024px) 720px, 100vw"
             className="object-cover"
-            priority
           />
         </div>
       )}
