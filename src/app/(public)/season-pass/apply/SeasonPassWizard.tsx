@@ -27,6 +27,7 @@ import {
   SEASON_LABEL,
   SEASON_PASS_PICKUP_LOCATIONS,
   SEASON_PASS_SHIPPING_FEE_BAHT,
+  type SeasonPassSeatZone,
   type SeasonTier,
   type SeasonTierId,
 } from "@/lib/season-pass-tiers";
@@ -39,15 +40,6 @@ type Step = "form" | "payment" | "success";
 type Method = "card" | "promptpay" | "banking";
 type DeliveryMethod = "SHIPPING" | "PICKUP";
 const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"] as const;
-const SEASON_SEAT_ZONES = [
-  "VIP-A",
-  "VIP-B",
-  "PRIMIUM-A",
-  "PRIMIUM-B",
-  "PRIMIUM-E",
-  "GOLD-D",
-  "GOLD-F",
-] as const;
 
 export type ShippingProvince = {
   name: string;
@@ -61,7 +53,7 @@ interface CustomerData {
   name: string;
   phone: string;
   email: string;
-  seatZone: (typeof SEASON_SEAT_ZONES)[number] | "";
+  seatZone: SeasonPassSeatZone | "";
   deliveryMethod: DeliveryMethod;
   shipAddress: string;
   shipCity: string;
@@ -171,6 +163,7 @@ export default function SeasonPassWizard({
         <div className="mt-4">
           {step === "form" && (
             <FormStep
+              tier={tier}
               initial={customer}
               memberEmail={memberEmail}
               shippingProvinces={shippingProvinces}
@@ -257,12 +250,14 @@ function StepBar({ step }: { step: Step }) {
 // STEP 1 — ฟอร์มข้อมูลผู้สมัคร
 // ────────────────────────────────────────────────────────────
 function FormStep({
+  tier,
   initial,
   memberEmail,
   shippingProvinces,
   onSubmit,
   onDeliveryMethodChange,
 }: {
+  tier: SeasonTier;
   initial: CustomerData;
   memberEmail: string | null;
   shippingProvinces: ShippingProvince[];
@@ -418,7 +413,7 @@ function FormStep({
           className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-base outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
         >
           <option value="">เลือกโซนที่นั่ง</option>
-          {SEASON_SEAT_ZONES.map((zone) => (
+          {tier.allowedSeatZones.map((zone) => (
             <option key={zone} value={zone}>{zone}</option>
           ))}
         </select>

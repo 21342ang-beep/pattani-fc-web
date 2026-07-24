@@ -10,6 +10,7 @@ import { verifyPermission } from "@/lib/dal";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   SEASON_LABEL,
+  SEASON_PASS_SEAT_ZONES,
   SEASON_PASS_SHIPPING_FEE_BAHT,
   SEASON_TIERS,
 } from "@/lib/season-pass-tiers";
@@ -21,7 +22,7 @@ import {
 const createSchema = z
   .object({
     tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"] as const),
-    seatZone: z.enum(["VIP-A", "VIP-B", "PRIMIUM-A", "PRIMIUM-B", "PRIMIUM-E", "GOLD-D", "GOLD-F"] as const),
+    seatZone: z.enum(SEASON_PASS_SEAT_ZONES),
     name: z.string().trim().min(2, "กรุณากรอกชื่อ").max(100),
     phone: z
       .string()
@@ -53,6 +54,15 @@ const createSchema = z
     pickupLocation: z.string().trim().max(200).optional().or(z.literal("")),
   })
   .superRefine((d, ctx) => {
+    const tier = SEASON_TIERS.find((item) => item.id === d.tierId);
+    if (tier && !tier.allowedSeatZones.includes(d.seatZone)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["seatZone"],
+        message: "โซนที่นั่งไม่ตรงกับแพ็กเกจที่เลือก",
+      });
+    }
+
     if (d.deliveryMethod === "SHIPPING") {
       if (!d.shipAddress)
         ctx.addIssue({

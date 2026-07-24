@@ -15,6 +15,20 @@ export const SEASON_PASS_PICKUP_LOCATIONS = [
 ] as const;
 
 export type SeasonTierId = "vvip-elite" | "vip-advanced" | "premium" | "gold";
+export const SEASON_PASS_SEAT_ZONES = [
+  "VVIP-A",
+  "VVIP-B",
+  "VIP-A",
+  "VIP-B",
+  "PRIMIUM-A",
+  "PRIMIUM-B",
+  "PRIMIUM-F",
+  "GOLD-C",
+  "GOLD-E",
+  "GOLD-G",
+  "GOLD-J",
+] as const;
+export type SeasonPassSeatZone = (typeof SEASON_PASS_SEAT_ZONES)[number];
 
 export interface SeasonTier {
   id: SeasonTierId;
@@ -22,6 +36,7 @@ export interface SeasonTier {
   name: string;
   tagline: string;
   priceBaht: number; // ราคาเต็มบาท (ไม่ใช่สตางค์ — ไว้ display อย่างเดียว)
+  allowedSeatZones: readonly SeasonPassSeatZone[];
   benefits: string[];
   highlight?: boolean;
   ribbon?: string;
@@ -34,6 +49,7 @@ export const SEASON_TIERS: SeasonTier[] = [
     name: "VVIP ELITE MEMBER",
     tagline: "ประสบการณ์ระดับประธานสโมสร",
     priceBaht: 4000,
+    allowedSeatZones: ["VVIP-A", "VVIP-B"],
     benefits: [
       `เข้าชม ${SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล`,
       "บัตรสมาชิก VVIP + ที่นั่งประจำ (ระบุที่ชัดเจน)",
@@ -49,6 +65,7 @@ export const SEASON_TIERS: SeasonTier[] = [
     name: "VIP ADVANCED MEMBER",
     tagline: "สแตนด์ VIP มีหลังคา ที่นั่งสบาย",
     priceBaht: 2500,
+    allowedSeatZones: ["VIP-A", "VIP-B"],
     benefits: [
       `เข้าชม ${SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล`,
       "บัตรสมาชิก VIP + ที่นั่งประจำโซน VIP (ระบุที่ชัดเจน)",
@@ -65,6 +82,7 @@ export const SEASON_TIERS: SeasonTier[] = [
     name: "PREMIUM MEMBER",
     tagline: "โซนพรีเมียม บรรยากาศพร้อมเชียร์",
     priceBaht: 2000,
+    allowedSeatZones: ["PRIMIUM-A", "PRIMIUM-B", "PRIMIUM-F"],
     benefits: [
       `เข้าชม ${SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล`,
       "บัตรสมาชิก Premium ประจำปี",
@@ -77,6 +95,7 @@ export const SEASON_TIERS: SeasonTier[] = [
     name: "GOLD MEMBER",
     tagline: "จุดเริ่มต้นของแฟนพันธุ์แท้",
     priceBaht: 1500,
+    allowedSeatZones: ["GOLD-C", "GOLD-E", "GOLD-G", "GOLD-J"],
     benefits: [
       `เข้าชม ${SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล`,
       "บัตรสมาชิก Gold ประจำปี",

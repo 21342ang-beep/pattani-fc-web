@@ -157,6 +157,13 @@ function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
       >
         {tier.tagline}
       </p>
+      <p
+        className={`mt-3 text-base font-semibold md:text-lg ${
+          highlighted ? "text-yellow-200" : "text-green-800"
+        }`}
+      >
+        โซนที่เลือกได้: {tier.allowedSeatZones.join(" · ")}
+      </p>
 
       <div
         className={`mt-6 border-y py-5 ${
