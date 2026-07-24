@@ -61,7 +61,11 @@ const loginSchema = z.object({
 });
 
 export type CustomerAuthState =
-  | { error?: string; fieldErrors?: Partial<Record<string, string>> }
+  | {
+      error?: string;
+      fieldErrors?: Partial<Record<string, string>>;
+      redirectTo?: string;
+    }
   | undefined;
 
 export async function registerCustomer(
@@ -182,7 +186,7 @@ export async function registerCustomer(
     return { error: "เกิดข้อผิดพลาดในการสมัคร กรุณาลองใหม่อีกครั้ง" };
   }
 
-  redirect(returnTo ?? "/tickets/season");
+  return { redirectTo: returnTo ?? "/tickets/season" };
 }
 
 export async function loginCustomer(
