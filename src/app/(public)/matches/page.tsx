@@ -46,15 +46,15 @@ export default async function MatchesListPage(props: {
       : [];
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10 md:py-16">
+    <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-10 md:space-y-10 md:py-16">
       <header>
-        <h1 className="text-2xl font-bold">ตารางแข่งขัน</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-3xl font-black text-green-950 sm:text-4xl md:text-5xl">ตารางแข่งขัน</h1>
+        <p className="mt-2 text-lg text-slate-600 sm:text-xl md:text-2xl">
           เลือกแมตช์ที่สนใจเพื่อจองตั๋ว
           {zone && (
             <>
               {" — โซนที่เลือก: "}
-              <span className="rounded-full bg-yellow-400 px-2 py-0.5 text-xs font-bold text-green-950">
+              <span className="rounded-full bg-yellow-400 px-3 py-1 text-base font-bold text-green-950 md:text-lg">
                 {zone}
               </span>
             </>
@@ -64,13 +64,13 @@ export default async function MatchesListPage(props: {
 
       {onSaleMatches.length > 0 && (
         <section aria-labelledby="on-sale-heading">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <Ticket className="size-4" />
+          <div className="mb-4 flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 md:size-12">
+              <Ticket className="size-5 md:size-6" />
             </span>
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Book now</p>
-              <h2 id="on-sale-heading" className="text-xl font-black text-green-950">
+              <p className="text-sm font-bold uppercase tracking-widest text-emerald-700 md:text-base">Book now</p>
+              <h2 id="on-sale-heading" className="text-2xl font-black text-green-950 md:text-3xl">
                 โปรแกรมที่เปิดจอง
               </h2>
             </div>
@@ -83,55 +83,55 @@ export default async function MatchesListPage(props: {
         </section>
       )}
 
-      <nav className="flex flex-wrap items-center gap-2">
+      <nav className="flex flex-wrap items-center gap-3">
         <FilterTab href={competition === "all" ? "/matches" : `/matches?competition=${competition}`} active={filter === "all"} label="โปรแกรมการแข่งขัน" />
         <FilterTab href={`/matches?filter=on_sale${competition === "all" ? "" : `&competition=${competition}`}`} active={filter === "on_sale"} label="เปิดจอง" />
         <FilterTab href={`/matches?filter=upcoming${competition === "all" ? "" : `&competition=${competition}`}`} active={filter === "upcoming"} label="กำลังจะมาถึง" />
-        <form action="/matches" className="ml-auto flex items-center gap-2">
+        <form action="/matches" className="flex w-full items-center gap-3 sm:ml-auto sm:w-auto">
           {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
           <label htmlFor="competition" className="sr-only">ประเภทการแข่งขัน</label>
-          <select id="competition" name="competition" defaultValue={competition} className="rounded-md border bg-white px-3 py-1.5 text-sm text-slate-700">
+          <select id="competition" name="competition" defaultValue={competition} className="min-w-0 flex-1 rounded-md border bg-white px-4 py-2.5 text-base text-slate-700 sm:flex-none md:text-lg">
             <option value="all">ทั้งหมด</option>
             <option value="league">บอลลีก</option>
             <option value="cup">บอลถ้วย</option>
           </select>
-          <button type="submit" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100">แสดง</button>
+          <button type="submit" className="rounded-md border border-slate-300 px-4 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-100 md:text-lg">แสดง</button>
         </form>
       </nav>
 
       {listMatches.length === 0 && onSaleMatches.length === 0 ? (
-        <div className="rounded-lg border bg-white p-8 text-center text-slate-500">
+        <div className="rounded-lg border bg-white p-8 text-center text-lg text-slate-500 md:text-xl">
           ไม่พบแมตช์ในหมวดนี้
         </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {listMatches.map((m) => {
             const isOnSale = m.status === "ON_SALE";
             const isPattaniHomeMatch = isPattaniHomeTeam(m.homeTeam);
             return (
-              <li key={m.id} className="flex flex-col rounded-lg border bg-white p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between">
+              <li key={m.id} className="flex flex-col rounded-xl border bg-white p-5 shadow-sm md:p-6">
+                <div className="mb-4 flex items-center justify-between gap-3">
                   <StatusBadge status={m.status} />
-                  <span className="text-xs text-slate-500">
+                  <span className="text-sm text-slate-500 md:text-base">
                     {m.kickoffAt ? formatDateTime(m.kickoffAt) : "ยังไม่กำหนด"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-2 py-2">
+                <div className="flex items-center justify-between gap-3 py-2">
                   <TeamCrest logo={m.homeTeamLogo} name={m.homeTeam} />
-                  <span className="text-sm font-bold uppercase tracking-widest text-yellow-600">
+                  <span className="text-base font-bold uppercase tracking-widest text-yellow-600 md:text-lg">
                     VS
                   </span>
                   <TeamCrest logo={m.awayTeamLogo} name={m.awayTeam} />
                 </div>
-                <p className="mt-2 text-center text-sm text-slate-600">{m.venue ?? "ยังไม่กำหนดสนาม"}</p>
+                <p className="mt-3 text-center text-base text-slate-600 md:text-lg">{m.venue ?? "ยังไม่กำหนดสนาม"}</p>
                 {isPattaniHomeMatch && (
                   <div className="mt-auto pt-4">
-                    <div className="mb-2 text-sm font-medium">
+                    <div className="mb-3 text-base font-semibold md:text-lg">
                       ราคาแยกตามโซน
                     </div>
                     <Link
                       href={`/matches/${m.id}${zoneQS}`}
-                      className={`block w-full rounded-md px-3 py-2 text-center text-sm font-medium ${
+                      className={`block w-full rounded-md px-4 py-3 text-center text-base font-semibold md:text-lg ${
                         isOnSale
                           ? "bg-slate-900 text-white hover:bg-slate-700"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -166,31 +166,31 @@ function OnSaleMainboard({
     <article className="overflow-hidden rounded-2xl bg-gradient-to-br from-green-950 via-green-900 to-emerald-800 text-white shadow-xl">
       <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:p-10">
         <div>
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-3 py-1 text-xs font-black uppercase tracking-wider text-green-950">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-1.5 text-sm font-black uppercase tracking-wider text-green-950 md:text-base">
             <span className="size-2 animate-pulse rounded-full bg-green-950" /> เปิดจองแล้ว
           </div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-7">
             <MainboardTeam logo={match.homeTeamLogo} name={match.homeTeam} />
-            <span className="text-lg font-black tracking-[0.2em] text-yellow-300 sm:text-2xl">VS</span>
+            <span className="text-xl font-black tracking-[0.2em] text-yellow-300 sm:text-3xl">VS</span>
             <MainboardTeam logo={match.awayTeamLogo} name={match.awayTeam} />
           </div>
         </div>
         <div className="border-t border-white/20 pt-5 md:min-w-60 md:border-l md:border-t-0 md:pl-8 md:pt-0">
-          <p className="flex items-center gap-2 text-sm text-emerald-100">
-            <Calendar className="size-4 text-yellow-300" />
+          <p className="flex items-center gap-2 text-base text-emerald-100 md:text-lg">
+            <Calendar className="size-5 text-yellow-300" />
             {match.kickoffAt ? formatDateTime(match.kickoffAt) : "ยังไม่กำหนดวันแข่ง"}
           </p>
-          <p className="mt-2 flex items-center gap-2 text-sm text-emerald-100">
-            <MapPin className="size-4 text-yellow-300" />
+          <p className="mt-3 flex items-center gap-2 text-base text-emerald-100 md:text-lg">
+            <MapPin className="size-5 text-yellow-300" />
             {match.venue ?? "ยังไม่กำหนดสนาม"}
           </p>
-          <p className="mt-5 text-sm text-emerald-100">เริ่มต้น</p>
-          <p className="text-2xl font-black text-yellow-300">
+          <p className="mt-5 text-base text-emerald-100 md:text-lg">เริ่มต้น</p>
+          <p className="text-3xl font-black text-yellow-300 md:text-4xl">
             ราคาแยกตามโซน
           </p>
           <Link
             href={zoneQS ? `/matches/${match.id}${zoneQS}` : "/tickets"}
-            className="mt-5 block rounded-lg bg-yellow-300 px-5 py-3 text-center text-sm font-bold text-green-950 transition hover:bg-yellow-200"
+            className="mt-5 block rounded-lg bg-yellow-300 px-5 py-3.5 text-center text-base font-bold text-green-950 transition hover:bg-yellow-200 md:text-lg"
           >
             จองตั๋วตอนนี้
           </Link>
@@ -203,14 +203,14 @@ function OnSaleMainboard({
 function MainboardTeam({ logo, name }: { logo: string | null; name: string }) {
   return (
     <div className="flex min-w-0 flex-col items-center gap-3 text-center">
-      <div className="flex size-20 items-center justify-center overflow-hidden rounded-full bg-white p-2 shadow-lg sm:size-28">
+      <div className="flex size-24 items-center justify-center overflow-hidden rounded-full bg-white p-2 shadow-lg sm:size-28 md:size-32">
         {logo ? (
           <Image src={logo} alt={name} width={112} height={112} unoptimized className="size-full object-contain" />
         ) : (
-          <Shield className="size-9 text-slate-300" />
+          <Shield className="size-10 text-slate-300" />
         )}
       </div>
-      <h3 className="line-clamp-2 text-base font-black sm:text-xl">{name}</h3>
+      <h3 className="line-clamp-2 text-lg font-black sm:text-xl md:text-2xl">{name}</h3>
     </div>
   );
 }
@@ -227,7 +227,7 @@ function FilterTab({
   return (
     <Link
       href={href}
-      className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+      className={`rounded-md px-4 py-2.5 text-base font-semibold md:text-lg ${
         active ? "bg-slate-900 text-white" : "bg-white text-slate-700 hover:bg-slate-100"
       }`}
     >
@@ -239,7 +239,7 @@ function FilterTab({
 function TeamCrest({ logo, name }: { logo: string | null; name: string }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-2">
-      <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+      <div className="flex size-20 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm md:size-24">
         {logo ? (
           <Image
             src={logo}
@@ -250,10 +250,10 @@ function TeamCrest({ logo, name }: { logo: string | null; name: string }) {
             className="size-full object-contain p-1"
           />
         ) : (
-          <Shield className="size-7 text-slate-300" />
+          <Shield className="size-8 text-slate-300" />
         )}
       </div>
-      <span className="line-clamp-2 max-w-[8rem] text-center text-xs font-semibold text-green-900">
+      <span className="line-clamp-2 max-w-[9rem] text-center text-sm font-semibold text-green-900 md:text-base">
         {name}
       </span>
     </div>
@@ -268,5 +268,5 @@ function StatusBadge({ status }: { status: string }) {
     FINISHED: { label: "จบแล้ว", cls: "bg-slate-100 text-slate-500" },
   };
   const s = map[status] ?? { label: status, cls: "bg-slate-100 text-slate-600" };
-  return <span className={`rounded-full px-2 py-0.5 text-xs ${s.cls}`}>{s.label}</span>;
+  return <span className={`rounded-full px-3 py-1 text-sm font-semibold md:text-base ${s.cls}`}>{s.label}</span>;
 }
