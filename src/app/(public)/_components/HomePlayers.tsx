@@ -72,9 +72,9 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
           <AnimatePresence mode="wait" initial={false}>
             <motion.ul
               key={String(activeSlide)}
-              initial={{ opacity: 0, x: -96 }}
+              initial={{ opacity: 0, x: 96 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 96 }}
+              exit={{ opacity: 0, x: -96 }}
               transition={{ duration: 0.45, ease: "easeOut" }}
               className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
             >

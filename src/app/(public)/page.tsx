@@ -39,7 +39,8 @@ export default async function HomePage() {
       collection: "players",
       where: { active: { equals: true } },
       sort: "jerseyNumber",
-      limit: 4,
+      // ส่งผู้เล่นทุกคนให้ carousel แบ่งเป็นชุดละ 4 ใบและเลื่อนต่อเนื่อง
+      limit: 100,
       depth: 1,
       overrideAccess: true,
     }),

@@ -28,6 +28,12 @@ const TIER_ICONS: Record<SeasonTierId, React.ReactNode> = {
   gold: <Medal className="size-9 md:size-10" />,
 };
 
+const TIER_MOCKUPS: Partial<Record<SeasonTierId, string>> = {
+  "vip-advanced": "/season-pass-vip-mockup.png",
+  premium: "/season-pass-premium-mockup.png",
+  gold: "/season-pass-gold-mockup.png",
+};
+
 export default async function SeasonTicketsPage() {
   const session = await readCustomerSession();
   return (
@@ -87,6 +93,7 @@ function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
   const highlighted = tier.highlight;
   const priceLabel = tier.priceBaht.toLocaleString("th-TH");
   const unitLabel = `บาท / ฤดูกาล · ${SEASON_MATCHES} แมตช์`;
+  const mockup = TIER_MOCKUPS[tier.id];
   return (
     <div
       className={`relative flex flex-col overflow-hidden rounded-3xl border-2 p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl md:p-8 lg:p-9 ${
@@ -112,6 +119,23 @@ function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
       >
         {TIER_ICONS[tier.id]}
       </div>
+
+      {mockup && (
+        <div
+          className={`mb-6 overflow-hidden rounded-2xl border ${
+            highlighted ? "border-yellow-300/30 bg-white" : "border-green-100 bg-white"
+          }`}
+        >
+          <Image
+            src={mockup}
+            alt={`ภาพตัวอย่างบัตรสมาชิก ${tier.name} Pattani FC`}
+            width={1600}
+            height={1600}
+            sizes="(max-width: 640px) calc(100vw - 4rem), (max-width: 1024px) calc(50vw - 3rem), 360px"
+            className="aspect-square w-full object-cover"
+          />
+        </div>
+      )}
 
       <p
         className={`text-sm font-bold uppercase tracking-widest md:text-base ${
