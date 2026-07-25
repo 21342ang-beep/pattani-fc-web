@@ -32,25 +32,25 @@ export default async function MemberLoginPage(props: {
 
   return (
     <main className="flex flex-1 items-center justify-center bg-gradient-to-br from-green-50 via-yellow-50 to-green-100 px-4 py-12">
-      <div className="w-full max-w-sm rounded-2xl border border-green-200 bg-white p-7 shadow-xl">
-        <div className="mb-5 flex flex-col items-center">
+      <div className="w-full max-w-md rounded-2xl border border-green-200 bg-white p-7 shadow-xl md:p-9">
+        <div className="mb-6 flex flex-col items-center">
           <Image
             src="/logo-pattani-fc.png"
             alt="Pattani FC"
-            width={64}
-            height={64}
+            width={80}
+            height={80}
           />
-          <h1 className="mt-3 text-2xl font-black text-green-900">
+          <h1 className="mt-3 text-3xl font-black text-green-900 md:text-4xl">
             เข้าสู่ระบบสมาชิก
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1.5 text-base text-slate-600 md:text-lg">
             สำหรับลูกค้าและแฟนคลับ Pattani FC
           </p>
         </div>
 
         <MemberLoginForm errorMessage={errorMessage} returnTo={returnTo ?? undefined} />
 
-        <p className="mt-5 text-center text-sm text-slate-600">
+        <p className="mt-6 text-center text-base text-slate-600 md:text-lg">
           ยังไม่มีบัญชี?{" "}
           <Link
             href={returnTo ? `/register?next=${encodeURIComponent(returnTo)}` : "/register"}
@@ -63,9 +63,9 @@ export default async function MemberLoginPage(props: {
         <div className="mt-6 border-t border-slate-200 pt-4 text-center">
           <Link
             href="/login"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-500 transition hover:text-green-800"
+            className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-green-800"
           >
-            <Shield className="size-3.5" />
+            <Shield className="size-4" />
             เป็นผู้ดูแลระบบ? เข้าสู่ระบบที่นี่
           </Link>
         </div>

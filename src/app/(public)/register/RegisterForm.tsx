@@ -56,7 +56,7 @@ export default function RegisterForm({
   return (
     <div className="space-y-4">
       {(state?.error || errorMessage) && !state?.fieldErrors && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="rounded-md bg-red-50 px-3 py-2 text-base text-red-700">
           {errorMessage || state?.error}
         </p>
       )}
@@ -114,7 +114,7 @@ export default function RegisterForm({
           </SelectField>
         </div>
         <div className="rounded-lg border border-green-100 bg-green-50/40 p-4">
-          <p className="text-sm font-bold text-green-900">ที่อยู่ตามบัตรประชาชน</p>
+          <p className="text-base font-bold text-green-900 md:text-lg">ที่อยู่ตามบัตรประชาชน</p>
           <div className="mt-3 space-y-3">
             <Field
               label="ที่อยู่"
@@ -165,12 +165,12 @@ export default function RegisterForm({
 
         {/* ─── PDPA ─── */}
         <div>
-          <label className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+          <label className="flex items-start gap-2.5 rounded-md border border-slate-200 bg-slate-50 p-3.5 text-base">
             <input
               type="checkbox"
               checked={pdpaChecked}
               onChange={(e) => setPdpaChecked(e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-green-700"
+              className="mt-1 h-5 w-5 accent-green-700"
             />
             <span className="text-slate-700">
               ฉันยอมรับ{" "}
@@ -185,7 +185,7 @@ export default function RegisterForm({
             </span>
           </label>
           {fe.pdpaConsent && (
-            <p className="mt-1 text-xs text-red-600">{fe.pdpaConsent}</p>
+            <p className="mt-1 text-sm text-red-600">{fe.pdpaConsent}</p>
           )}
         </div>
 
@@ -196,13 +196,13 @@ export default function RegisterForm({
           value="password"
           disabled={pending || !pdpaChecked}
           suppressHydrationWarning
-          className="w-full rounded-md bg-green-800 px-4 py-2.5 text-sm font-bold text-yellow-300 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-white"
+          className="w-full rounded-md bg-green-800 px-4 py-3 text-base font-bold text-yellow-300 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-white md:text-lg"
         >
           {pending ? "กำลังดำเนินการ..." : "สมัครสมาชิก"}
         </button>
 
         {!pdpaChecked && (
-          <p className="text-center text-[11px] text-slate-500">
+          <p className="text-center text-sm text-slate-500">
             กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนสมัคร
           </p>
         )}
@@ -212,7 +212,7 @@ export default function RegisterForm({
 }
 
 function selectClassName(invalid: boolean) {
-  return `w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+  return `w-full rounded-md border bg-white px-4 py-3 text-base outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 md:text-lg ${
     invalid
       ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
       : "border-green-200 focus:border-green-600 focus:ring-green-600/20"
@@ -232,11 +232,11 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-green-900">
+      <label className="block text-base font-semibold text-green-900 md:text-lg">
         {label} <RequirementLabel required={required} />
       </label>
-      <div className="mt-1">{children}</div>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      <div className="mt-1.5">{children}</div>
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 }
@@ -253,22 +253,22 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-green-900">
+      <label className="block text-base font-semibold text-green-900 md:text-lg">
         {label} <RequirementLabel required={!!input.required} />
       </label>
       <input
         {...input}
         suppressHydrationWarning
-        className={`mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 ${
+        className={`mt-1.5 w-full rounded-md border px-4 py-3 text-base outline-none focus:ring-2 md:text-lg ${
           error
             ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
             : "border-green-200 focus:border-green-600 focus:ring-green-600/20"
         }`}
       />
       {error ? (
-        <p className="mt-1 text-xs text-red-600">{error}</p>
+        <p className="mt-1 text-sm text-red-600">{error}</p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-slate-500">{hint}</p>
+        <p className="mt-1 text-sm text-slate-500">{hint}</p>
       ) : null}
     </div>
   );
@@ -286,16 +286,16 @@ function PasswordField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-green-900">
+      <label className="block text-base font-semibold text-green-900 md:text-lg">
         {label} <RequirementLabel required={!!input.required} />
       </label>
-      <div className="mt-1">
-        <PasswordInput {...input} invalid={!!error} />
+      <div className="mt-1.5">
+        <PasswordInput {...input} invalid={!!error} className="px-4 py-3 text-base md:text-lg" />
       </div>
       {error ? (
-        <p className="mt-1 text-xs text-red-600">{error}</p>
+        <p className="mt-1 text-sm text-red-600">{error}</p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-slate-500">{hint}</p>
+        <p className="mt-1 text-sm text-slate-500">{hint}</p>
       ) : null}
     </div>
   );
@@ -303,8 +303,8 @@ function PasswordField({
 
 function RequirementLabel({ required }: { required: boolean }) {
   return required ? (
-    <span className="text-xs font-semibold text-red-600">* จำเป็น</span>
+    <span className="text-sm font-semibold text-red-600">* จำเป็น</span>
   ) : (
-    <span className="text-xs font-normal text-slate-400">(ไม่บังคับ)</span>
+    <span className="text-sm font-normal text-slate-400">(ไม่บังคับ)</span>
   );
 }
