@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   CreditCard,
@@ -35,6 +36,13 @@ import { createSeasonPassOrder } from "@/app/actions/season-passes";
 
 // Payment gateway ยังเป็น mock (ยังไม่ผูก provider จริง)
 // แต่หลัง mock payment สำเร็จ ระบบจะบันทึกออเดอร์ลง DB จริง → admin เห็นทันที
+
+// ผังสนามไฮไลต์โซนของแต่ละระดับบัตร — ช่วยให้เลือกโซนที่นั่งถูก (VVIP ยังไม่มีภาพ)
+const ZONE_MAP_IMAGE: Partial<Record<SeasonTierId, string>> = {
+  "vip-advanced": "/season-pass-zone-map-vip.png",
+  premium: "/season-pass-zone-map-premium.png",
+  gold: "/season-pass-zone-map-gold.png",
+};
 
 type Step = "form" | "payment" | "success";
 type Method = "card" | "promptpay" | "banking";
@@ -398,6 +406,19 @@ function FormStep({
           }`}
         />
       </Field>
+
+      {ZONE_MAP_IMAGE[tier.id] && (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+          <Image
+            src={ZONE_MAP_IMAGE[tier.id]!}
+            alt={`ผังโซนที่นั่งบัตร ${tier.badge}`}
+            width={1553}
+            height={1058}
+            unoptimized
+            className="h-auto w-full"
+          />
+        </div>
+      )}
 
       <Field
         label="โซนที่นั่ง"

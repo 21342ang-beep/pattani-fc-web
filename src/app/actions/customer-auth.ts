@@ -56,7 +56,8 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email("อีเมลไม่ถูกต้อง"),
+  // อีเมล หรือเบอร์โทรศัพท์ที่ใช้สมัคร
+  identifier: z.string().trim().min(1, "กรุณากรอกอีเมลหรือเบอร์โทรศัพท์").max(200),
   password: z.string().min(1, "กรุณากรอกรหัสผ่าน").max(200),
 });
 
@@ -205,16 +206,34 @@ export async function loginCustomer(
   }
 
   const parsed = loginSchema.safeParse({
-    email: formData.get("email"),
+    identifier: formData.get("identifier"),
     password: formData.get("password"),
   });
   if (!parsed.success) {
-    return { error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
+    return { error: "อีเมล/เบอร์โทรศัพท์ หรือรหัสผ่านไม่ถูกต้อง" };
   }
 
-  const customer = await prisma.customer.findUnique({
-    where: { email: parsed.data.email },
-  });
+  const identifier = parsed.data.identifier;
+  let customer: Awaited<ReturnType<typeof prisma.customer.findUnique>> = null;
+  if (identifier.includes("@")) {
+    customer = await prisma.customer.findUnique({
+      where: { email: identifier.toLowerCase() },
+    });
+  } else {
+    // เบอร์ถูกเก็บตามที่ผู้ใช้พิมพ์ (มี - เว้นวรรคได้) → เทียบเฉพาะตัวเลขใน DB
+    const digits = identifier.replace(/\D/g, "");
+    if (digits.length >= 9) {
+      const rows = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "Customer"
+        WHERE regexp_replace(coalesce("phone", ''), '\\D', '', 'g') = ${digits}
+        ORDER BY "lastLoginAt" DESC NULLS LAST, "createdAt" DESC
+        LIMIT 1
+      `;
+      if (rows.length > 0) {
+        customer = await prisma.customer.findUnique({ where: { id: rows[0].id } });
+      }
+    }
+  }
   // เปรียบเทียบ password เสมอแม้ user ไม่มี เพื่อกัน timing attack
   const dummyHash = "$2b$12$QZJ/HRFVLd4HnZLjo8OBU.j8KD14Szu.WVM20ciuOHbEESySgkRN.";
   const ok = await bcrypt.compare(
@@ -223,7 +242,7 @@ export async function loginCustomer(
   );
 
   if (!customer || !ok) {
-    return { error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
+    return { error: "อีเมล/เบอร์โทรศัพท์ หรือรหัสผ่านไม่ถูกต้อง" };
   }
 
   // บัญชี social-only ไม่มีรหัสผ่าน → แจ้งให้ใช้ social login
@@ -238,7 +257,9 @@ export async function loginCustomer(
     data: { lastLoginAt: new Date() },
   });
   await createCustomerSession(customer.id, customer.email, customer.name);
-  redirect("/member");
+  // ล็อกอินจาก flow จองบัตรรายปี → เด้งกลับไปกรอกรายละเอียดการจองต่อ
+  const returnTo = getSafeReturnTo(formData.get("returnTo")?.toString());
+  redirect(returnTo ?? "/member");
 }
 
 export async function logoutCustomer(): Promise<void> {

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Shield } from "lucide-react";
 import { readCustomerSession } from "@/lib/customer-session";
+import { getSafeReturnTo } from "@/lib/oauth";
 import MemberLoginForm from "./MemberLoginForm";
 
 export const dynamic = "force-dynamic";
@@ -21,11 +22,12 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default async function MemberLoginPage(props: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; returnTo?: string }>;
 }) {
-  const session = await readCustomerSession();
-  if (session) redirect("/member");
   const sp = await props.searchParams;
+  const returnTo = getSafeReturnTo(sp.returnTo);
+  const session = await readCustomerSession();
+  if (session) redirect(returnTo ?? "/member");
   const errorMessage = sp.error ? ERROR_MESSAGES[sp.error] : undefined;
 
   return (
@@ -46,12 +48,12 @@ export default async function MemberLoginPage(props: {
           </p>
         </div>
 
-        <MemberLoginForm errorMessage={errorMessage} />
+        <MemberLoginForm errorMessage={errorMessage} returnTo={returnTo ?? undefined} />
 
         <p className="mt-5 text-center text-sm text-slate-600">
           ยังไม่มีบัญชี?{" "}
           <Link
-            href="/register"
+            href={returnTo ? `/register?next=${encodeURIComponent(returnTo)}` : "/register"}
             className="font-semibold text-green-800 hover:underline"
           >
             สมัครสมาชิก

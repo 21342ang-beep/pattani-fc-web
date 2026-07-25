@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Gift, Sparkles, Calendar, ArrowRight } from "lucide-react";
 import { verifyCustomer } from "@/lib/customer-dal";
 import { logoutCustomer } from "@/app/actions/customer-auth";
+import { prisma } from "@/lib/prisma";
 import { payload } from "@/lib/payload";
 import { formatDateTime } from "@/lib/format";
 
@@ -54,14 +55,27 @@ export default async function MemberPage(props: {
   const noticeMessage = notice ? NOTICE_MESSAGES[notice] : undefined;
 
   const cms = await payload();
-  const { docs } = await cms.find({
-    collection: "promotions",
-    where: { active: { equals: true } },
-    sort: "-startAt",
-    limit: 20,
-    depth: 1,
-    overrideAccess: true,
-  });
+  const [{ docs }, bookingCount, seasonPassCount] = await Promise.all([
+    cms.find({
+      collection: "promotions",
+      where: { active: { equals: true } },
+      sort: "-startAt",
+      limit: 20,
+      depth: 1,
+      overrideAccess: true,
+    }),
+    prisma.booking.count({
+      where: { customerEmail: { equals: customer.email, mode: "insensitive" } },
+    }),
+    prisma.seasonPassOrder.count({
+      where: {
+        OR: [
+          { customerId: customer.id },
+          { customerEmail: { equals: customer.email, mode: "insensitive" } },
+        ],
+      },
+    }),
+  ]);
   const promotions = docs as unknown as PromotionDoc[];
 
   return (
@@ -109,6 +123,12 @@ export default async function MemberPage(props: {
       {/* Quick links */}
       <section className="mx-auto max-w-6xl px-4 py-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <QuickCard
+            href="/member/bookings"
+            icon="🎫"
+            title="ตั๋วของฉัน"
+            desc={`บัตรรายปี ${seasonPassCount} ใบ · ตั๋วรายแมตช์ ${bookingCount} รายการ`}
+          />
           <QuickCard
             href="/matches"
             icon="🎟️"

@@ -6,7 +6,7 @@ import { LayoutDashboard, User, Ticket, KeyRound } from "lucide-react";
 
 const items = [
   { href: "/member", label: "ภาพรวม", icon: LayoutDashboard },
-  { href: "/member/bookings", label: "การจองของฉัน", icon: Ticket },
+  { href: "/member/bookings", label: "ตั๋วของฉัน", icon: Ticket },
   { href: "/member/profile", label: "โปรไฟล์", icon: User },
   { href: "/member/change-password", label: "รหัสผ่าน", icon: KeyRound },
 ];

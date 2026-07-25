@@ -20,7 +20,8 @@ export default async function SeasonPassApplyPage(props: {
   // session ใช้แค่ auto-fill ฟอร์มให้สมาชิก (guest กรอกเองได้)
   const session = await readCustomerSession();
   if (!session) {
-    redirect(`/register?next=${encodeURIComponent(`/season-pass/apply?tier=${tier.id}`)}`);
+    // ต้องเป็นสมาชิกก่อนจอง — เข้าสู่ระบบ (หรือกดสมัครจากหน้า login) แล้วเด้งกลับมาต่อ
+    redirect(`/member/login?returnTo=${encodeURIComponent(`/season-pass/apply?tier=${tier.id}`)}`);
   }
   const customer = await prisma.customer.findUnique({
     where: { id: session.customerId },
