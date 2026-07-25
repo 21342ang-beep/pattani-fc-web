@@ -342,14 +342,18 @@ export default function TopNav({
 
         {/* Desktop nav — hidden below md */}
         <nav className="hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
-          <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)] items-center px-2 py-2.5">
-            <div className="flex items-center justify-end gap-2 pr-4">
-              {items.slice(0, 4).map(renderDesktopItem)}
-            </div>
+          <div className="mx-auto grid max-w-7xl grid-cols-[repeat(4,minmax(0,1fr))_8rem_repeat(4,minmax(0,1fr))] items-center px-2 py-2.5">
+            {items.slice(0, 4).map((item) => (
+              <div key={"children" in item ? item.label : item.href} className="flex justify-center">
+                {renderDesktopItem(item)}
+              </div>
+            ))}
             <div aria-hidden />
-            <div className="flex items-center justify-start gap-2 pl-4">
-              {items.slice(4).map(renderDesktopItem)}
-            </div>
+            {items.slice(4).map((item) => (
+              <div key={"children" in item ? item.label : item.href} className="flex justify-center">
+                {renderDesktopItem(item)}
+              </div>
+            ))}
           </div>
         </nav>
       </motion.div>
