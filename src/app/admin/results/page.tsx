@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 import { reportMatchResult } from "@/app/actions/match-results";
+import DeleteResultMatchButton from "./DeleteResultMatchButton";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,14 @@ export default async function AdminMatchResultsPage({
   const competitionType = competition === "CUP" ? "CUP" : "LEAGUE";
   const matches = await prisma.match.findMany({
     where: { status: { not: "CANCELLED" }, competitionType },
-    orderBy: { kickoffAt: "desc" },
+  });
+  // เรียงแมตช์ที่วันแข่งใกล้วันปัจจุบันที่สุดไว้บนสุด — ยังไม่กำหนดวันแข่งไว้ล่างสุด
+  const now = Date.now();
+  matches.sort((a, b) => {
+    if (!a.kickoffAt && !b.kickoffAt) return 0;
+    if (!a.kickoffAt) return 1;
+    if (!b.kickoffAt) return -1;
+    return Math.abs(a.kickoffAt.getTime() - now) - Math.abs(b.kickoffAt.getTime() - now);
   });
   return (
     <div>
@@ -27,7 +35,7 @@ export default async function AdminMatchResultsPage({
           <p className="mt-1 text-sm text-slate-600">เพิ่มแมตช์และบันทึกสกอร์ เพื่อแสดงผลบนเว็บไซต์</p>
         </div>
         <Link
-          href={`/admin/matches/new?competition=${competitionType}`}
+          href={`/admin/results/new?competition=${competitionType}`}
           className="rounded-md bg-green-800 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
         >
           + เพิ่มแมตช์
@@ -57,6 +65,13 @@ export default async function AdminMatchResultsPage({
                 <input id={`away-score-${match.id}`} name="awayScore" type="number" min="0" max="99" required defaultValue={match.awayScore ?? ""} className="w-16 rounded-md border px-2 py-2 text-center font-bold" />
               </div>
               <button type="submit" className="rounded-md bg-green-800 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">บันทึกผล</button>
+              <Link
+                href={`/admin/results/${match.id}`}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                แก้ไข
+              </Link>
+              <DeleteResultMatchButton matchId={match.id} />
             </form>
           );
         })}

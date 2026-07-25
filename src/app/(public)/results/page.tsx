@@ -1,4 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
+import { Shield } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
 import { buildStandings, LEAGUE_STANDING_TEAMS } from "@/lib/standings";
@@ -54,9 +56,9 @@ export default async function ResultsPage({
               <article key={match.id} className="rounded-xl border bg-white p-6 shadow-sm md:p-7">
                 <p className="text-center text-base text-slate-500 md:text-lg">{match.kickoffAt ? formatDateTime(match.kickoffAt) : "ผลการแข่งขัน"}</p>
                 <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-center md:gap-6">
-                  <h2 className="text-xl font-bold text-green-900 md:text-2xl">{match.homeTeam}</h2>
+                  <ResultTeam logo={match.homeTeamLogo} name={match.homeTeam} />
                   <p className="rounded-lg bg-green-950 px-5 py-3 text-3xl font-black text-yellow-300 md:px-6 md:py-4 md:text-4xl">{match.homeScore} - {match.awayScore}</p>
-                  <h2 className="text-xl font-bold text-green-900 md:text-2xl">{match.awayTeam}</h2>
+                  <ResultTeam logo={match.awayTeamLogo} name={match.awayTeam} />
                 </div>
               </article>
             ))}
@@ -64,6 +66,28 @@ export default async function ResultsPage({
         )}
       </section>
       <Link href="/matches" className="inline-block text-lg font-semibold text-green-800 hover:underline md:text-xl">ดูโปรแกรมการแข่งขัน →</Link>
+    </div>
+  );
+}
+
+function ResultTeam({ logo, name }: { logo: string | null; name: string }) {
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-2">
+      <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm md:size-20">
+        {logo ? (
+          <Image
+            src={logo}
+            alt={name}
+            width={80}
+            height={80}
+            unoptimized
+            className="size-full object-contain p-1"
+          />
+        ) : (
+          <Shield className="size-7 text-slate-300" />
+        )}
+      </div>
+      <h2 className="line-clamp-2 text-xl font-bold text-green-900 md:text-2xl">{name}</h2>
     </div>
   );
 }
