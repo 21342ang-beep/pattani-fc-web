@@ -63,6 +63,10 @@ const createSchema = z
       });
     }
 
+    if (!d.shirtSize) {
+      ctx.addIssue({ code: "custom", path: ["shirtSize"], message: "กรุณาเลือกไซส์เสื้อ" });
+    }
+
     if (d.deliveryMethod === "SHIPPING") {
       if (!d.shipAddress)
         ctx.addIssue({

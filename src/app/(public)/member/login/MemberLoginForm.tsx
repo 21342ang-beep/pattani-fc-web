@@ -56,6 +56,9 @@ export default function MemberLoginForm({
             />
           </div>
         </div>
+        <div className="-mt-1 text-right">
+          <a href="/member/forgot-password" className="text-sm font-semibold text-green-800 hover:underline">ลืมรหัสผ่าน?</a>
+        </div>
         {state?.error && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-base text-red-700">
             {state.error}

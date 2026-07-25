@@ -124,12 +124,12 @@ export default async function MyTicketsPage() {
                         </p>
                       </div>
                       {pass.status === "CONFIRMED" && (
-                        <a
-                          href={`/api/season-passes/${encodeURIComponent(pass.passCode)}/barcode`}
+                        <Link
+                          href={`/tickets/season/${encodeURIComponent(pass.passCode)}`}
                           className="inline-flex items-center gap-1.5 rounded-full bg-green-800 px-4 py-2 text-sm font-bold text-yellow-300 transition hover:bg-green-900"
                         >
                           เปิดบาร์โค้ด <ArrowRight className="size-4" />
-                        </a>
+                        </Link>
                       )}
                     </div>
                   </article>

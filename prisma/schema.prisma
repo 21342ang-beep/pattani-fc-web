@@ -65,10 +65,24 @@ model Customer {
   lastLoginAt     DateTime?
   pdpaConsentAt   DateTime?
   accounts        CustomerAccount[]
+  passwordResetOtps CustomerPasswordResetOtp[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([email])
+}
+
+model CustomerPasswordResetOtp {
+  id            String   @id @default(cuid())
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  providerToken String
+  attempts      Int      @default(0)
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([expiresAt])
 }
 
 // บัญชีจาก provider ภายนอก (Google / Line) ผูกกับ Customer

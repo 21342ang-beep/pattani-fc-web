@@ -320,6 +320,7 @@ function FormStep({
       nextErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
     }
     if (!seatZone) nextErrors.seatZone = "กรุณาเลือกโซนที่นั่ง";
+    if (!shirtSize) nextErrors.shirtSize = "กรุณาเลือกไซส์เสื้อ";
     if (deliveryMethod === "SHIPPING") {
       if (!shipAddress.trim()) nextErrors.shipAddress = "กรุณากรอกที่อยู่";
       if (!selectedProvince) nextErrors.shipProvince = "กรุณาเลือกจังหวัดจากรายการ";
@@ -574,6 +575,17 @@ function FormStep({
                     {loc}
                   </option>
                 ))}
+              </select>
+            </Field>
+            <Field label="ไซส์เสื้อ" htmlFor="sp-pickup-shirt-size" error={errors.shirtSize}>
+              <select
+                id="sp-pickup-shirt-size"
+                value={shirtSize}
+                onChange={(e) => setShirtSize(e.target.value as CustomerData["shirtSize"])}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20 sm:max-w-[180px]"
+              >
+                <option value="">เลือกไซส์เสื้อ</option>
+                {SHIRT_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
               </select>
             </Field>
             {(() => {
@@ -1175,7 +1187,7 @@ function SuccessStep({
           ดูโปรแกรมการแข่งขัน
         </Link>
         <Link
-          href="/tickets"
+          href="/tickets/season"
           className="rounded-full border border-green-200 bg-white px-6 py-3 text-base font-medium text-green-900 transition hover:bg-green-50"
         >
           กลับหน้าตั๋ว
