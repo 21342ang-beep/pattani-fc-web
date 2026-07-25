@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   BOOKING_SEARCH_OTP_COOKIE,
+  bookingSearchPhoneVariants,
   normalizeBookingSearchPhone,
 } from "@/lib/booking-search-otp";
 
@@ -58,7 +59,7 @@ async function thaiBulkSmsRequest(path: string, values: Record<string, string>) 
     signal: AbortSignal.timeout(10_000),
   });
   const data: unknown = await response.json().catch(() => null);
-  return { ok: response.ok, data };
+  return { ok: response.ok, status: response.status, data };
 }
 
 function responseValue(data: unknown, key: string): string | null {
@@ -67,10 +68,21 @@ function responseValue(data: unknown, key: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
+function logOtpProviderFailure(status: number, data: unknown) {
+  // Do not log the request body: it contains API credentials and recipient data.
+  console.error("ThaiBulkSMS OTP request rejected", {
+    status,
+    code: responseValue(data, "code"),
+    providerStatus: responseValue(data, "status"),
+  });
+}
+
 async function findBookings(phone: string, customerName: string): Promise<BookingSearchResult[]> {
+  const [domesticPhone, internationalPhone] = bookingSearchPhoneVariants(phone);
   const bookingRows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM "Booking"
-    WHERE regexp_replace("customerPhone", '\\D', '', 'g') = ${phone}
+    WHERE regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
+       OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}
   `;
   if (bookingRows.length === 0) return [];
 
@@ -108,9 +120,11 @@ async function findBookings(phone: string, customerName: string): Promise<Bookin
 }
 
 async function findSeasonPasses(phone: string, customerName: string): Promise<SeasonPassSearchResult[]> {
+  const [domesticPhone, internationalPhone] = bookingSearchPhoneVariants(phone);
   const orderRows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM "SeasonPassOrder"
-    WHERE regexp_replace("customerPhone", '\\D', '', 'g') = ${phone}
+    WHERE regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
+       OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}
   `;
   if (orderRows.length === 0) return [];
 
@@ -164,6 +178,9 @@ export async function requestBookingSearchOtp(
   }
 
   const phone = normalizeBookingSearchPhone(parsedPhone.data);
+  if (!/^0[689]\d{8}$/.test(phone)) {
+    return { error: "กรุณากรอกเบอร์มือถือไทย 10 หลัก เช่น 0929810552" };
+  }
   const recentRows = await prisma.$queryRaw<{ count: number }[]>`
     SELECT COUNT(*)::int AS "count" FROM "BookingSearchOtp"
     WHERE "phone" = ${phone}
@@ -175,13 +192,14 @@ export async function requestBookingSearchOtp(
   }
 
   try {
-    const { ok, data } = await thaiBulkSmsRequest("/v2/otp/request", {
+    const { ok, status, data } = await thaiBulkSmsRequest("/v2/otp/request", {
       key: credentials.key,
       secret: credentials.secret,
       msisdn: phone,
     });
     const token = responseValue(data, "token");
     if (!ok || responseValue(data, "status") !== "success" || !token) {
+      logOtpProviderFailure(status, data);
       return { error: "ไม่สามารถส่งรหัส OTP ได้ กรุณาลองใหม่" };
     }
 
