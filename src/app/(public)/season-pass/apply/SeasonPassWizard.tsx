@@ -17,6 +17,7 @@ import {
   User,
   Phone,
   Mail,
+  MapPin,
   Crown,
   Star,
   Award,
@@ -27,7 +28,9 @@ import {
   SEASON_MATCHES,
   SEASON_LABEL,
   SEASON_PASS_PICKUP_LOCATIONS,
+  SEASON_PASS_PICKUP_LOCATION_INFO,
   SEASON_PASS_SHIPPING_FEE_BAHT,
+  type SeasonPassPickupLocation,
   type SeasonPassSeatZone,
   type SeasonTier,
   type SeasonTierId,
@@ -573,6 +576,27 @@ function FormStep({
                 ))}
               </select>
             </Field>
+            {(() => {
+              const info =
+                SEASON_PASS_PICKUP_LOCATION_INFO[pickupLocation as SeasonPassPickupLocation];
+              if (!info) return null;
+              return (
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2.5 text-sm text-green-900">
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-green-700" />
+                  <div>
+                    <p>{info.address}</p>
+                    <a
+                      href={info.mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 font-semibold text-green-800 underline hover:text-green-900"
+                    >
+                      เปิดแผนที่นำทาง <ChevronRight className="size-3.5" />
+                    </a>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

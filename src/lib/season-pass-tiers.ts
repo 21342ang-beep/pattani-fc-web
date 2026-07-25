@@ -9,10 +9,33 @@ export const SEASON_PASS_SHIPPING_FEE_BAHT = 50;
 
 // สถานที่ให้เลือกรับบัตรด้วยตัวเอง
 export const SEASON_PASS_PICKUP_LOCATIONS = [
-  "สนามเรนโบว์สเตเดียม (Pattani FC)",
-  "สำนักงานสโมสร Pattani FC",
-  "สนามกีฬาติณสูลานนท์",
+  "สโมสร",
+  "HiHiBuffet",
+  "Maisz",
 ] as const;
+export type SeasonPassPickupLocation = (typeof SEASON_PASS_PICKUP_LOCATIONS)[number];
+
+// ที่อยู่ + หมุดแผนที่ของแต่ละจุดรับ — ให้ลูกค้ากดนำทางได้จากฟอร์ม
+function mapSearchUrl(query: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+export const SEASON_PASS_PICKUP_LOCATION_INFO: Record<
+  SeasonPassPickupLocation,
+  { address: string; mapUrl: string }
+> = {
+  "สโมสร": {
+    address: "140 3 ถนนยะรัง ตำบลจะบังติกอ อำเภอเมืองปัตตานี ปัตตานี 94000",
+    mapUrl: mapSearchUrl("Pattani FC 140 3 ถนนยะรัง ตำบลจะบังติกอ อำเภอเมืองปัตตานี ปัตตานี 94000"),
+  },
+  HiHiBuffet: {
+    address: "ถ.หน้าสงเคราะห์ ตำบลรูสะมิแล อำเภอเมืองปัตตานี ปัตตานี 94000",
+    mapUrl: mapSearchUrl("HiHiBuffet ถ.หน้าสงเคราะห์ ตำบลรูสะมิแล อำเภอเมืองปัตตานี ปัตตานี 94000"),
+  },
+  Maisz: {
+    address: "4, 12 ถ.รามโกมุท ตำบลบานา อำเภอเมืองปัตตานี ปัตตานี 94000",
+    mapUrl: mapSearchUrl("Maisz 4, 12 ถ.รามโกมุท ตำบลบานา อำเภอเมืองปัตตานี ปัตตานี 94000"),
+  },
+};
 
 export type SeasonTierId = "vvip-elite" | "vip-advanced" | "premium" | "gold";
 export const SEASON_PASS_SEAT_ZONES = [
