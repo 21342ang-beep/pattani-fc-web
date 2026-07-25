@@ -44,7 +44,7 @@ export default async function ResultsPage({
       </nav>
       <section>
         <h2 className="mb-5 text-3xl font-black text-green-900 md:text-4xl lg:text-5xl">ตารางคะแนน {competitionType === "LEAGUE" ? "บอลลีก" : "บอลถ้วย"}</h2>
-        <StandingsTable standings={standings} />
+        <StandingsTable standings={standings} showZones={competitionType === "LEAGUE"} />
       </section>
       <section>
         <h2 className="mb-5 text-3xl font-black text-green-900 md:text-4xl lg:text-5xl">ผลการแข่งขัน</h2>
