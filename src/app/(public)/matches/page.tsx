@@ -35,14 +35,16 @@ export default async function MatchesListPage(props: {
     getMatchesByFilter(filter, competitionType),
     getMatchesByFilter("on_sale", competitionType),
   ]);
+  const pattaniMatches = matches.filter(isPattaniFixture);
+  const pattaniOnSaleMatches = onSaleMatches.filter(isPattaniFixture);
   // เลือกโซนแล้วมีแมตช์ที่เปิดขายเพียงรายการเดียว → ข้ามหน้ากดจอง
   // และไปยังฟอร์มกรอกข้อมูลของแมตช์นั้นทันที
-  if (zone && onSaleMatches.length === 1) {
-    redirect(`/matches/${onSaleMatches[0].id}?zone=${zone}`);
+  if (zone && pattaniOnSaleMatches.length === 1) {
+    redirect(`/matches/${pattaniOnSaleMatches[0].id}?zone=${zone}`);
   }
   const listMatches =
     filter === "all" || filter === "upcoming"
-      ? matches.filter((match) => match.status !== "ON_SALE")
+      ? pattaniMatches.filter((match) => match.status !== "ON_SALE")
       : [];
 
   return (
@@ -62,7 +64,7 @@ export default async function MatchesListPage(props: {
         </p>
       </header>
 
-      {onSaleMatches.length > 0 && (
+      {pattaniOnSaleMatches.length > 0 && (
         <section aria-labelledby="on-sale-heading">
           <div className="mb-4 flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 md:size-12">
@@ -76,7 +78,7 @@ export default async function MatchesListPage(props: {
             </div>
           </div>
           <div className="space-y-4">
-            {onSaleMatches.map((match) => (
+            {pattaniOnSaleMatches.map((match) => (
               <OnSaleMainboard key={match.id} match={match} zoneQS={zoneQS} />
             ))}
           </div>
@@ -99,7 +101,7 @@ export default async function MatchesListPage(props: {
         </form>
       </nav>
 
-      {listMatches.length === 0 && onSaleMatches.length === 0 ? (
+      {listMatches.length === 0 && pattaniOnSaleMatches.length === 0 ? (
         <div className="rounded-lg border bg-white p-8 text-center text-lg text-slate-500 md:text-xl">
           ไม่พบแมตช์ในหมวดนี้
         </div>
@@ -150,9 +152,17 @@ export default async function MatchesListPage(props: {
   );
 }
 
-function isPattaniHomeTeam(teamName: string) {
+function isPattaniTeam(teamName: string) {
   const normalized = teamName.trim().toLocaleLowerCase("th-TH");
   return normalized.includes("pattani") || normalized.includes("ปัตตานี");
+}
+
+function isPattaniHomeTeam(teamName: string) {
+  return isPattaniTeam(teamName);
+}
+
+function isPattaniFixture(match: { homeTeam: string; awayTeam: string }) {
+  return isPattaniTeam(match.homeTeam) || isPattaniTeam(match.awayTeam);
 }
 
 function OnSaleMainboard({
