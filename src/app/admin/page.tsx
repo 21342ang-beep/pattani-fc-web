@@ -153,14 +153,14 @@ function StatPill({
 }) {
   return (
     <div
-      className={`rounded-lg border p-4 shadow-sm ${
+      className={`rounded-xl border p-5 shadow-sm sm:p-6 ${
         highlight
           ? "border-yellow-400 bg-yellow-50"
           : "border-green-100 bg-white"
       }`}
     >
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold text-green-900">{value}</p>
+      <p className="text-sm text-slate-500 sm:text-base">{label}</p>
+      <p className="mt-1 text-3xl font-bold text-green-900 sm:text-4xl">{value}</p>
     </div>
   );
 }
@@ -183,31 +183,31 @@ function SectionCard({
   return (
     <Link
       href={href}
-      className={`group flex h-full flex-col justify-between rounded-xl border p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group flex h-full flex-col justify-between rounded-xl border p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:p-6 ${
         emphasized
           ? "border-yellow-300 bg-gradient-to-br from-yellow-50 to-white"
           : "border-slate-200 bg-white hover:border-green-300"
       }`}
     >
       <div>
-        <div className="mb-3 flex items-center gap-3">
+        <div className="mb-4 flex items-center gap-4">
           <span
             aria-hidden
-            className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-2xl group-hover:bg-green-100"
+            className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-green-50 text-3xl group-hover:bg-green-100 sm:size-14"
           >
             {icon}
           </span>
-          <h2 className="text-base font-bold text-green-900">{label}</h2>
+          <h2 className="text-xl font-bold text-green-900 sm:text-2xl">{label}</h2>
         </div>
-        <p className="text-sm leading-relaxed text-slate-600">{description}</p>
+        <p className="text-base leading-relaxed text-slate-600 sm:text-lg">{description}</p>
       </div>
-      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-        <span className="text-xs font-medium text-slate-500">
+      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+        <span className="text-sm font-medium text-slate-500 sm:text-base">
           {stat ?? "เปิดหน้า"}
         </span>
         <span
           aria-hidden
-          className="text-sm font-semibold text-green-700 group-hover:text-green-900"
+          className="text-lg font-semibold text-green-700 group-hover:text-green-900"
         >
           →
         </span>
