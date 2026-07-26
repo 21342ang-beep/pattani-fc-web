@@ -528,6 +528,32 @@ export default function TopNav({
                   })}
                 </nav>
 
+                <div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.75rem] gap-2 border-t border-yellow-300/10 pt-4">
+                  <Link
+                    href="/faq"
+                    onClick={closeNavigation}
+                    className="truncate rounded-xl bg-white/5 px-3 py-3 text-center text-sm font-semibold text-yellow-100 transition hover:bg-white/10"
+                  >
+                    {dict.util.faq}
+                  </Link>
+                  <Link
+                    href="/privacy-policy"
+                    onClick={closeNavigation}
+                    className="truncate rounded-xl bg-white/5 px-3 py-3 text-center text-sm font-semibold text-yellow-100 transition hover:bg-white/10"
+                  >
+                    นโยบายส่วนตัว
+                  </Link>
+                  <Link
+                    href="/login"
+                    onClick={closeNavigation}
+                    aria-label={dict.util.admin}
+                    title={dict.util.admin}
+                    className="grid size-11 place-items-center rounded-xl bg-white/5 text-yellow-100 transition hover:bg-white/10"
+                  >
+                    <Shield className="size-5" aria-hidden />
+                  </Link>
+                </div>
+
               </div>
 
               <div className="flex items-center justify-between gap-3 border-t border-yellow-300/10 bg-green-950/80 px-4 py-3">
