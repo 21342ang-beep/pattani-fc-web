@@ -18,6 +18,14 @@ function emptyToNull(v: FormDataEntryValue | null): string | null {
   return t === "" ? null : t;
 }
 
+// ค่า datetime-local ไม่มีเขตเวลา จึงกำหนดให้ทุกนัดแข่งขันใช้เวลาไทยเสมอ
+// แล้วแปลงเป็น instant ก่อนบันทึก เพื่อไม่ให้เวลาเลื่อนตาม timezone ของ server
+function parseBangkokDateTime(v: FormDataEntryValue | null): Date | null {
+  const value = emptyToNull(v);
+  if (value == null) return null;
+  return new Date(`${value}:00+07:00`);
+}
+
 function numOrNull(v: FormDataEntryValue | null): number | null {
   const s = emptyToNull(v);
   if (s == null) return null;
@@ -81,7 +89,7 @@ async function parseFormToMatchInput(formData: FormData) {
     homeTeamLogo: home.path,
     awayTeamLogo: away.path,
     venue: emptyToNull(formData.get("venue")),
-    kickoffAt: emptyToNull(formData.get("kickoffAt")),
+    kickoffAt: parseBangkokDateTime(formData.get("kickoffAt")),
     totalSeats: zoneCapacities.length > 0
       ? zoneCapacities.reduce((sum, capacity) => sum + capacity, 0)
       : numOrNull(formData.get("totalSeats")),

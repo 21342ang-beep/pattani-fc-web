@@ -10,6 +10,7 @@ import { verifyPermission } from "@/lib/dal";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   SEASON_LABEL,
+  SEASON_MATCHES,
   SEASON_PASS_SEAT_ZONES,
   SEASON_PASS_SHIPPING_FEE_BAHT,
   SEASON_TIERS,
@@ -257,5 +258,53 @@ export async function deleteSeasonPassOrder(
     return { ok: true };
   } catch {
     return { error: "ลบไม่สำเร็จ" };
+  }
+}
+
+// Admin: ล้างการจองบัตรรายปีทั้งหมดสำหรับการทดสอบ โดยคืนบาร์โค้ดให้จองใหม่ได้
+export async function deleteAllSeasonPassOrders(): Promise<
+  { ok: true; deleted: number } | { error: string }
+> {
+  await verifyPermission("SEASON_PASSES");
+
+  try {
+    const deleted = await prisma.$transaction(async (tx) => {
+      const orders = await tx.seasonPassOrder.findMany({
+        select: { id: true },
+      });
+      const orderIds = orders.map((order) => order.id);
+      if (orderIds.length === 0) return 0;
+
+      const barcodes = await tx.seasonPassBarcode.findMany({
+        where: { orderId: { in: orderIds } },
+        select: { id: true },
+      });
+      const barcodeIds = barcodes.map((barcode) => barcode.id);
+
+      if (barcodeIds.length > 0) {
+        await tx.seasonPassScan.deleteMany({
+          where: { barcodeId: { in: barcodeIds } },
+        });
+        await tx.seasonPassBarcode.updateMany({
+          where: { id: { in: barcodeIds } },
+          data: {
+            orderId: null,
+            assignedAt: null,
+            usesRemaining: SEASON_MATCHES,
+          },
+        });
+      }
+
+      const result = await tx.seasonPassOrder.deleteMany({
+        where: { id: { in: orderIds } },
+      });
+      return result.count;
+    });
+
+    revalidatePath("/admin/season-passes");
+    revalidatePath("/admin/season-passes/check");
+    return { ok: true, deleted };
+  } catch {
+    return { error: "ลบการจองทั้งหมดไม่สำเร็จ" };
   }
 }

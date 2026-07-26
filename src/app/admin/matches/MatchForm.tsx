@@ -21,6 +21,22 @@ type Match = {
   description: string | null;
 };
 
+function toBangkokDateTimeInput(value: Date | string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+}
+
 export default function MatchForm({
   action,
   initial,
@@ -34,7 +50,7 @@ export default function MatchForm({
 }) {
   const [state, formAction, pending] = useActionState<MatchFormState, FormData>(action, undefined);
   const initialKickoff = initial?.kickoffAt
-    ? new Date(initial.kickoffAt).toISOString().slice(0, 16)
+    ? toBangkokDateTimeInput(initial.kickoffAt)
     : "";
   const [zoneSeats, setZoneSeats] = useState({
     zone150Seats: initial?.zone150Seats?.toString() ?? "",
@@ -105,7 +121,7 @@ export default function MatchForm({
           name="kickoffAt"
           type="datetime-local"
           defaultValue={initialKickoff}
-          hint="เว้นว่างได้ถ้ายังไม่กำหนด"
+          hint="ใช้เวลาไทย (ICT) · เว้นว่างได้ถ้ายังไม่กำหนด"
         />
         <Field
           label="จำนวนที่นั่ง"

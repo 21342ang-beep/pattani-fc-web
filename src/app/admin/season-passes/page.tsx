@@ -10,6 +10,7 @@ import { formatDateTime } from "@/lib/format";
 import Link from "next/link";
 import SeasonPassStatusSelect from "./SeasonPassStatusSelect";
 import DeleteSeasonPassButton from "./DeleteSeasonPassButton";
+import DeleteAllSeasonPassOrdersButton from "./DeleteAllSeasonPassOrdersButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "บัตรรายปี — Admin" };
@@ -64,12 +65,15 @@ export default async function AdminSeasonPassesPage(props: {
             บัตรสมาชิกครอบคลุม {SEASON_MATCHES} แมตช์เหย้าต่อฤดูกาล
           </p>
         </div>
-        <Link
-          href="/admin/season-passes/check"
-          className="rounded-md border border-green-200 bg-white px-3 py-1.5 text-sm font-medium text-green-900 hover:bg-green-50"
-        >
-          🎫 สแกนและประวัติการใช้งานบัตรรายปี
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/season-passes/check"
+            className="rounded-md border border-green-200 bg-white px-3 py-1.5 text-sm font-medium text-green-900 hover:bg-green-50"
+          >
+            🎫 สแกนและประวัติการใช้งานบัตรรายปี
+          </Link>
+          <DeleteAllSeasonPassOrdersButton count={orders.length} />
+        </div>
       </div>
 
       {/* สรุปตัวเลข */}
