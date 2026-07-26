@@ -61,16 +61,7 @@ export default async function AdminMatchResultsPage({
   const { competition, month: rawMonth, date: rawDate } = await searchParams;
   const competitionType = competition === "CUP" ? "CUP" : "LEAGUE";
   const matches = await prisma.match.findMany({
-    where: {
-      status: { not: "CANCELLED" },
-      competitionType,
-      OR: [
-        { homeTeam: { contains: "pattani", mode: "insensitive" } },
-        { homeTeam: { contains: "ปัตตานี" } },
-        { awayTeam: { contains: "pattani", mode: "insensitive" } },
-        { awayTeam: { contains: "ปัตตานี" } },
-      ],
-    },
+    where: { status: { not: "CANCELLED" }, competitionType },
     orderBy: { kickoffAt: "asc" },
   });
   const selectedDate = rawDate && DATE_PATTERN.test(rawDate) ? rawDate : null;

@@ -125,7 +125,6 @@ model Match {
   zoneAwaySeats Int?
   pricePerSeat  Int?        // ราคาเป็นสตางค์ (เลี่ยง floating point)
   competitionType CompetitionType @default(LEAGUE)
-  isResultOnly  Boolean     @default(false)
   homeScore     Int?
   awayScore     Int?
   status        MatchStatus @default(SCHEDULED)
@@ -137,7 +136,6 @@ model Match {
 
   @@index([kickoffAt])
   @@index([status])
-  @@index([isResultOnly])
 }
 
 model LeagueTeam {

@@ -19,14 +19,6 @@ const resultMatchSchema = z.object({
   competitionType: z.enum(["LEAGUE", "CUP"]).catch("LEAGUE"),
 });
 
-function isPattaniFixture(homeTeam: string, awayTeam: string): boolean {
-  const isPattaniTeam = (team: string) => {
-    const normalized = team.trim().toLocaleLowerCase("th-TH");
-    return normalized.includes("pattani") || normalized.includes("ปัตตานี");
-  };
-  return isPattaniTeam(homeTeam) || isPattaniTeam(awayTeam);
-}
-
 export type ResultMatchFormState = { error?: string } | undefined;
 
 function parseResultMatchFields(formData: FormData) {
@@ -99,9 +91,6 @@ export async function createResultMatch(
   await verifyPermission("MATCH_RESULTS");
   const parsed = parseResultMatchFields(formData);
   if (!parsed.success) return { error: "กรุณากรอกชื่อทีมเหย้าและทีมเยือนให้ถูกต้อง" };
-  if (!isPattaniFixture(parsed.data.homeTeam, parsed.data.awayTeam)) {
-    return { error: "บันทึกผลได้เฉพาะแมตช์ที่มีปัตตานี เอฟซี ลงแข่งขัน" };
-  }
 
   let logos;
   try {
@@ -117,7 +106,6 @@ export async function createResultMatch(
         homeTeamLogo: logos.home.path,
         awayTeamLogo: logos.away.path,
         status: "SCHEDULED",
-        isResultOnly: true,
       },
     });
   } catch (e) {
@@ -137,9 +125,6 @@ export async function updateResultMatch(
   await verifyPermission("MATCH_RESULTS");
   const parsed = parseResultMatchFields(formData);
   if (!parsed.success) return { error: "กรุณากรอกชื่อทีมเหย้าและทีมเยือนให้ถูกต้อง" };
-  if (!isPattaniFixture(parsed.data.homeTeam, parsed.data.awayTeam)) {
-    return { error: "บันทึกผลได้เฉพาะแมตช์ที่มีปัตตานี เอฟซี ลงแข่งขัน" };
-  }
 
   // สกอร์: กรอกครบทั้งคู่ = บันทึก/แก้ผล, ว่างทั้งคู่ = ยกเลิกผลที่บันทึกไว้
   const homeScoreRaw = formData.get("homeScore");
