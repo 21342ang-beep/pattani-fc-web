@@ -13,7 +13,9 @@ export const getMatchesByFilter = unstable_cache(
         ? { status: { in: ["SCHEDULED", "ON_SALE"] } }
         : { status: { notIn: ["CANCELLED"] } };
     return prisma.match.findMany({
-      where: competitionType ? { ...where, competitionType } : where,
+      where: competitionType
+        ? { ...where, competitionType, isResultOnly: false }
+        : { ...where, isResultOnly: false },
       orderBy: { kickoffAt: "asc" },
     });
   },
