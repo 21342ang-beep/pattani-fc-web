@@ -84,9 +84,9 @@ export default async function TicketsPage() {
         </div>
 
         {/* แผนผังสนาม — โชว์บนสุด ให้คนดูมุมมองก่อนเลือกโซน */}
-        <div className="relative aspect-[1553/1053] w-full">
+        <div className="relative aspect-[1463/1058] w-full">
             <Image
-                src="/stadium-zones-match-2026-27-v3.png"
+                src="/stadium-zones-match-2026-27-v4.png"
               alt="แผนผังโซนที่นั่งของ Rainbow Stadium — Pattani FC (ความจุ 10,700)"
               fill
               sizes="(min-width: 1024px) 1024px, 100vw"
