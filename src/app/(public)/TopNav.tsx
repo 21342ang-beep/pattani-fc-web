@@ -161,7 +161,7 @@ export default function TopNav({
             aria-expanded={isOpen}
             aria-haspopup="menu"
             suppressHydrationWarning
-            className={`flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-3 text-lg tracking-[0.025em] [word-spacing:0.1em] transition-colors 2xl:text-xl ${
+            className={`flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-3.5 text-xl tracking-[0.035em] [word-spacing:0.15em] transition-colors 2xl:text-2xl ${
               active || isOpen ? "font-black text-white" : "font-bold text-white hover:text-white"
             }`}
           >
@@ -183,7 +183,7 @@ export default function TopNav({
     }
     const active = isActive(path, it.href);
     return (
-    <Link key={it.href} href={it.href} onClick={closeNavigation} className={`whitespace-nowrap rounded-full px-3 py-3 text-lg tracking-[0.025em] [word-spacing:0.1em] transition-colors 2xl:text-xl ${active ? "font-black text-white" : "font-bold text-white hover:text-white"}`}>
+    <Link key={it.href} href={it.href} onClick={closeNavigation} className={`whitespace-nowrap rounded-full px-5 py-3.5 text-xl tracking-[0.035em] [word-spacing:0.15em] transition-colors 2xl:text-2xl ${active ? "font-black text-white" : "font-bold text-white hover:text-white"}`}>
         <span>{it.label}</span>
       </Link>
     );
@@ -342,18 +342,15 @@ export default function TopNav({
 
         {/* Desktop nav — hidden below md */}
         <nav className="hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
-          <div className="mx-auto grid w-full max-w-[88rem] grid-cols-[repeat(4,minmax(0,1fr))_9rem_repeat(4,minmax(0,1fr))] items-center px-4 py-2.5">
+          <div className="mx-auto grid max-w-7xl grid-cols-[repeat(4,minmax(0,1fr))_8rem_repeat(4,minmax(0,1fr))] items-center px-2 py-2.5">
             {items.slice(0, 4).map((item) => (
-              <div key={"children" in item ? item.label : item.href} className="flex justify-center xl:translate-x-3">
+              <div key={"children" in item ? item.label : item.href} className="flex justify-center">
                 {renderDesktopItem(item)}
               </div>
             ))}
             <div aria-hidden />
-            {items.slice(4).map((item, index) => (
-              <div
-                key={"children" in item ? item.label : item.href}
-                className={`flex justify-center ${index >= 2 ? "xl:-translate-x-8" : "xl:-translate-x-3"}`}
-              >
+            {items.slice(4).map((item) => (
+              <div key={"children" in item ? item.label : item.href} className="flex justify-center">
                 {renderDesktopItem(item)}
               </div>
             ))}
