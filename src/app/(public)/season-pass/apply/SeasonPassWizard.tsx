@@ -167,8 +167,8 @@ export default function SeasonPassWizard({
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-[1.4fr_1fr]">
-      <div>
+    <div className="grid gap-5 md:grid-cols-[1.4fr_1fr] md:gap-6">
+      <div className="min-w-0">
         <StepBar step={step} />
 
         <div className="mt-4">
@@ -198,12 +198,14 @@ export default function SeasonPassWizard({
         </div>
       </div>
 
-      <TierSummary
-        tier={tier}
-        isMember={isMember}
-        shippingFee={shippingFee}
-        totalBaht={totalBaht}
-      />
+      <div className="min-w-0 md:sticky md:top-24 md:self-start">
+        <TierSummary
+          tier={tier}
+          isMember={isMember}
+          shippingFee={shippingFee}
+          totalBaht={totalBaht}
+        />
+      </div>
     </div>
   );
 }
@@ -219,12 +221,12 @@ function StepBar({ step }: { step: Step }) {
   ];
   const currentIdx = steps.findIndex((s) => s.id === step);
   return (
-    <ol className="flex items-center gap-2 text-xs md:text-sm">
+    <ol className="grid grid-cols-3 gap-1 text-center text-[11px] sm:text-xs md:flex md:items-center md:gap-2 md:text-sm">
       {steps.map((s, i) => {
         const done = i < currentIdx;
         const active = i === currentIdx;
         return (
-          <li key={s.id} className="flex flex-1 items-center gap-2">
+          <li key={s.id} className="flex min-w-0 flex-1 flex-col items-center gap-1 md:flex-row md:gap-2">
             <span
               className={`flex size-7 shrink-0 items-center justify-center rounded-full font-bold ${
                 done
@@ -237,7 +239,7 @@ function StepBar({ step }: { step: Step }) {
               {done ? <Check className="size-4" /> : i + 1}
             </span>
             <span
-              className={`truncate ${
+              className={`w-full truncate ${
                 active
                   ? "font-bold text-green-900"
                   : done
@@ -247,9 +249,7 @@ function StepBar({ step }: { step: Step }) {
             >
               {s.label}
             </span>
-            {i < steps.length - 1 && (
-              <ChevronRight className="hidden size-4 shrink-0 text-slate-300 md:block" />
-            )}
+            {i < steps.length - 1 && <ChevronRight className="hidden size-4 shrink-0 text-slate-300 md:block" />}
           </li>
         );
       })}
@@ -354,7 +354,7 @@ function FormStep({
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-7"
+      className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:p-7"
       autoComplete="on"
     >
       <div>
@@ -708,8 +708,8 @@ function PaymentStep({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <header className="border-b border-slate-200 bg-gradient-to-r from-green-950 to-green-800 px-6 py-4 text-white">
-        <div className="flex items-center justify-between gap-3">
+      <header className="border-b border-slate-200 bg-gradient-to-r from-green-950 to-green-800 px-4 py-4 text-white sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2.5">
             <Lock className="size-4 text-yellow-300" />
             <span className="text-sm font-bold tracking-wide">SECURE PAYMENT GATEWAY</span>
@@ -769,7 +769,7 @@ function PaymentStep({
         </div>
       </div>
 
-      <div className="p-5 md:p-7">
+      <div className="p-4 sm:p-5 md:p-7">
         {method === "card" && (
           <CardPanel
             amountBaht={totalBaht}
@@ -785,7 +785,7 @@ function PaymentStep({
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-3 text-[11px]">
+      <div className="flex flex-col items-start gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-[11px] sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <button
           type="button"
           onClick={onBack}
@@ -915,7 +915,7 @@ function MockPreviewCard({
 }) {
   const masked = (digits.padEnd(16, "•").match(/.{1,4}/g) ?? []).slice(0, 4).join(" ");
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-900 via-green-800 to-emerald-700 p-5 text-white shadow-lg">
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-900 via-green-800 to-emerald-700 p-4 text-white shadow-lg sm:p-5">
       <div className="absolute -right-8 -top-8 size-40 rounded-full bg-yellow-300/10" />
       <div className="absolute -bottom-10 -left-6 size-32 rounded-full bg-yellow-300/10" />
       <div className="relative flex items-start justify-between">
@@ -926,7 +926,7 @@ function MockPreviewCard({
           {brand}
         </span>
       </div>
-      <div className="relative mt-8 font-mono text-lg tracking-[0.25em] text-white/95 md:text-xl">
+      <div className="relative mt-8 break-all font-mono text-base tracking-[0.16em] text-white/95 sm:text-lg sm:tracking-[0.25em] md:text-xl">
         {masked}
       </div>
       <div className="relative mt-4 flex items-end justify-between text-[11px] uppercase tracking-widest text-white/80">
@@ -1180,16 +1180,16 @@ function SuccessStep({
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <Link
           href="/matches"
-          className="rounded-full bg-green-800 px-6 py-3 text-base font-semibold text-yellow-300 transition hover:bg-green-900"
+          className="w-full rounded-full bg-green-800 px-6 py-3 text-center text-base font-semibold text-yellow-300 transition hover:bg-green-900 sm:w-auto"
         >
           ดูโปรแกรมการแข่งขัน
         </Link>
         <Link
           href="/tickets/season"
-          className="rounded-full border border-green-200 bg-white px-6 py-3 text-base font-medium text-green-900 transition hover:bg-green-50"
+          className="w-full rounded-full border border-green-200 bg-white px-6 py-3 text-center text-base font-medium text-green-900 transition hover:bg-green-50 sm:w-auto"
         >
           กลับหน้าตั๋ว
         </Link>
@@ -1243,14 +1243,14 @@ function DigitalPass({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-4">
+      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-widest text-yellow-100/60">รหัสบัตร</p>
           <p className="mt-1 truncate font-mono text-base font-bold tracking-wider text-yellow-300 md:text-lg">
             {passCode}
           </p>
         </div>
-        <div className="w-44 shrink-0 rounded-lg bg-white p-2">
+        <div className="w-full max-w-44 shrink-0 rounded-lg bg-white p-2 sm:w-44">
           <img
             src={`/api/season-passes/${encodeURIComponent(passCode)}/barcode`}
             alt={`บาร์โค้ด ${passCode}`}
@@ -1282,7 +1282,7 @@ function TierSummary({
   totalBaht: number;
 }) {
   return (
-    <aside className="h-fit space-y-5 rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
+    <aside className="h-fit space-y-5 rounded-2xl border border-green-100 bg-white p-4 shadow-sm sm:p-6">
       <div>
         <p className="text-xs font-bold uppercase tracking-widest text-yellow-600">
           บัตรที่เลือก
@@ -1371,7 +1371,7 @@ function Field({
     <div>
       <label
         htmlFor={htmlFor}
-        className="mb-1.5 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-600"
+        className="mb-1.5 flex flex-col items-start gap-0.5 text-xs font-semibold uppercase tracking-wider text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:gap-2"
       >
         <span className="inline-flex items-center gap-1.5">
           {icon}
