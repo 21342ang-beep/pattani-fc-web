@@ -90,49 +90,55 @@ export default async function AdminMatchResultsPage({
           <h1 className="text-xl font-bold">รายงานผลการแข่งขัน</h1>
           <p className="mt-1 text-sm text-slate-600">เพิ่มแมตช์และบันทึกสกอร์ เพื่อแสดงผลบนเว็บไซต์</p>
         </div>
-        <Link
-          href={`/admin/results/new?competition=${competitionType}`}
-          className="rounded-md bg-green-800 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-        >
-          + เพิ่มแมตช์
-        </Link>
+        <div className="flex items-center gap-2">
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded-md border border-green-800 px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 [&::-webkit-details-marker]:hidden">
+              ปฏิทิน
+            </summary>
+            <div className="absolute right-0 z-10 mt-2 w-80 rounded-xl border bg-white p-4 shadow-xl">
+              <div className="flex items-center justify-between gap-3">
+                <Link href={resultHref({ month: shiftMonth(month, -1) })} className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-slate-50" aria-label="เดือนก่อนหน้า">←</Link>
+                <h2 className="text-base font-bold text-green-900">{monthLabel(month)}</h2>
+                <Link href={resultHref({ month: shiftMonth(month, 1) })} className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-slate-50" aria-label="เดือนถัดไป">→</Link>
+              </div>
+              <div className="mt-3 grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-500">
+                {["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map((day) => <span key={day} className="py-2">{day}</span>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: leadingBlankDays }, (_, index) => <span key={`blank-${index}`} />)}
+                {calendarDays.map((day) => {
+                  const date = `${month}-${String(day).padStart(2, "0")}`;
+                  const hasMatch = matchDates.has(date);
+                  const isSelected = selectedDate === date;
+                  return (
+                    <Link
+                      key={date}
+                      href={resultHref({ month, date })}
+                      className={`relative flex aspect-square items-center justify-center rounded-md text-sm font-semibold transition hover:bg-green-100 ${isSelected ? "bg-green-800 text-white" : hasMatch ? "bg-amber-100 text-amber-950" : "text-slate-700"}`}
+                      aria-label={`เลือกวันที่ ${date}${hasMatch ? " มีการแข่งขัน" : ""}`}
+                    >
+                      {day}
+                      {hasMatch && !isSelected && <span className="absolute bottom-1 size-1.5 rounded-full bg-green-700" />}
+                    </Link>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs text-slate-500"><span className="mr-1 inline-block size-2 rounded-full bg-green-700" />วันที่มีการแข่งขัน</p>
+            </div>
+          </details>
+          <Link
+            href={`/admin/results/new?competition=${competitionType}`}
+            className="rounded-md bg-green-800 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+          >
+            + เพิ่มแมตช์
+          </Link>
+        </div>
       </div>
 
       <nav className="mb-6 flex gap-2" aria-label="ประเภทการแข่งขัน">
         <Link href={`/admin/results?competition=LEAGUE&month=${month}`} className={`rounded-full px-4 py-2 text-sm font-semibold ${competitionType === "LEAGUE" ? "bg-green-800 text-white" : "border bg-white text-green-800"}`}>บอลลีก</Link>
         <Link href={`/admin/results?competition=CUP&month=${month}`} className={`rounded-full px-4 py-2 text-sm font-semibold ${competitionType === "CUP" ? "bg-green-800 text-white" : "border bg-white text-green-800"}`}>บอลถ้วย</Link>
       </nav>
-
-      <section className="rounded-xl border bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex items-center justify-between gap-3">
-          <Link href={resultHref({ month: shiftMonth(month, -1) })} className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-slate-50" aria-label="เดือนก่อนหน้า">←</Link>
-          <h2 className="text-lg font-bold text-green-900">{monthLabel(month)}</h2>
-          <Link href={resultHref({ month: shiftMonth(month, 1) })} className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-slate-50" aria-label="เดือนถัดไป">→</Link>
-        </div>
-        <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-500">
-          {["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map((day) => <span key={day} className="py-2">{day}</span>)}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: leadingBlankDays }, (_, index) => <span key={`blank-${index}`} />)}
-          {calendarDays.map((day) => {
-            const date = `${month}-${String(day).padStart(2, "0")}`;
-            const hasMatch = matchDates.has(date);
-            const isSelected = selectedDate === date;
-            return (
-              <Link
-                key={date}
-                href={resultHref({ month, date })}
-                className={`relative flex aspect-square items-center justify-center rounded-md text-sm font-semibold transition hover:bg-green-100 ${isSelected ? "bg-green-800 text-white" : hasMatch ? "bg-amber-100 text-amber-950" : "text-slate-700"}`}
-                aria-label={`เลือกวันที่ ${date}${hasMatch ? " มีการแข่งขัน" : ""}`}
-              >
-                {day}
-                {hasMatch && !isSelected && <span className="absolute bottom-1 size-1.5 rounded-full bg-green-700" />}
-              </Link>
-            );
-          })}
-        </div>
-        <p className="mt-4 text-xs text-slate-500"><span className="mr-1 inline-block size-2 rounded-full bg-green-700" />วันที่มีการแข่งขัน</p>
-      </section>
 
       {selectedDate && (
         <section className="mt-6 space-y-3">
