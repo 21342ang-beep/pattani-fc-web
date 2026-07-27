@@ -21,7 +21,7 @@ export default function OnSaleMatchBoard({
   showBookingButton?: boolean;
 }) {
   return (
-    <article className="overflow-hidden rounded-2xl bg-gradient-to-br from-green-950 via-green-900 to-emerald-800 text-white shadow-xl">
+    <article className="overflow-hidden rounded-2xl bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-[length:100%_100%] bg-center text-white shadow-xl">
       <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:p-10">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-1.5 text-base font-black uppercase tracking-wider text-green-950 sm:text-lg">
@@ -30,7 +30,7 @@ export default function OnSaleMatchBoard({
           </div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-7">
             <Team logo={match.homeTeamLogo} name={match.homeTeam} />
-            <span className="text-3xl font-black tracking-[0.2em] text-yellow-300 sm:text-4xl">VS</span>
+            <span className="invisible text-3xl font-black tracking-[0.2em] sm:text-4xl" aria-hidden>VS</span>
             <Team logo={match.awayTeamLogo} name={match.awayTeam} />
           </div>
         </div>

@@ -173,7 +173,7 @@ function OnSaleMainboard({
   zoneQS: string;
 }) {
   return (
-    <article className="overflow-hidden rounded-2xl bg-gradient-to-br from-green-950 via-green-900 to-emerald-800 text-white shadow-xl">
+    <article className="overflow-hidden rounded-2xl bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-[length:100%_100%] bg-center text-white shadow-xl">
       <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:p-10">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-1.5 text-sm font-black uppercase tracking-wider text-green-950 md:text-base">
@@ -181,7 +181,7 @@ function OnSaleMainboard({
           </div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-7">
             <MainboardTeam logo={match.homeTeamLogo} name={match.homeTeam} />
-            <span className="text-xl font-black tracking-[0.2em] text-yellow-300 sm:text-3xl">VS</span>
+            <span className="invisible text-xl font-black tracking-[0.2em] sm:text-3xl" aria-hidden>VS</span>
             <MainboardTeam logo={match.awayTeamLogo} name={match.awayTeam} />
           </div>
         </div>
