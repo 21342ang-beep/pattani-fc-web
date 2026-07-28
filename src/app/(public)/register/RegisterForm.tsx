@@ -95,7 +95,7 @@ export default function RegisterForm({
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <SelectField label="เพศ" error={fe.gender} required>
-            <select name="gender" required defaultValue="" className={selectClassName(!!fe.gender)}>
+            <select name="gender" required defaultValue="" className={selectClassName(!!fe.gender)} suppressHydrationWarning>
               <option value="" disabled>เลือกเพศ</option>
               <option value="MALE">ชาย</option>
               <option value="FEMALE">หญิง</option>
@@ -127,20 +127,20 @@ export default function RegisterForm({
             />
             <div className="grid gap-3 sm:grid-cols-2">
               <SelectField label="จังหวัด" error={fe.province} required>
-                <select name="province" value={province} onChange={(event) => handleProvinceChange(event.target.value)} required className={selectClassName(!!fe.province)}>
+                <select name="province" value={province} onChange={(event) => handleProvinceChange(event.target.value)} required className={selectClassName(!!fe.province)} suppressHydrationWarning>
                   <option value="">เลือกจังหวัด</option>
                   {shippingProvinces.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
                 </select>
               </SelectField>
               <SelectField label="อำเภอ/เขต" error={fe.district} required>
-                <select name="district" value={district} onChange={(event) => handleDistrictChange(event.target.value)} disabled={!selectedProvince} required className={selectClassName(!!fe.district)}>
+                <select name="district" value={district} onChange={(event) => handleDistrictChange(event.target.value)} disabled={!selectedProvince} required className={selectClassName(!!fe.district)} suppressHydrationWarning>
                   <option value="">{selectedProvince ? "เลือกอำเภอ/เขต" : "เลือกจังหวัดก่อน"}</option>
                   {selectedProvince?.districts.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
                 </select>
               </SelectField>
             </div>
             <SelectField label="รหัสไปรษณีย์" error={fe.postalCode} required>
-              <select name="postalCode" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} disabled={!selectedDistrict} required className={selectClassName(!!fe.postalCode)}>
+              <select name="postalCode" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} disabled={!selectedDistrict} required className={selectClassName(!!fe.postalCode)} suppressHydrationWarning>
                 <option value="">{selectedDistrict ? "เลือกรหัสไปรษณีย์" : "เลือกอำเภอก่อน"}</option>
                 {selectedDistrict?.postalCodes.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>

@@ -61,7 +61,7 @@ export async function GET(req: Request) {
     successRedirectUrl(
       result.emailChanged ? "email_from_google" : undefined,
       stateData.returnTo,
-      stateData.intent === "register" ? "/tickets/season" : "/member",
+      "/member",
     ),
   );
 }

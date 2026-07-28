@@ -31,7 +31,7 @@ export default async function RegisterPage(props: {
   const sp = await props.searchParams;
   const returnTo = getSafeReturnTo(sp.next);
   const session = await readCustomerSession();
-  if (session) redirect(returnTo ?? "/tickets/season");
+  if (session) redirect(returnTo ?? "/member");
   const errorMessage = sp.error ? ERROR_MESSAGES[sp.error] : undefined;
   const shippingProvinces: ShippingProvince[] = getAllProvinces()
     .map((province) => ({

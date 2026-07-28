@@ -55,7 +55,7 @@ export async function GET(req: Request) {
     successRedirectUrl(
       result.emailChanged ? "email_from_line" : undefined,
       stateData.returnTo,
-      stateData.intent === "register" ? "/tickets/season" : "/member",
+      "/member",
     ),
   );
 }
