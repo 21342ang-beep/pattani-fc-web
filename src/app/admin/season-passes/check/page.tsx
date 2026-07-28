@@ -13,7 +13,7 @@ export const metadata = { title: "สแกนบัตรรายปี — Ad
 export default async function SeasonPassCheckPage() {
   await verifyPermission("SEASON_PASSES");
   const [matches, orders, scans] = await Promise.all([
-    prisma.match.findMany({ where: { competitionType: "LEAGUE", status: { in: ["ON_SALE", "SCHEDULED", "SOLD_OUT"] } }, orderBy: { kickoffAt: "asc" }, take: 100, select: { id: true, homeTeam: true, awayTeam: true, kickoffAt: true } }),
+    prisma.match.findMany({ where: { competitionType: "LEAGUE" }, orderBy: { kickoffAt: "asc" }, take: 100, select: { id: true, homeTeam: true, awayTeam: true, kickoffAt: true } }),
     prisma.seasonPassOrder.findMany({ select: { tierId: true } }),
     prisma.seasonPassScan.findMany({ orderBy: { scannedAt: "desc" }, take: 100, select: { id: true, scannedAt: true, scannedBy: true, match: { select: { homeTeam: true, awayTeam: true } }, barcode: { select: { tierId: true, order: { select: { passCode: true, customerName: true } } } } } }),
   ]);

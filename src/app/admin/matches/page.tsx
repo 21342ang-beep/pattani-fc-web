@@ -54,7 +54,17 @@ export default async function AdminMatchesPage(props: {
   }
 
   const matches = await prisma.match.findMany({
-    where: competition ? { competitionType: competition } : undefined,
+    where: competition
+      ? {
+          competitionType: competition,
+          OR: [
+            { homeTeam: { contains: "Pattani", mode: "insensitive" } },
+            { awayTeam: { contains: "Pattani", mode: "insensitive" } },
+            { homeTeam: { contains: "ปัตตานี" } },
+            { awayTeam: { contains: "ปัตตานี" } },
+          ],
+        }
+      : undefined,
     orderBy: { kickoffAt: "asc" },
     include: {
       bookings: {
