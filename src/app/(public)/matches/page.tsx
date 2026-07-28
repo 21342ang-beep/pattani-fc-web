@@ -173,7 +173,7 @@ function OnSaleMainboard({
   zoneQS: string;
 }) {
   return (
-    <article className="overflow-hidden rounded-2xl bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-cover bg-[position:28%_center] text-white shadow-xl md:bg-[length:100%_100%] md:bg-center">
+    <article className="overflow-hidden rounded-2xl bg-green-950 bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-[length:200%_auto] bg-[position:22%_-10%] bg-no-repeat text-white shadow-xl md:bg-[length:100%_100%] md:bg-center">
       <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:p-10">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-1.5 text-sm font-black uppercase tracking-wider text-green-950 md:text-base">
