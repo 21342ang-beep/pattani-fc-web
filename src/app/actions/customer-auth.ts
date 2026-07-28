@@ -187,7 +187,9 @@ export async function registerCustomer(
     return { error: "เกิดข้อผิดพลาดในการสมัคร กรุณาลองใหม่อีกครั้ง" };
   }
 
-  return { redirectTo: returnTo ?? "/tickets/season" };
+  // สมัครสำเร็จแล้วให้ Server Action เปลี่ยนหน้าโดยตรง เพื่อให้ cookie session
+  // และปลายทางการจองถูกใช้งานใน response เดียวกัน (ไม่พึ่ง client-side effect)
+  redirect(returnTo ?? "/tickets/season");
 }
 
 export async function loginCustomer(
