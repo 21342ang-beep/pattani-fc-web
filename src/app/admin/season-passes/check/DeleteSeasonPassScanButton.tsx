@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteSeasonPassScan } from "@/app/actions/gate-check";
 
-export default function DeleteSeasonPassScanButton({ scanId }: { scanId: string }) {
+export default function DeleteSeasonPassScanButton({ scanId, onDeleted }: { scanId: string; onDeleted?: () => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -17,10 +17,13 @@ export default function DeleteSeasonPassScanButton({ scanId }: { scanId: string 
         startTransition(async () => {
           const result = await deleteSeasonPassScan(scanId);
           if ("error" in result) alert(result.error);
-          else router.refresh();
+          else {
+            onDeleted?.();
+            router.refresh();
+          }
         });
       }}
-      className="text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
+      className="rounded-lg border border-red-200 bg-white px-3 py-2 text-base font-semibold text-red-600 hover:bg-red-50 hover:text-red-800 disabled:opacity-50"
     >
       {pending ? "กำลังลบ..." : "ลบ"}
     </button>

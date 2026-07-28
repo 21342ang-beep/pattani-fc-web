@@ -34,12 +34,12 @@ export default async function CheckBookingPage() {
       <header>
         <Link
           href="/admin/bookings"
-          className="text-sm font-medium text-green-800 hover:underline"
+          className="text-base font-medium text-green-800 hover:underline md:text-lg"
         >
           ← กลับไปหน้าการจอง
         </Link>
-        <h1 className="mt-1 text-2xl font-bold text-green-900">สแกนใช้งานตั๋ว</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="mt-1 text-3xl font-bold text-green-900 md:text-4xl">สแกนใช้งานตั๋ว</h1>
+        <p className="text-base text-slate-600 md:text-lg">
           ยิงบาร์โค้ดเพื่อบันทึกการใช้งานและตรวจสอบสิทธิ์เข้าชมการแข่งขัน
         </p>
       </header>
@@ -48,17 +48,17 @@ export default async function CheckBookingPage() {
       <section className="rounded-xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold text-green-900">ข้อมูลการใช้งานบัตรจากการสแกน</h2>
-            <p className="text-sm text-slate-600">แสดง 100 รายการล่าสุดจากทั้งหมด {totalScans.toLocaleString("th-TH")} ครั้ง</p>
+            <h2 className="text-2xl font-bold text-green-900 md:text-3xl">ข้อมูลการใช้งานบัตรจากการสแกน</h2>
+            <p className="text-base text-slate-600 md:text-lg">แสดง 100 รายการล่าสุดจากทั้งหมด {totalScans.toLocaleString("th-TH")} ครั้ง</p>
           </div>
-          <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
+          <span className="rounded-full bg-green-100 px-3 py-1.5 text-base font-semibold text-green-800 md:text-lg">
             สแกนแล้ว {totalScans.toLocaleString("th-TH")} ครั้ง
           </span>
         </div>
 
         <div className="mt-4 overflow-x-auto rounded-lg border">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="border-b bg-slate-50 text-left text-xs uppercase text-slate-600">
+          <table className="w-full min-w-[900px] text-base md:text-lg">
+            <thead className="border-b bg-slate-50 text-left text-sm uppercase text-slate-600 md:text-base">
               <tr>
                 <th className="px-3 py-2">เวลาสแกน</th>
                 <th className="px-3 py-2">รหัสการจอง</th>
@@ -72,10 +72,10 @@ export default async function CheckBookingPage() {
               {scans.map((scan) => (
                 <tr key={scan.id} className="border-b last:border-0">
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{formatDateTime(scan.scannedAt)}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{scan.booking.bookingCode}</td>
+                  <td className="px-3 py-2 font-mono text-sm md:text-base">{scan.booking.bookingCode}</td>
                   <td className="px-3 py-2 font-medium">{scan.booking.customerName}</td>
                   <td className="px-3 py-2">{scan.booking.match.homeTeam} vs {scan.booking.match.awayTeam}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-slate-500">{scan.scannedBy}</td>
+                  <td className="px-3 py-2 font-mono text-sm text-slate-500 md:text-base">{scan.scannedBy}</td>
                   <td className="px-3 py-2 text-right"><DeleteBookingGateScanButton scanId={scan.id} /></td>
                 </tr>
               ))}

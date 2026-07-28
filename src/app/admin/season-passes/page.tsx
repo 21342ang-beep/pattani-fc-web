@@ -58,17 +58,17 @@ export default async function AdminSeasonPassesPage(props: {
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-green-900">
+          <h1 className="text-3xl font-bold text-green-900 md:text-4xl">
             บัตรรายปี · Season Pass {SEASON_LABEL}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-base text-slate-600 md:text-lg">
             บัตรสมาชิกครอบคลุม {SEASON_MATCHES} แมตช์เหย้าต่อฤดูกาล
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/admin/season-passes/check"
-            className="rounded-md border border-green-200 bg-white px-3 py-1.5 text-sm font-medium text-green-900 hover:bg-green-50"
+            className="rounded-md border border-green-200 bg-white px-3 py-2 text-base font-medium text-green-900 hover:bg-green-50 md:text-lg"
           >
             🎫 สแกนและประวัติการใช้งานบัตรรายปี
           </Link>
@@ -101,9 +101,9 @@ export default async function AdminSeasonPassesPage(props: {
 
       <section className="mb-6">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-green-900">แยกข้อมูลการซื้อตามแพ็กเกจ</h2>
+          <h2 className="text-2xl font-bold text-green-900 md:text-3xl">แยกข้อมูลการซื้อตามแพ็กเกจ</h2>
           {selectedTier && (
-            <Link href="/admin/season-passes" className="text-sm font-medium text-green-800 hover:underline">
+            <Link href="/admin/season-passes" className="text-base font-medium text-green-800 hover:underline md:text-lg">
               แสดงทั้งหมด
             </Link>
           )}
@@ -119,10 +119,10 @@ export default async function AdminSeasonPassesPage(props: {
                 href={`/admin/season-passes?tier=${tier.id}`}
                 className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${selectedTier === tier.id ? "border-yellow-400 bg-yellow-50" : "border-green-100 bg-white"}`}
               >
-                <p className="text-xs font-bold uppercase tracking-widest text-yellow-700">แพ็กเกจ ฿{tier.priceBaht.toLocaleString("th-TH")}</p>
-                <p className="mt-1 text-sm font-bold text-green-900">{tier.badge}</p>
-                <p className="mt-3 text-2xl font-black text-green-900">{tierOrders.length.toLocaleString("th-TH")} <span className="text-sm font-medium">รายการ</span></p>
-                <p className="mt-1 text-xs text-slate-600">ยืนยันแล้ว {confirmed.length} รายการ · ฿{revenue.toLocaleString("th-TH")}</p>
+                <p className="text-sm font-bold uppercase tracking-widest text-yellow-700 md:text-base">แพ็กเกจ ฿{tier.priceBaht.toLocaleString("th-TH")}</p>
+                <p className="mt-1 text-base font-bold text-green-900 md:text-lg">{tier.badge}</p>
+                <p className="mt-3 text-3xl font-black text-green-900 md:text-4xl">{tierOrders.length.toLocaleString("th-TH")} <span className="text-base font-medium md:text-lg">รายการ</span></p>
+                <p className="mt-1 text-sm text-slate-600 md:text-base">ยืนยันแล้ว {confirmed.length} รายการ · ฿{revenue.toLocaleString("th-TH")}</p>
               </Link>
             );
           })}
@@ -131,8 +131,8 @@ export default async function AdminSeasonPassesPage(props: {
 
       {/* ตารางบัตร */}
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-slate-50 text-xs uppercase">
+        <table className="w-full min-w-[1100px] text-base md:text-lg">
+          <thead className="border-b bg-slate-50 text-sm uppercase md:text-base">
             <tr>
               <th className="px-3 py-2 text-left">รหัสบัตร</th>
               <th className="px-3 py-2 text-left">Tier</th>
@@ -149,7 +149,7 @@ export default async function AdminSeasonPassesPage(props: {
               <tr>
                 <td colSpan={8} className="p-8 text-center text-slate-500">
                   ยังไม่มีคนซื้อบัตรรายปี — เมื่อลูกค้าสมัครที่{" "}
-                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">
+                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm">
                     /season-pass/apply
                   </code>{" "}
                   จะปรากฏที่นี่
@@ -162,27 +162,27 @@ export default async function AdminSeasonPassesPage(props: {
                 const total = o.priceBaht + o.shippingFeeBaht;
                 return (
                   <tr key={o.id} className="border-b last:border-0 align-top">
-                    <td className="px-3 py-2 font-mono text-xs">
+                    <td className="px-3 py-2 font-mono text-sm md:text-base">
                       {o.passCode}
                     </td>
                     <td className="px-3 py-2">
-                      <span className="rounded bg-yellow-100 px-2 py-0.5 text-[11px] font-bold text-yellow-900">
+                      <span className="rounded bg-yellow-100 px-2 py-0.5 text-sm font-bold text-yellow-900">
                         {tier?.badge ?? o.tierId}
                       </span>
                     </td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{o.customerName}</div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-sm text-slate-500 md:text-base">
                         {o.customerEmail ?? (
                           <span className="italic">ไม่มีอีเมล</span>
                         )}
                       </div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-sm text-slate-500 md:text-base">
                         {o.customerPhone}
                       </div>
                       <div className="mt-1">
                         <span
-                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium ${
+                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-sm font-medium ${
                             isMember
                               ? "bg-emerald-100 text-emerald-800"
                               : "bg-slate-100 text-slate-700"
@@ -195,27 +195,27 @@ export default async function AdminSeasonPassesPage(props: {
                     <td className="px-3 py-2">
                       {o.deliveryMethod === "SHIPPING" ? (
                         <div>
-                          <div className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
+                          <div className="text-sm font-bold uppercase tracking-wider text-blue-700">
                             📦 ส่งพัสดุ (+฿{o.shippingFeeBaht})
                           </div>
-                          <div className="mt-0.5 whitespace-pre-wrap text-xs text-slate-700">
+                          <div className="mt-0.5 whitespace-pre-wrap text-sm text-slate-700 md:text-base">
                             {o.shipAddress}
                             {o.shipCity && ` · ${o.shipCity}`}
                             {o.shipProvince && ` · ${o.shipProvince}`}
                             {o.shipPostalCode && ` ${o.shipPostalCode}`}
                           </div>
                           {o.shipNote && (
-                            <div className="mt-0.5 text-[11px] italic text-slate-500">
+                            <div className="mt-0.5 text-sm italic text-slate-500">
                               หมายเหตุ: {o.shipNote}
                             </div>
                           )}
                         </div>
                       ) : (
                         <div>
-                          <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                          <div className="text-sm font-bold uppercase tracking-wider text-emerald-700">
                             🏟️ รับด้วยตัวเอง
                           </div>
-                          <div className="mt-0.5 text-xs text-slate-700">
+                          <div className="mt-0.5 text-sm text-slate-700 md:text-base">
                             {o.pickupLocation ?? "—"}
                           </div>
                         </div>
@@ -226,7 +226,7 @@ export default async function AdminSeasonPassesPage(props: {
                         ฿{total.toLocaleString("th-TH")}
                       </div>
                       {o.shippingFeeBaht > 0 && (
-                        <div className="text-[10px] text-slate-500">
+                        <div className="text-sm text-slate-500">
                           บัตร ฿{o.priceBaht.toLocaleString("th-TH")} + ส่ง ฿
                           {o.shippingFeeBaht}
                         </div>
@@ -235,7 +235,7 @@ export default async function AdminSeasonPassesPage(props: {
                     <td className="px-3 py-2">
                       <div className="flex flex-col items-start gap-1">
                         <span
-                          className={`rounded px-2 py-0.5 text-xs ${
+                          className={`rounded px-2 py-0.5 text-sm ${
                             statusColor[o.status]
                           }`}
                         >
@@ -247,7 +247,7 @@ export default async function AdminSeasonPassesPage(props: {
                         />
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-500">
+                    <td className="px-3 py-2 text-sm text-slate-500 md:text-base">
                       {formatDateTime(o.createdAt)}
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -266,7 +266,7 @@ export default async function AdminSeasonPassesPage(props: {
 
       {/* สรุปประเภทบัตรที่เปิดขาย */}
       <div className="mt-8">
-        <h2 className="mb-3 text-lg font-bold text-green-900">
+        <h2 className="mb-3 text-2xl font-bold text-green-900 md:text-3xl">
           ประเภทบัตรที่เปิดขาย
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -275,16 +275,16 @@ export default async function AdminSeasonPassesPage(props: {
               key={t.id}
               className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
             >
-              <p className="text-[11px] font-bold uppercase tracking-widest text-yellow-600">
+              <p className="text-sm font-bold uppercase tracking-widest text-yellow-600 md:text-base">
                 {t.badge}
               </p>
-              <p className="mt-1 text-sm font-semibold text-green-900">
+              <p className="mt-1 text-base font-semibold text-green-900 md:text-lg">
                 {t.name}
               </p>
-              <p className="mt-2 text-2xl font-black text-green-900">
+              <p className="mt-2 text-3xl font-black text-green-900 md:text-4xl">
                 ฿{t.priceBaht.toLocaleString("th-TH")}
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm text-slate-500 md:text-base">
                 / ฤดูกาล · {SEASON_MATCHES} แมตช์
               </p>
             </div>
@@ -314,10 +314,10 @@ function StatCard({
           : "text-slate-900";
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+      <p className="text-sm font-medium uppercase tracking-wider text-slate-500 md:text-base">
         {label}
       </p>
-      <p className={`mt-1 text-2xl font-black ${accentClass}`}>{value}</p>
+      <p className={`mt-1 text-3xl font-black md:text-4xl ${accentClass}`}>{value}</p>
     </div>
   );
 }

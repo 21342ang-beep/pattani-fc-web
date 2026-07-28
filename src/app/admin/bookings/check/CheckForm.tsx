@@ -83,7 +83,7 @@ export default function CheckForm() {
     <div className="space-y-5">
       <form onSubmit={handleSubmit} className="rounded-xl border bg-white p-6 shadow-sm">
         <label className="block" htmlFor="booking-code">
-          <span className="text-sm font-semibold text-slate-800">สแกนบาร์โค้ด / รหัสการจอง</span>
+          <span className="text-base font-semibold text-slate-800 md:text-lg">สแกนบาร์โค้ด / รหัสการจอง</span>
           <input
             ref={inputRef}
             id="booking-code"
@@ -94,29 +94,29 @@ export default function CheckForm() {
             spellCheck={false}
             inputMode="text"
             maxLength={50}
-            className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 font-mono text-base outline-none transition focus:border-green-700 focus:ring-2 focus:ring-green-700/20"
+            className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 font-mono text-lg outline-none transition focus:border-green-700 focus:ring-2 focus:ring-green-700/20 md:text-xl"
             placeholder="สแกนหรือกรอกรหัสการจองที่นี่"
             aria-describedby="scan-help"
           />
         </label>
-        <p id="scan-help" className="mt-2 text-xs text-slate-500">
+        <p id="scan-help" className="mt-2 text-sm text-slate-500 md:text-base">
           ใช้เครื่องสแกนที่ส่ง Enter ได้ตามปกติ หรือกรอกรหัสจากมือถือแล้วกดปุ่มตรวจสอบ
         </p>
         <button
           type="submit"
           disabled={isPending || !CODE_FORMAT.test(code.trim())}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-green-800 px-5 py-3 text-base font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-green-800 px-5 py-3.5 text-lg font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto md:text-xl"
         >
           {isPending ? <Loader2 className="size-5 animate-spin" /> : <CheckCircle2 className="size-5" />}
           ตรวจสอบรหัสการจอง
         </button>
         {isPending && (
-          <p className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+          <p className="mt-3 flex items-center gap-2 text-base text-slate-600 md:text-lg">
             <Loader2 className="size-4 animate-spin" /> กำลังบันทึกการใช้งาน...
           </p>
         )}
         {error && !isPending && (
-          <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+          <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-base font-medium text-red-700 md:text-lg">
             {error}
           </p>
         )}
@@ -125,11 +125,11 @@ export default function CheckForm() {
       {latest && <ScanResult record={latest} featured />}
 
       <section aria-live="polite" className="rounded-xl border bg-white p-5 shadow-sm">
-        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+        <h2 className="flex items-center gap-2 text-2xl font-bold text-slate-900 md:text-3xl">
           <ScanLine className="size-5 text-green-800" /> รายการที่สแกนล่าสุด
         </h2>
         {history.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">ยังไม่มีรายการสแกนในรอบนี้</p>
+          <p className="mt-3 text-base text-slate-500 md:text-lg">ยังไม่มีรายการสแกนในรอบนี้</p>
         ) : (
           <div className="mt-3 space-y-3">
             {history.map((record) => (
@@ -168,13 +168,13 @@ function ScanResult({ record, featured = false }: { record: ScanRecord; featured
         {styles.icon}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <h3 className="font-bold text-slate-900">{styles.title}</h3>
-            <time className="text-xs text-slate-600" dateTime={record.receivedAt}>
+            <h3 className="text-lg font-bold text-slate-900 md:text-xl">{styles.title}</h3>
+            <time className="text-sm text-slate-600 md:text-base" dateTime={record.receivedAt}>
               {formatDateTime(record.receivedAt)}
             </time>
           </div>
-          <p className="mt-1 text-sm font-medium text-slate-700">{record.message}</p>
-          <dl className="mt-3 grid gap-x-5 gap-y-1 text-sm sm:grid-cols-2">
+          <p className="mt-1 text-base font-medium text-slate-700 md:text-lg">{record.message}</p>
+          <dl className="mt-3 grid gap-x-5 gap-y-2 text-base md:text-lg sm:grid-cols-2">
             <Info label="รหัสการจอง"><span className="font-mono">{result.bookingCode}</span></Info>
             <Info label="ผู้จอง">{result.customerName}</Info>
             <Info label="แมตช์">{result.match.homeTeam} vs {result.match.awayTeam}</Info>

@@ -219,6 +219,7 @@ export type ScanSeasonPassResult =
       seatZone: string;
       tierId: string;
       usesRemaining: number;
+      scanId: string;
     }
   | { ok: false; error: "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "INVALID" | "LEAGUE_ONLY" };
 
@@ -266,9 +267,9 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
       if (consumed.count !== 1) throw new Error("EXHAUSTED");
       const scan = await tx.seasonPassScan.create({
         data: { barcodeId: pass.id, matchId, scannedBy: user.id },
-        select: { barcode: { select: { usesRemaining: true } } },
+        select: { id: true, barcode: { select: { usesRemaining: true } } },
       });
-      return scan.barcode.usesRemaining;
+      return { usesRemaining: scan.barcode.usesRemaining, scanId: scan.id };
     });
     return {
       ok: true,
@@ -278,7 +279,8 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
       customerEmail: order.customerEmail,
       seatZone: order.seatZone,
       tierId: pass.tierId,
-      usesRemaining: result,
+      usesRemaining: result.usesRemaining,
+      scanId: result.scanId,
     };
   } catch (error) {
     if (error instanceof Error && error.message === "EXHAUSTED") return { ok: false, error: "EXHAUSTED" };
@@ -312,5 +314,69 @@ export async function deleteSeasonPassScan(scanId: string): Promise<{ ok: true }
     return { ok: true };
   } catch {
     return { error: "ลบข้อมูลการสแกนไม่สำเร็จ" };
+  }
+}
+
+export async function deleteAllSeasonPassScans(): Promise<{ ok: true; deleted: number } | { error: string }> {
+  await verifyPermission("SEASON_PASSES");
+
+  try {
+    const deleted = await prisma.$transaction(async (tx) => {
+      const scans = await tx.seasonPassScan.findMany({ select: { id: true, barcodeId: true } });
+      if (scans.length === 0) return 0;
+
+      const scanIds = scans.map((scan) => scan.id);
+      const restoredUses = new Map<string, number>();
+      for (const scan of scans) {
+        restoredUses.set(scan.barcodeId, (restoredUses.get(scan.barcodeId) ?? 0) + 1);
+      }
+
+      await tx.seasonPassScan.deleteMany({ where: { id: { in: scanIds } } });
+      await Promise.all(
+        [...restoredUses.entries()].map(([barcodeId, uses]) =>
+          tx.seasonPassBarcode.update({ where: { id: barcodeId }, data: { usesRemaining: { increment: uses } } }),
+        ),
+      );
+      return scans.length;
+    });
+    revalidatePath("/admin/season-passes/check");
+    return { ok: true, deleted };
+  } catch {
+    return { error: "ลบข้อมูลการสแกนทั้งหมดไม่สำเร็จ" };
+  }
+}
+
+export async function deleteSeasonPassScansByTier(tierId: string): Promise<{ ok: true; deleted: number } | { error: string }> {
+  await verifyPermission("SEASON_PASSES");
+  if (!z.enum(["vip-advanced", "premium", "gold"]).safeParse(tierId).success) {
+    return { error: "แพ็กเกจบัตรไม่ถูกต้อง" };
+  }
+
+  try {
+    const deleted = await prisma.$transaction(async (tx) => {
+      const scans = await tx.seasonPassScan.findMany({
+        where: { barcode: { tierId } },
+        select: { id: true, barcodeId: true },
+      });
+      if (scans.length === 0) return 0;
+
+      const scanIds = scans.map((scan) => scan.id);
+      const restoredUses = new Map<string, number>();
+      for (const scan of scans) {
+        restoredUses.set(scan.barcodeId, (restoredUses.get(scan.barcodeId) ?? 0) + 1);
+      }
+
+      await tx.seasonPassScan.deleteMany({ where: { id: { in: scanIds } } });
+      await Promise.all(
+        [...restoredUses.entries()].map(([barcodeId, uses]) =>
+          tx.seasonPassBarcode.update({ where: { id: barcodeId }, data: { usesRemaining: { increment: uses } } }),
+        ),
+      );
+      return scans.length;
+    });
+    revalidatePath("/admin/season-passes/check");
+    return { ok: true, deleted };
+  } catch {
+    return { error: "ลบข้อมูลการสแกนของแพ็กเกจไม่สำเร็จ" };
   }
 }
