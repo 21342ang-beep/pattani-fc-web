@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Gift, Sparkles, Calendar, ArrowRight } from "lucide-react";
 import { verifyCustomer } from "@/lib/customer-dal";
-import { logoutCustomer } from "@/app/actions/customer-auth";
 import { prisma } from "@/lib/prisma";
 import { payload } from "@/lib/payload";
 import { formatDateTime } from "@/lib/format";
@@ -99,12 +98,6 @@ export default async function MemberPage(props: {
               <p className="text-sm text-green-100/80">{customer.email}</p>
             </div>
           </div>
-
-          <form action={logoutCustomer}>
-            <button className="rounded-full border border-yellow-300/30 bg-white/5 px-5 py-2 text-sm font-semibold text-yellow-100 backdrop-blur-sm transition hover:bg-white/10">
-              ออกจากระบบ
-            </button>
-          </form>
         </div>
       </section>
 
