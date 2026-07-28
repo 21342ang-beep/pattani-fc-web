@@ -30,16 +30,22 @@ const emptyBarcodesByTier: BarcodesByTier = {
   gold: [],
 };
 
-export default function BarcodeGenerator() {
+export default function BarcodeGenerator({
+  initialBarcodeCounts,
+}: {
+  initialBarcodeCounts: Record<TierId, number>;
+}) {
   const [state, setState] = useState<CreateBarcodesState>(initialCreateBarcodesState);
   const [selectedTier, setSelectedTier] = useState<TierId>("vip-advanced");
   const [activeTab, setActiveTab] = useState<TierId>("vip-advanced");
   const [barcodesByTier, setBarcodesByTier] = useState<BarcodesByTier>(emptyBarcodesByTier);
+  const [barcodeCounts, setBarcodeCounts] = useState(initialBarcodeCounts);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
   const [pending, startTransition] = useTransition();
   const activePackage = packages.find((item) => item.id === activeTab)!;
   const activeBarcodes = barcodesByTier[activeTab];
+  const activeBarcodeCount = barcodeCounts[activeTab];
 
   function submit(formData: FormData) {
     startTransition(async () => {
@@ -53,22 +59,20 @@ export default function BarcodeGenerator() {
         ...current,
         [tierId]: [...current[tierId], ...nextState.barcodes],
       }));
+      setBarcodeCounts((current) => ({ ...current, [tierId]: current[tierId] + nextState.barcodes.length }));
       setActiveTab(tierId);
     });
   }
 
   async function downloadPackage() {
-    if (activeBarcodes.length === 0) return;
+    if (activeBarcodeCount === 0) return;
     setDownloadError("");
     setDownloading(true);
     try {
       const response = await fetch("/api/admin/barcodes/download", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tierId: activeTab,
-          barcodes: activeBarcodes.map((item) => item.barcode),
-        }),
+        body: JSON.stringify({ tierId: activeTab }),
       });
       if (!response.ok) throw new Error("DOWNLOAD_FAILED");
 
@@ -87,7 +91,7 @@ export default function BarcodeGenerator() {
   }
 
   function resetBarcodes() {
-    if (activeBarcodes.length === 0) return;
+    if (activeBarcodeCount === 0) return;
     if (!window.confirm(`ลบบาร์โค้ดทั้งหมดในแพ็กเกจ ฿${activePackage.price.toLocaleString("th-TH")} และเริ่มลำดับใหม่ที่ 0001 ใช่หรือไม่?\n\nรายการที่ถูกใช้งานแล้วจะไม่ถูกลบ`)) return;
 
     startTransition(async () => {
@@ -97,6 +101,7 @@ export default function BarcodeGenerator() {
         return;
       }
       setBarcodesByTier((current) => ({ ...current, [activeTab]: [] }));
+      setBarcodeCounts((current) => ({ ...current, [activeTab]: 0 }));
       setState({ ok: true, message: `ลบแล้ว ${result.deleted.toLocaleString("th-TH")} ใบ — ครั้งถัดไปจะเริ่มที่ 0001`, barcodes: [] });
     });
   }
@@ -119,6 +124,7 @@ export default function BarcodeGenerator() {
         ...current,
         [activeTab]: current[activeTab].filter((item) => !deletedCodes.has(item.barcode)),
       }));
+      setBarcodeCounts((current) => ({ ...current, [activeTab]: Math.max(0, current[activeTab] - result.deleted) }));
       setState({ ok: true, message: `ลบบาร์โค้ด ${result.deleted.toLocaleString("th-TH")} ใบแล้ว`, barcodes: [] });
     });
   }
@@ -198,7 +204,7 @@ export default function BarcodeGenerator() {
             <button
               type="button"
               onClick={resetBarcodes}
-              disabled={activeBarcodes.length === 0 || pending}
+              disabled={activeBarcodeCount === 0 || pending}
               className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >
               ลบทั้งหมดในแท็บ
@@ -206,7 +212,7 @@ export default function BarcodeGenerator() {
             <button
               type="button"
               onClick={downloadPackage}
-              disabled={activeBarcodes.length === 0 || downloading}
+              disabled={activeBarcodeCount === 0 || downloading}
               className="rounded-lg bg-green-800 px-3 py-2 text-sm font-semibold text-white transition hover:bg-green-900 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
               {downloading ? "กำลังรวมไฟล์..." : `ดาวน์โหลดทั้งหมด ฿${activePackage.price.toLocaleString("th-TH")}`}
@@ -222,13 +228,15 @@ export default function BarcodeGenerator() {
               className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition ${activeTab === item.id ? "border-green-700 text-green-800" : "border-transparent text-slate-500 hover:text-green-800"}`}
             >
               ฿{item.price.toLocaleString("th-TH")}
-              {barcodesByTier[item.id].length > 0 && ` (${barcodesByTier[item.id].length})`}
+              {barcodeCounts[item.id] > 0 && ` (${barcodeCounts[item.id].toLocaleString("th-TH")})`}
             </button>
           ))}
         </div>
         {activeBarcodes.length === 0 ? (
           <p className="p-8 text-center text-sm text-slate-500">
-            ยังไม่มีบาร์โค้ดที่สร้างในแพ็กเกจ ฿{activePackage.price.toLocaleString("th-TH")}
+            {activeBarcodeCount > 0
+              ? `มีบาร์โค้ด ${activeBarcodeCount.toLocaleString("th-TH")} ใบในแพ็กเกจ ฿${activePackage.price.toLocaleString("th-TH")} — กด “ดาวน์โหลดทั้งหมด” เพื่อรับไฟล์ทั้งหมด`
+              : `ยังไม่มีบาร์โค้ดที่สร้างในแพ็กเกจ ฿${activePackage.price.toLocaleString("th-TH")}`}
           </p>
         ) : (
           <div className="overflow-x-auto">

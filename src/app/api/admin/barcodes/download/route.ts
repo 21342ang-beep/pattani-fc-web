@@ -6,10 +6,6 @@ import { withSeasonPassBarcodePrintSize } from "@/lib/season-pass-barcode-svg";
 
 const inputSchema = z.object({
   tierId: z.enum(["vip-advanced", "premium", "gold"]),
-  barcodes: z
-    .array(z.string().regex(/^PFC26-(4000|2500|2000|1500)-\d{4}$/))
-    .min(1)
-    .max(500),
 });
 
 export async function POST(request: Request) {
@@ -21,20 +17,20 @@ export async function POST(request: Request) {
   const parsed = inputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return new Response("Invalid request", { status: 400 });
 
-  const requestedCodes = [...new Set(parsed.data.barcodes)];
   const records = await prisma.seasonPassBarcode.findMany({
     where: {
       tierId: parsed.data.tierId,
-      barcode: { in: requestedCodes },
+      isGenerated: true,
     },
+    orderBy: { barcode: "asc" },
     select: { barcode: true },
   });
-  if (records.length !== requestedCodes.length) {
+  if (records.length === 0) {
     return new Response("Barcode not found", { status: 404 });
   }
 
   const zip = createZip(
-    requestedCodes.map((barcode) => ({
+    records.map(({ barcode }) => ({
       name: `${barcode}.svg`,
       content: Buffer.from(
         withSeasonPassBarcodePrintSize(
