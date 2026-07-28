@@ -84,7 +84,7 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
             {displaySlides.map((slide, slideIndex) => (
               <ul
                 key={`${slide.map((player) => player.id).join("-")}-${slideIndex}`}
-                className="grid w-full shrink-0 grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
+                className="grid w-full shrink-0 grid-cols-2 gap-3 pr-3 sm:grid-cols-4 sm:gap-5 sm:pr-5"
               >
                 {slide.map((player) => (
                   <li key={String(player.id)}>
