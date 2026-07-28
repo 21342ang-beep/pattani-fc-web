@@ -16,7 +16,6 @@ export default async function SeasonPassCheckPage() {
     prisma.match.findMany({
       where: { competitionType: "LEAGUE" },
       orderBy: { kickoffAt: "asc" },
-      take: 100,
       select: { id: true, homeTeam: true, awayTeam: true, kickoffAt: true },
     }),
     prisma.seasonPassOrder.findMany({ select: { tierId: true } }),
