@@ -17,6 +17,7 @@ const packages = [
 type TierId = (typeof packages)[number]["id"];
 type BarcodeItem = Extract<CreateBarcodesState, { ok: true }>['barcodes'][number];
 type BarcodesByTier = Record<TierId, BarcodeItem[]>;
+const DOWNLOAD_BATCH_SIZE = 500;
 
 const initialCreateBarcodesState: CreateBarcodesState = {
   ok: false,
@@ -40,7 +41,7 @@ export default function BarcodeGenerator({
   const [activeTab, setActiveTab] = useState<TierId>("vip-advanced");
   const [barcodesByTier, setBarcodesByTier] = useState<BarcodesByTier>(emptyBarcodesByTier);
   const [barcodeCounts, setBarcodeCounts] = useState(initialBarcodeCounts);
-  const [downloading, setDownloading] = useState(false);
+  const [downloadingOffset, setDownloadingOffset] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState("");
   const [pending, startTransition] = useTransition();
   const activePackage = packages.find((item) => item.id === activeTab)!;
@@ -64,29 +65,31 @@ export default function BarcodeGenerator({
     });
   }
 
-  async function downloadPackage() {
+  async function downloadPackage(offset: number) {
     if (activeBarcodeCount === 0) return;
     setDownloadError("");
-    setDownloading(true);
+    setDownloadingOffset(offset);
     try {
       const response = await fetch("/api/admin/barcodes/download", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tierId: activeTab }),
+        body: JSON.stringify({ tierId: activeTab, offset }),
       });
-      if (!response.ok) throw new Error("DOWNLOAD_FAILED");
+      if (!response.ok) throw new Error(await response.text());
 
       const file = await response.blob();
       const url = URL.createObjectURL(file);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `PFC26-${activePackage.price}-barcodes.zip`;
+      const first = String(offset + 1).padStart(4, "0");
+      const last = String(Math.min(offset + DOWNLOAD_BATCH_SIZE, activeBarcodeCount)).padStart(4, "0");
+      link.download = `PFC26-${activePackage.price}-barcodes-${first}-${last}.zip`;
       link.click();
       URL.revokeObjectURL(url);
     } catch {
       setDownloadError("ดาวน์โหลดไฟล์ไม่สำเร็จ กรุณาลองใหม่");
     } finally {
-      setDownloading(false);
+      setDownloadingOffset(null);
     }
   }
 
@@ -209,14 +212,23 @@ export default function BarcodeGenerator({
             >
               ลบทั้งหมดในแท็บ
             </button>
-            <button
-              type="button"
-              onClick={downloadPackage}
-              disabled={activeBarcodeCount === 0 || downloading}
-              className="rounded-lg bg-green-800 px-3 py-2 text-sm font-semibold text-white transition hover:bg-green-900 disabled:cursor-not-allowed disabled:bg-slate-400"
-            >
-              {downloading ? "กำลังรวมไฟล์..." : `ดาวน์โหลดทั้งหมด ฿${activePackage.price.toLocaleString("th-TH")}`}
-            </button>
+            {Array.from({ length: Math.ceil(activeBarcodeCount / DOWNLOAD_BATCH_SIZE) }, (_, index) => {
+              const offset = index * DOWNLOAD_BATCH_SIZE;
+              const first = String(offset + 1).padStart(4, "0");
+              const last = String(Math.min(offset + DOWNLOAD_BATCH_SIZE, activeBarcodeCount)).padStart(4, "0");
+              const downloading = downloadingOffset === offset;
+              return (
+                <button
+                  key={offset}
+                  type="button"
+                  onClick={() => downloadPackage(offset)}
+                  disabled={downloadingOffset !== null}
+                  className="rounded-lg bg-green-800 px-3 py-2 text-sm font-semibold text-white transition hover:bg-green-900 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {downloading ? "กำลังรวมไฟล์..." : `ดาวน์โหลด ${first}–${last}`}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="flex overflow-x-auto border-b border-slate-200 px-3">
@@ -235,7 +247,7 @@ export default function BarcodeGenerator({
         {activeBarcodes.length === 0 ? (
           <p className="p-8 text-center text-sm text-slate-500">
             {activeBarcodeCount > 0
-              ? `มีบาร์โค้ด ${activeBarcodeCount.toLocaleString("th-TH")} ใบในแพ็กเกจ ฿${activePackage.price.toLocaleString("th-TH")} — กด “ดาวน์โหลดทั้งหมด” เพื่อรับไฟล์ทั้งหมด`
+              ? `มีบาร์โค้ด ${activeBarcodeCount.toLocaleString("th-TH")} ใบในแพ็กเกจ ฿${activePackage.price.toLocaleString("th-TH")} — เลือกดาวน์โหลดชุดละไม่เกิน 500 ใบ`
               : `ยังไม่มีบาร์โค้ดที่สร้างในแพ็กเกจ ฿${activePackage.price.toLocaleString("th-TH")}`}
           </p>
         ) : (
