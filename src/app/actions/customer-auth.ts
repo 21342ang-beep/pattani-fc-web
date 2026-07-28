@@ -36,7 +36,8 @@ const registerSchema = z.object({
       const date = new Date(`${value}T00:00:00.000Z`);
       return !Number.isNaN(date.getTime()) && date <= new Date();
     }, "วันเกิดไม่ถูกต้อง"),
-  address: z.string().trim().min(5, "กรุณากรอกที่อยู่").max(500),
+  // รองรับเลขที่บ้านสั้น เช่น 73/1 หรือ 1/1
+  address: z.string().trim().min(3, "กรุณากรอกที่อยู่").max(500),
   province: z.string().trim().min(1, "กรุณาเลือกจังหวัด"),
   district: z.string().trim().min(1, "กรุณาเลือกอำเภอ/เขต"),
   postalCode: z.string().regex(/^\d{5}$/, "กรุณาเลือกรหัสไปรษณีย์"),
