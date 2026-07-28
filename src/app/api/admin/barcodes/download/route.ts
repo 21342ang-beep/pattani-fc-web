@@ -2,6 +2,7 @@ import bwipjs from "bwip-js/node";
 import { z } from "zod";
 import { getAdminUser, hasPermission } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
+import { withSeasonPassBarcodePrintSize } from "@/lib/season-pass-barcode-svg";
 
 const inputSchema = z.object({
   tierId: z.enum(["vip-advanced", "premium", "gold"]),
@@ -36,13 +37,15 @@ export async function POST(request: Request) {
     requestedCodes.map((barcode) => ({
       name: `${barcode}.svg`,
       content: Buffer.from(
-        bwipjs.toSVG({
-          bcid: "code128",
-          text: barcode,
-          scale: 2,
-          height: 12,
-          includetext: true,
-        }),
+        withSeasonPassBarcodePrintSize(
+          bwipjs.toSVG({
+            bcid: "code128",
+            text: barcode,
+            scale: 2,
+            height: 12,
+            includetext: true,
+          }),
+        ),
         "utf8",
       ),
     })),

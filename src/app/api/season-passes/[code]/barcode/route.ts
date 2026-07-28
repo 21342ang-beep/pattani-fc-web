@@ -1,5 +1,6 @@
 import bwipjs from "bwip-js/node";
 import { prisma } from "@/lib/prisma";
+import { withSeasonPassBarcodePrintSize } from "@/lib/season-pass-barcode-svg";
 
 export async function GET(
   _request: Request,
@@ -16,7 +17,9 @@ export async function GET(
   });
   if (!pass) return new Response("Not found", { status: 404 });
 
-  const svg = bwipjs.toSVG({ bcid: "code128", text: barcode, scale: 2, height: 12, includetext: true });
+  const svg = withSeasonPassBarcodePrintSize(
+    bwipjs.toSVG({ bcid: "code128", text: barcode, scale: 2, height: 12, includetext: true }),
+  );
   return new Response(svg, {
     headers: { "Content-Type": "image/svg+xml", "Cache-Control": "private, max-age=300" },
   });
