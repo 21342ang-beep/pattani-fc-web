@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -72,14 +72,6 @@ export default function CheckForm() {
     [router, startTransition],
   );
 
-  // เครื่องสแกนส่วนใหญ่ส่ง Enter ปิดท้าย แต่รองรับการยิงโดยไม่มี Enter ด้วย
-  useEffect(() => {
-    const trimmed = code.trim();
-    if (!CODE_FORMAT.test(trimmed)) return;
-    const timer = window.setTimeout(() => scanCode(trimmed), 280);
-    return () => window.clearTimeout(timer);
-  }, [code, scanCode]);
-
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     scanCode(code);
@@ -103,13 +95,21 @@ export default function CheckForm() {
             inputMode="text"
             maxLength={50}
             className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 font-mono text-base outline-none transition focus:border-green-700 focus:ring-2 focus:ring-green-700/20"
-            placeholder="ยิงบาร์โค้ดที่นี่"
+            placeholder="สแกนหรือกรอกรหัสการจองที่นี่"
             aria-describedby="scan-help"
           />
         </label>
         <p id="scan-help" className="mt-2 text-xs text-slate-500">
-          ระบบจะล้างช่องให้เองหลังสแกน เพื่อยิงบาร์โค้ดใบถัดไปได้ทันที
+          ใช้เครื่องสแกนที่ส่ง Enter ได้ตามปกติ หรือกรอกรหัสจากมือถือแล้วกดปุ่มตรวจสอบ
         </p>
+        <button
+          type="submit"
+          disabled={isPending || !CODE_FORMAT.test(code.trim())}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-green-800 px-5 py-3 text-base font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+        >
+          {isPending ? <Loader2 className="size-5 animate-spin" /> : <CheckCircle2 className="size-5" />}
+          ตรวจสอบรหัสการจอง
+        </button>
         {isPending && (
           <p className="mt-3 flex items-center gap-2 text-sm text-slate-600">
             <Loader2 className="size-4 animate-spin" /> กำลังบันทึกการใช้งาน...
