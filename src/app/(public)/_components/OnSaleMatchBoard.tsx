@@ -21,7 +21,7 @@ export default function OnSaleMatchBoard({
   showBookingButton?: boolean;
 }) {
   return (
-    <article className="overflow-hidden rounded-2xl bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-[length:100%_100%] bg-center text-white shadow-xl">
+    <article className="overflow-hidden rounded-2xl bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-cover bg-[position:28%_center] text-white shadow-xl md:bg-[length:100%_100%] md:bg-center">
       <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:p-10">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-1.5 text-base font-black uppercase tracking-wider text-green-950 sm:text-lg">

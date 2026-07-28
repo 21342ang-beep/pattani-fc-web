@@ -22,23 +22,23 @@ export default async function PrivacyPolicyPage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 md:py-16">
       <div className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-widest text-yellow-600">
+        <p className="text-sm font-semibold uppercase tracking-widest text-yellow-600 md:text-base">
           Privacy Policy · PDPA
         </p>
-        <h1 className="mt-1 text-3xl font-black text-green-900 md:text-4xl">
+        <h1 className="mt-1 text-4xl font-black text-green-900 md:text-5xl">
           นโยบายความเป็นส่วนตัว
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-base text-slate-600 md:text-lg">
           ปรับปรุงล่าสุด: 8 กรกฎาคม 2569
         </p>
-        <div className="mt-5 rounded-lg border border-green-100 bg-green-50 p-4 text-sm text-green-950">
+        <div className="mt-5 rounded-lg border border-green-100 bg-green-50 p-5 text-base text-green-950 md:text-lg">
           <p className="font-bold">ชื่อนิติบุคคล: ห้างหุ้นส่วนจำกัด สโมสรฟุตบอลปัตตานี เอฟซี</p>
           <p className="mt-1">ที่อยู่: 140/3 ถนนยะรัง ตำบลจะบังติกอ อำเภอเมืองปัตตานี จังหวัดปัตตานี 94000</p>
           <p className="mt-1">เบอร์โทรติดต่อ: <a href="tel:0815998925" className="font-semibold hover:underline">0815998925</a></p>
         </div>
       </div>
 
-      <div className="prose prose-slate max-w-none space-y-6 text-slate-800">
+      <div className="prose prose-slate max-w-none space-y-8 text-slate-800">
         <Section title="1. ผู้ควบคุมข้อมูลส่วนบุคคล">
           <p>
             สโมสรฟุตบอลปัตตานี เอฟซี (&ldquo;Pattani FC&rdquo;, &ldquo;เรา&rdquo;)
@@ -135,9 +135,67 @@ export default async function PrivacyPolicyPage() {
             ดาวน์โหลดข้อกำหนดและเงื่อนไขการขาย
           </a>
         </Section>
+        <Section title="การคืนเงิน">
+          <p>
+            ผู้ซื้อที่เข้าเงื่อนไขสามารถแจ้งขอคืนเงินภายใน 7 วัน นับจากวันที่ประกาศยกเลิกการแข่งขันหรือวันที่เกิดเหตุ
+            โดยผู้ซื้อต้องแสดงหลักฐานประกอบดังนี้
+          </p>
+          <ol className="list-decimal space-y-1 pl-6">
+            <li>เลขคำสั่งซื้อ</li>
+            <li>หลักฐานการชำระเงิน</li>
+            <li>รายละเอียดการติดต่อ</li>
+          </ol>
+          <p>
+            เมื่อสโมสรตรวจสอบข้อมูลเรียบร้อยแล้ว จะดำเนินการคืนเงินภายใน 7–14 วันทำการ
+            ผ่านช่องทางการชำระเงินเดิม หรือช่องทางอื่นที่ตกลงร่วมกัน
+          </p>
+        </Section>
+        <Section title="ข้อกำหนดและเงื่อนไขการใช้บริการ (Terms & Conditions)">
+          <p>
+            <strong>การเข้าใช้งานเว็บไซต์</strong> การสมัครสมาชิก และการสั่งซื้อบัตรเข้าชมการแข่งขัน
+            ถือว่าผู้ใช้งานยอมรับข้อกำหนดและเงื่อนไขทั้งหมดของสโมสร
+          </p>
+          <p>
+            <strong>การสมัครสมาชิก</strong> ผู้ใช้งานต้องให้ข้อมูลที่ถูกต้อง ครบถ้วน และเป็นปัจจุบัน
+            โดยสโมสรขอสงวนสิทธิ์ในการระงับหรือยกเลิกบัญชีผู้ใช้งาน หากพบว่ามีการให้ข้อมูลอันเป็นเท็จ
+            หรือมีการใช้งานที่ผิดกฎหมายหรือผิดวัตถุประสงค์ของเว็บไซต์
+          </p>
+          <p>
+            <strong>การสั่งซื้อบัตรเข้าชมการแข่งขัน</strong> บัตรเข้าชมทุกใบใช้ได้เฉพาะการแข่งขัน วันที่
+            เวลา และสนามที่ระบุไว้เท่านั้น ผู้ซื้อควรตรวจสอบรายละเอียดการแข่งขัน ประเภทบัตร
+            และโซนที่นั่งก่อนชำระเงิน เมื่อชำระเงินเรียบร้อยแล้ว จะไม่สามารถยกเลิก เปลี่ยนแปลง
+            หรือขอคืนเงินได้ เว้นแต่เป็นไปตามนโยบายการคืนเงินของสโมสร
+          </p>
+          <p>
+            <strong>บัตรอิเล็กทรอนิกส์ (E-Ticket)</strong> บัตรเข้าชมการแข่งขันจะจัดส่งในรูปแบบบาร์โค้ด
+            (Barcode) ผ่านบัญชีผู้ใช้งานหรืออีเมลที่ลงทะเบียนไว้ บาร์โค้ดแต่ละใบสามารถใช้เข้าสนามได้เพียง 1 ครั้ง
+            เท่านั้น ห้ามคัดลอก ดัดแปลง เผยแพร่ หรือส่งต่อบาร์โค้ดให้บุคคลอื่นโดยไม่ได้รับอนุญาต
+            ผู้ที่นำบาร์โค้ดมาแสดงและผ่านการตรวจสอบเข้าสนามเป็นคนแรก จะถือเป็นผู้มีสิทธิ์เข้าชมการแข่งขัน
+            ผู้ซื้อมีหน้าที่เก็บรักษาบาร์โค้ดไว้เป็นความลับ หากมีการเปิดเผย ส่งต่อ หรือสูญหาย
+            สโมสรจะไม่รับผิดชอบต่อความเสียหายที่เกิดขึ้น
+          </p>
+          <p>
+            <strong>การเลื่อนหรือเปลี่ยนแปลงการแข่งขัน</strong> สโมสรอาจเปลี่ยนแปลงวันแข่งขัน
+            เวลาแข่งขัน สนามแข่งขัน หรือรายละเอียดอื่นของการแข่งขัน ตามความเหมาะสมหรือเหตุสุดวิสัย
+            โดยบัตรเดิมยังสามารถใช้เข้าชมการแข่งขันได้ เว้นแต่สโมสรจะแจ้งเป็นอย่างอื่น
+          </p>
+          <div>
+            <p>
+              <strong>การปฏิเสธการเข้าสนาม</strong> สโมสรมีสิทธิ์ปฏิเสธการเข้าสนามของบุคคล ดังนี้
+            </p>
+            <ol className="list-decimal space-y-1 pl-6">
+              <li>ใช้บัตรหรือบาร์โค้ดปลอม</li>
+              <li>ใช้บาร์โค้ดที่ถูกใช้งานแล้ว</li>
+              <li>มีพฤติกรรมก่อความไม่สงบ หรือฝ่าฝืนกฎระเบียบของสนาม</li>
+              <li>พกพาสิ่งของต้องห้ามตามที่สนามหรือฝ่ายจัดการแข่งขันกำหนด</li>
+              <li>ไม่ปฏิบัติตามคำแนะนำของเจ้าหน้าที่รักษาความปลอดภัย</li>
+            </ol>
+          </div>
+          <p>จากพฤติกรรมดังกล่าว สโมสรจะไม่คืนเงินค่าบัตร</p>
+        </Section>
       </div>
 
-      <div className="mt-10 border-t border-slate-200 pt-6 text-sm">
+      <div className="mt-10 border-t border-slate-200 pt-6 text-base md:text-lg">
         <Link
           href="/register"
           className="font-semibold text-green-800 hover:underline"
@@ -158,8 +216,8 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="mb-2 text-lg font-bold text-green-900">{title}</h2>
-      <div className="space-y-2 text-sm leading-relaxed text-slate-700">
+      <h2 className="mb-3 text-2xl font-bold text-green-900 md:text-3xl">{title}</h2>
+      <div className="space-y-3 text-lg leading-relaxed text-slate-700 md:text-xl">
         {children}
       </div>
     </section>
