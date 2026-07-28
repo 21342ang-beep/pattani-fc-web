@@ -86,7 +86,7 @@ export default function RegisterForm({
           error={fe.email}
         />
         <Field
-          label="เบอร์โทร (ไม่บังคับ)"
+          label="เบอร์โทร"
           name="phone"
           type="tel"
           autoComplete="tel"
