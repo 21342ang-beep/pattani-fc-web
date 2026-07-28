@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   registerCustomer,
@@ -34,6 +34,10 @@ export default function RegisterForm({
   const fe = state?.fieldErrors ?? {};
   const selectedProvince = shippingProvinces.find((item) => item.name === province);
   const selectedDistrict = selectedProvince?.districts.find((item) => item.name === district);
+
+  useEffect(() => {
+    if (state?.redirectTo) window.location.assign(state.redirectTo);
+  }, [state?.redirectTo]);
 
   function handleProvinceChange(value: string) {
     setProvince(value);

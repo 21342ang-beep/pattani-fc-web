@@ -65,6 +65,7 @@ export type CustomerAuthState =
   | {
       error?: string;
       fieldErrors?: Partial<Record<string, string>>;
+      redirectTo?: string;
     }
   | undefined;
 
@@ -186,9 +187,7 @@ export async function registerCustomer(
     return { error: "เกิดข้อผิดพลาดในการสมัคร กรุณาลองใหม่อีกครั้ง" };
   }
 
-  // ใช้ Server Action redirect โดยตรง เพื่อให้ cookie session ที่เพิ่งสร้างถูกส่งพร้อม
-  // การนำทาง และคงปลายทางเดิมของ flow บัตรรายปีไว้เสมอ
-  redirect(returnTo ?? "/tickets/season");
+  return { redirectTo: returnTo ?? "/tickets/season" };
 }
 
 export async function loginCustomer(
