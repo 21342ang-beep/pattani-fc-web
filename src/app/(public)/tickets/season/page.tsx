@@ -208,7 +208,7 @@ function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
       </ul>
 
       <Link
-        href={isMember ? `/season-pass/apply?tier=${tier.id}` : `/member/login?returnTo=${encodeURIComponent(`/season-pass/apply?tier=${tier.id}`)}`}
+        href={isMember ? `/tickets/season/apply?tier=${tier.id}` : `/member/login?returnTo=${encodeURIComponent(`/tickets/season/apply?tier=${tier.id}`)}`}
         className={`mt-8 inline-flex w-full items-center justify-center rounded-full px-6 py-3.5 text-lg font-bold transition md:py-4 md:text-xl ${
           highlighted
             ? "bg-yellow-400 text-green-950 hover:bg-yellow-300"

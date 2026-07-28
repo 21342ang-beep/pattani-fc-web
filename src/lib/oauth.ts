@@ -45,7 +45,11 @@ export type OAuthState = {
 };
 
 export function getSafeReturnTo(value: string | null | undefined): string | null {
-  if (!value || !value.startsWith("/season-pass/apply?") || value.startsWith("//")) {
+  if (
+    !value ||
+    (!value.startsWith("/tickets/season/apply?") && !value.startsWith("/season-pass/apply?")) ||
+    value.startsWith("//")
+  ) {
     return null;
   }
   return value;
