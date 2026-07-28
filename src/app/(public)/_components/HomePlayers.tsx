@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Shield } from "lucide-react";
@@ -35,7 +35,9 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
     (_, index) => players.slice(index * playersPerSlide, (index + 1) * playersPerSlide),
   );
   const [activeSlide, setActiveSlide] = useState(0);
+  const [isLoopReset, setIsLoopReset] = useState(false);
   const hasCarousel = slides.length > 1;
+  const displaySlides = hasCarousel ? [...slides, slides[0]] : slides;
 
   useEffect(() => {
     if (!hasCarousel || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -43,15 +45,13 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
     }
 
     const interval = window.setInterval(() => {
-      setActiveSlide((current) => (current + 1) % slides.length);
+      setActiveSlide((current) => current + 1);
     }, 5000);
 
     return () => window.clearInterval(interval);
   }, [hasCarousel, slides.length]);
 
   if (players.length === 0) return null;
-  const visiblePlayers = slides[activeSlide] ?? [];
-
   return (
     <section className="rounded-3xl border border-green-100 bg-white px-5 py-8 shadow-sm sm:px-8 sm:py-10">
       <div>
@@ -69,22 +69,31 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
         </div>
 
         <div className="mx-auto max-w-6xl overflow-hidden px-2 py-6">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.ul
-              key={String(activeSlide)}
-              initial={{ opacity: 0, x: 96 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -96 }}
-              transition={{ duration: 0.45, ease: "easeOut" }}
-              className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
-            >
-              {visiblePlayers.map((player) => (
-                <li key={String(player.id)}>
-                  <PlayerSpotlight player={player} />
-                </li>
-              ))}
-            </motion.ul>
-          </AnimatePresence>
+          <motion.div
+            animate={{ x: `-${(activeSlide * 100) / displaySlides.length}%` }}
+            transition={isLoopReset ? { duration: 0 } : { duration: 0.65, ease: "easeInOut" }}
+            onAnimationComplete={() => {
+              if (hasCarousel && activeSlide === slides.length) {
+                setIsLoopReset(true);
+                setActiveSlide(0);
+                requestAnimationFrame(() => setIsLoopReset(false));
+              }
+            }}
+            className="flex"
+          >
+            {displaySlides.map((slide, slideIndex) => (
+              <ul
+                key={`${slide.map((player) => player.id).join("-")}-${slideIndex}`}
+                className="grid w-full shrink-0 grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
+              >
+                {slide.map((player) => (
+                  <li key={String(player.id)}>
+                    <PlayerSpotlight player={player} />
+                  </li>
+                ))}
+              </ul>
+            ))}
+          </motion.div>
         </div>
 
         {hasCarousel && (
@@ -93,7 +102,10 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
               <button
                 key={slide.map((player) => player.id).join("-")}
                 type="button"
-                onClick={() => setActiveSlide(index)}
+                onClick={() => {
+                  setIsLoopReset(false);
+                  setActiveSlide(index);
+                }}
                 aria-label={`แสดงผู้เล่นชุดที่ ${index + 1}`}
                 aria-current={index === activeSlide}
                 className={`h-2 rounded-full transition-all ${
