@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   registerCustomer,
   type CustomerAuthState,
@@ -28,7 +27,6 @@ export default function RegisterForm({
   const [province, setProvince] = useState("");
   const [district, setDistrict] = useState("");
   const [postalCode, setPostalCode] = useState("");
-  const router = useRouter();
   const [state, formAction, pending] = useActionState<CustomerAuthState, FormData>(
     registerCustomer,
     undefined,
@@ -36,10 +34,6 @@ export default function RegisterForm({
   const fe = state?.fieldErrors ?? {};
   const selectedProvince = shippingProvinces.find((item) => item.name === province);
   const selectedDistrict = selectedProvince?.districts.find((item) => item.name === district);
-
-  useEffect(() => {
-    if (state?.redirectTo) router.replace(state.redirectTo);
-  }, [router, state?.redirectTo]);
 
   function handleProvinceChange(value: string) {
     setProvince(value);
