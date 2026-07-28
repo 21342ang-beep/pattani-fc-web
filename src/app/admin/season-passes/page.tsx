@@ -27,9 +27,10 @@ export default async function AdminSeasonPassesPage(props: {
 }) {
   await verifyPermission("SEASON_PASSES");
   const { tier: rawTier } = await props.searchParams;
-  const selectedTier = SEASON_TIERS.some((tier) => tier.id === rawTier)
+  const saleTiers = SEASON_TIERS.filter((tier) => tier.id !== "vvip-elite");
+  const selectedTier = saleTiers.some((tier) => tier.id === rawTier)
     ? (rawTier as SeasonTierId)
-    : null;
+    : saleTiers[0].id;
 
   const orders = await prisma.seasonPassOrder.findMany({
     orderBy: { createdAt: "desc" },
@@ -43,7 +44,7 @@ export default async function AdminSeasonPassesPage(props: {
     const tierOrders = ordersByTier.get(order.tierId as SeasonTierId);
     if (tierOrders) tierOrders.push(order);
   }
-  const displayedOrders = selectedTier ? ordersByTier.get(selectedTier) ?? [] : orders;
+  const displayedOrders = ordersByTier.get(selectedTier) ?? [];
 
   const summary = {
     total: orders.length,
@@ -101,15 +102,10 @@ export default async function AdminSeasonPassesPage(props: {
 
       <section className="mb-6">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-bold text-green-900 md:text-3xl">แยกข้อมูลการซื้อตามแพ็กเกจ</h2>
-          {selectedTier && (
-            <Link href="/admin/season-passes" className="text-base font-medium text-green-800 hover:underline md:text-lg">
-              แสดงทั้งหมด
-            </Link>
-          )}
+          <h2 className="text-2xl font-bold text-green-900 md:text-3xl">ข้อมูลการจองตามแพ็กเกจ</h2>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SEASON_TIERS.filter((tier) => tier.id !== "vvip-elite").map((tier) => {
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="tablist" aria-label="แพ็กเกจบัตรรายปี">
+          {saleTiers.map((tier) => {
             const tierOrders = ordersByTier.get(tier.id) ?? [];
             const confirmed = tierOrders.filter((order) => order.status === "CONFIRMED");
             const revenue = confirmed.reduce((sum, order) => sum + order.priceBaht + order.shippingFeeBaht, 0);
@@ -117,7 +113,9 @@ export default async function AdminSeasonPassesPage(props: {
               <Link
                 key={tier.id}
                 href={`/admin/season-passes?tier=${tier.id}`}
-                className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${selectedTier === tier.id ? "border-yellow-400 bg-yellow-50" : "border-green-100 bg-white"}`}
+                role="tab"
+                aria-selected={selectedTier === tier.id}
+                className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-700/30 ${selectedTier === tier.id ? "border-green-700 bg-green-50 ring-2 ring-green-700/20" : "border-green-100 bg-white"}`}
               >
                 <p className="text-sm font-bold uppercase tracking-widest text-yellow-700 md:text-base">แพ็กเกจ ฿{tier.priceBaht.toLocaleString("th-TH")}</p>
                 <p className="mt-1 text-base font-bold text-green-900 md:text-lg">{tier.badge}</p>
@@ -130,7 +128,7 @@ export default async function AdminSeasonPassesPage(props: {
       </section>
 
       {/* ตารางบัตร */}
-      <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-lg border bg-white shadow-sm" role="tabpanel">
         <table className="w-full min-w-[1100px] text-base md:text-lg">
           <thead className="border-b bg-slate-50 text-sm uppercase md:text-base">
             <tr>
@@ -264,33 +262,6 @@ export default async function AdminSeasonPassesPage(props: {
         </table>
       </div>
 
-      {/* สรุปประเภทบัตรที่เปิดขาย */}
-      <div className="mt-8">
-        <h2 className="mb-3 text-2xl font-bold text-green-900 md:text-3xl">
-          ประเภทบัตรที่เปิดขาย
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SEASON_TIERS.filter((t) => t.id !== "vvip-elite").map((t) => (
-            <div
-              key={t.id}
-              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-            >
-              <p className="text-sm font-bold uppercase tracking-widest text-yellow-600 md:text-base">
-                {t.badge}
-              </p>
-              <p className="mt-1 text-base font-semibold text-green-900 md:text-lg">
-                {t.name}
-              </p>
-              <p className="mt-2 text-3xl font-black text-green-900 md:text-4xl">
-                ฿{t.priceBaht.toLocaleString("th-TH")}
-              </p>
-              <p className="text-sm text-slate-500 md:text-base">
-                / ฤดูกาล · {SEASON_MATCHES} แมตช์
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
