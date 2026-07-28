@@ -199,7 +199,7 @@ function OnSaleMainboard({
             ราคาแยกตามโซน
           </p>
           <Link
-            href={zoneQS ? `/matches/${match.id}${zoneQS}` : "/tickets"}
+            href={`/matches/${match.id}${zoneQS}`}
             className="mt-5 block rounded-lg bg-yellow-300 px-5 py-3.5 text-center text-base font-bold text-green-950 transition hover:bg-yellow-200 md:text-lg"
           >
             จองตั๋วตอนนี้
