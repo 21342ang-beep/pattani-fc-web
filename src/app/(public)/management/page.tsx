@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import Image from "next/image";
 import PageHero from "../_components/PageHero";
 import { Crown, Users2, Scale, Cpu, UserCog } from "lucide-react";
 
@@ -147,15 +148,42 @@ function PersonCard({ person }: { person: Person }) {
   // ใช้ initial ตัวแรกของชื่อเป็น avatar fallback — ไม่มีรูปจาก PDF
   // (ภายหลังถ้ามีรูป สามารถเพิ่ม person.photoUrl แล้ว render <Image> ได้)
   const initial = person.name.replace(/^[^ก-๙a-zA-Z]+/, "").charAt(0) || "?";
+  const photoUrl = person.name.includes("วรวิทย์ บารู")
+    ? "/management-worawit-baroo.jpg"
+    : person.name.includes("สุกรี หะยีสาแม")
+      ? "/management-sukree-hayeeyasaemae.png"
+      : person.name.includes("ซัยนูรดีน นิมา")
+        ? "/management-sainurdeen-nima.jpg"
+        : person.name.includes("นินี สุไลมาน")
+          ? "/management-ninee-sulaiman.png"
+          : person.name.includes("มูฮัมหมัดฟาห์มี ตาเละ")
+            ? "/management-muhammad-fahmi-taleh.png"
+            : person.name.includes("เจะอับดุลลาเตะ ซีเดะ")
+              ? "/management-jeabdullateh-sideh.png"
+              : person.name.includes("มูฮัมหมัดดือราโอ๊ะ")
+                ? "/management-muhammad-due-raoh.png"
+                : person.name.includes("หาญณรงค์ ชุณหะคุณากร")
+                  ? "/management-harnnarong-chunahakunakorn.png"
+                  : null;
   return (
     <Card className="h-full overflow-hidden">
       <div className="flex items-center gap-4 p-5">
-        <div
-          aria-hidden
-          className="flex size-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-green-800 to-green-950 text-xl font-black text-yellow-300"
-        >
-          {initial}
-        </div>
+        {photoUrl ? (
+          <Image
+            src={photoUrl}
+            alt={person.name}
+            width={160}
+            height={160}
+            className="size-20 shrink-0 rounded-xl border border-green-100 object-cover object-[center_18%]"
+          />
+        ) : (
+          <div
+            aria-hidden
+            className="flex size-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-green-800 to-green-950 text-xl font-black text-yellow-300"
+          >
+            {initial}
+          </div>
+        )}
         <CardContent className="flex-1 p-0">
           <p className="text-base font-bold leading-snug text-green-900 md:text-lg">
             {person.name}
