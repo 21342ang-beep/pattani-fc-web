@@ -127,10 +127,34 @@ export default function SeasonPassWizard({
 
   const isMember = !!memberEmail;
 
-  function handleFormSubmit(data: CustomerData) {
+  async function handleFormSubmit(data: CustomerData) {
     setCustomer(data);
     setSaveError(null);
-    setStep("payment");
+    if (!data.seatZone) {
+      setSaveError("กรุณาเลือกโซนที่นั่ง");
+      return;
+    }
+    const res = await createSeasonPassOrder({
+      tierId: tier.id,
+      name: data.name,
+      phone: data.phone,
+      email: data.email || "",
+      seatZone: data.seatZone,
+      paymentMethod: "promptpay",
+      deliveryMethod: data.deliveryMethod,
+      shipAddress: data.shipAddress,
+      shipCity: data.shipCity,
+      shipProvince: data.shipProvince,
+      shipPostalCode: data.shipPostalCode,
+      shirtSize: data.shirtSize,
+      shipNote: data.shipNote,
+      pickupLocation: data.pickupLocation,
+    });
+    if (!res.ok) {
+      setSaveError(res.error);
+      return;
+    }
+    window.location.assign(`/checkout/season/${encodeURIComponent(res.passCode)}`);
   }
 
   // เรียก server action → บันทึกออเดอร์ลง DB → คืน passCode ที่แท้จริง
@@ -172,6 +196,11 @@ export default function SeasonPassWizard({
         <StepBar step={step} />
 
         <div className="mt-4">
+          {saveError && step === "form" && (
+            <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {saveError}
+            </p>
+          )}
           {step === "form" && (
             <FormStep
               tier={tier}
