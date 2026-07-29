@@ -28,9 +28,10 @@ export async function POST(request: Request) {
 
   if (!payload.data?.payment_request_id) return Response.json({ ok: true });
 
-  const payments = await prisma.$queryRaw<Array<{ id: string; bookingId: string; referenceId: string; amount: number }>>(
-    Prisma.sql`SELECT "id", "bookingId", "referenceId", "amount" FROM "XenditPayment"
-      WHERE "paymentRequestId" = ${payload.data.payment_request_id} LIMIT 1`
+  const payments = await prisma.$queryRaw<Array<{ id: string; bookingId: string; referenceId: string; amount: number; bookingCode: string }>>(
+    Prisma.sql`SELECT xp."id", xp."bookingId", xp."referenceId", xp."amount", b."bookingCode"
+      FROM "XenditPayment" xp INNER JOIN "Booking" b ON b."id" = xp."bookingId"
+      WHERE xp."paymentRequestId" = ${payload.data.payment_request_id} LIMIT 1`
   );
   const payment = payments[0];
   if (!payment || payload.data.reference_id !== payment.referenceId) {
@@ -52,8 +53,8 @@ export async function POST(request: Request) {
         },
       });
     });
-    revalidatePath(`/tickets/${payment.referenceId.replace(/^booking_/, "")}`);
-    revalidatePath(`/checkout/${payment.referenceId.replace(/^booking_/, "")}`);
+    revalidatePath(`/tickets/${payment.bookingCode}`);
+    revalidatePath(`/checkout/${payment.bookingCode}`);
   } else if (payload.event === "payment.failure") {
     await prisma.$executeRaw(Prisma.sql`UPDATE "XenditPayment"
       SET "status" = 'FAILED', "paymentId" = COALESCE(${payload.data.payment_id ?? null}, "paymentId"), "updatedAt" = NOW()

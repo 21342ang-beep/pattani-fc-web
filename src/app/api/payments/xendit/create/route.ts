@@ -41,14 +41,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    const referenceId = `booking_${booking.bookingCode}_${randomUUID().replace(/-/g, "")}`;
     const created = await createPromptPayPaymentRequest({
-      referenceId: `booking_${booking.bookingCode}`,
+      referenceId,
       amountBaht: booking.totalAmount / 100,
       description: `Pattani FC ticket ${booking.bookingCode}`,
     });
     await prisma.$executeRaw(Prisma.sql`INSERT INTO "XenditPayment"
       ("id", "bookingId", "referenceId", "paymentRequestId", "amount", "status", "qrString", "updatedAt")
-      VALUES (${randomUUID()}, ${booking.id}, ${`booking_${booking.bookingCode}`}, ${created.paymentRequestId}, ${booking.totalAmount}, 'PENDING', ${created.qrString}, NOW())`);
+      VALUES (${randomUUID()}, ${booking.id}, ${referenceId}, ${created.paymentRequestId}, ${booking.totalAmount}, 'PENDING', ${created.qrString}, NOW())`);
     return Response.json({ paymentRequestId: created.paymentRequestId, qrSvg: await toQrSvg(created.qrString) });
   } catch (error) {
     if (error instanceof Error && error.message.includes("Unique constraint")) {
