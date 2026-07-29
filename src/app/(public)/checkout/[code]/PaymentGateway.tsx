@@ -1,610 +1,124 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CreditCard,
-  QrCode,
-  Smartphone,
-  Lock,
-  ShieldCheck,
-  BadgeCheck,
-  Loader2,
-} from "lucide-react";
-import { confirmPayment, type ConfirmPaymentState } from "@/app/actions/checkout";
+import { Loader2, Lock, QrCode, ShieldCheck } from "lucide-react";
 
-// หน้าชำระเงินแบบ payment gateway (mock)
-// ⚠️ ข้อมูลบัตรทั้งหมดเป็น client-side only — ไม่ถูกส่งไปที่ server
-//    server action `confirmPayment` รับเฉพาะ bookingCode + phone (เหมือน PromptPay flow)
-//    method ถูก fix เป็น PROMPTPAY ที่ server → กันการปลอม method จาก client
-
-type Method = "card" | "promptpay" | "banking";
-
-const METHODS: {
-  id: Method;
-  label: string;
-  sublabel: string;
-  Icon: typeof CreditCard;
-}[] = [
-  { id: "card", label: "บัตรเครดิต / เดบิต", sublabel: "Visa · Mastercard · JCB", Icon: CreditCard },
-  { id: "promptpay", label: "PromptPay QR", sublabel: "สแกนด้วยแอปธนาคาร", Icon: QrCode },
-  { id: "banking", label: "Mobile Banking", sublabel: "เปิดแอปธนาคารโดยตรง", Icon: Smartphone },
-];
-
-const DISPLAY_METHODS = [...METHODS].sort((a, b) =>
-  a.id === "promptpay" ? -1 : b.id === "promptpay" ? 1 : 0
-);
+type PaymentState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; qrSvg: string; paymentRequestId: string }
+  | { status: "error"; message: string };
 
 export default function PaymentGateway({
   bookingCode,
-  phone,
   amountBaht,
-  qrSvg,
-  promptpay,
 }: {
   bookingCode: string;
-  phone: string;
   amountBaht: number;
-  qrSvg: string;
-  promptpay: string;
 }) {
-  const [method, setMethod] = useState<Method>("promptpay");
   const router = useRouter();
-  const [state, formAction, pending] = useActionState<ConfirmPaymentState, FormData>(
-    confirmPayment,
-    undefined
-  );
+  const [state, setState] = useState<PaymentState>({ status: "idle" });
 
   useEffect(() => {
-    if (state?.redirectTo) router.push(state.redirectTo);
-  }, [state, router]);
+    if (state.status !== "ready") return;
+    const timer = window.setInterval(async () => {
+      const response = await fetch(`/api/payments/xendit/status?bookingCode=${encodeURIComponent(bookingCode)}`, {
+        cache: "no-store",
+      });
+      const result = (await response.json().catch(() => null)) as { confirmed?: boolean } | null;
+      if (result?.confirmed) router.replace(`/tickets/${bookingCode}`);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [bookingCode, router, state.status]);
+
+  async function createPayment() {
+    setState({ status: "loading" });
+    try {
+      const response = await fetch("/api/payments/xendit/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingCode }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        qrSvg?: string;
+        paymentRequestId?: string;
+        error?: string;
+      } | null;
+      if (!response.ok || !result?.qrSvg || !result.paymentRequestId) {
+        throw new Error(result?.error ?? "ไม่สามารถสร้างรายการชำระเงินได้");
+      }
+      setState({ status: "ready", qrSvg: result.qrSvg, paymentRequestId: result.paymentRequestId });
+    } catch (error) {
+      setState({ status: "error", message: error instanceof Error ? error.message : "เกิดข้อผิดพลาด" });
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <GatewayHeader />
-
-      <div className="border-b border-slate-200 bg-slate-50/60 p-4 md:p-5">
-        <p className="mb-4 text-base font-semibold uppercase tracking-widest text-slate-500 md:text-lg">
-          เลือกวิธีชำระเงิน
-        </p>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {DISPLAY_METHODS.map((m) => {
-            const active = method === m.id;
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setMethod(m.id)}
-                className={`flex items-center gap-3 rounded-xl border-2 p-3 text-left transition ${
-                  active
-                    ? "border-green-800 bg-green-50 shadow-sm"
-                    : "border-slate-200 bg-white hover:border-slate-300"
-                }`}
-                aria-pressed={active}
-              >
-                <span
-                  className={`grid size-9 shrink-0 place-items-center rounded-lg ${
-                    active ? "bg-green-800 text-yellow-300" : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  <m.Icon className="size-5" />
-                </span>
-                <span className="min-w-0">
-                    <span className={`block text-base font-semibold ${active ? "text-green-900" : "text-slate-800"} md:text-lg`}>
-                    {m.label}
-                  </span>
-                  <span className="block truncate text-sm text-slate-500 md:text-base">{m.sublabel}</span>
-                </span>
-              </button>
-            );
-          })}
+      <header className="border-b border-slate-200 bg-gradient-to-r from-green-950 to-green-800 px-6 py-4 text-white">
+        <div className="flex items-center gap-2.5">
+          <Lock className="size-4 text-yellow-300" />
+          <span className="text-base font-bold tracking-wide md:text-lg">XENDIT PROMPTPAY</span>
         </div>
-      </div>
+        <p className="mt-2 text-sm text-white/70 md:text-base">
+          ยืนยัน E-Ticket อัตโนมัติเมื่อ Xendit แจ้งผลการชำระเงินสำเร็จ
+        </p>
+      </header>
 
       <div className="p-5 md:p-7">
-        {state?.error && (
+        {state.status === "error" && (
           <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-base text-red-700 md:text-lg">
-            {state.error}
+            {state.message}
           </p>
         )}
 
-        {method === "card" && (
-          <CardPanel
-            amountBaht={amountBaht}
-            bookingCode={bookingCode}
-            phoneValue={phone}
-            formAction={formAction}
-            pending={pending}
-          />
-        )}
-
-        {method === "promptpay" && (
-          <PromptPayPanel
-            amountBaht={amountBaht}
-            promptpay={promptpay}
-            qrSvg={qrSvg}
-            bookingCode={bookingCode}
-            phoneValue={phone}
-            formAction={formAction}
-            pending={pending}
-          />
-        )}
-
-        {method === "banking" && (
-          <BankingPanel
-            amountBaht={amountBaht}
-            bookingCode={bookingCode}
-            phoneValue={phone}
-            formAction={formAction}
-            pending={pending}
-          />
-        )}
-      </div>
-
-      <GatewayFooter />
-    </div>
-  );
-}
-
-function GatewayHeader() {
-  return (
-    <header className="border-b border-slate-200 bg-gradient-to-r from-green-950 to-green-800 px-6 py-4 text-white">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <Lock className="size-4 text-yellow-300" />
-          <span className="text-base font-bold tracking-wide md:text-lg">SECURE PAYMENT GATEWAY</span>
-        </div>
-        <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-yellow-300 md:text-sm">
-          <span className="size-1.5 rounded-full bg-yellow-300" />
-          Test mode
-        </span>
-      </div>
-      <p className="mt-2 text-sm text-white/70 md:text-base">
-        โหมดจำลอง — ยังไม่ได้เชื่อมต่อ payment provider จริง ข้อมูลบัตรจะไม่ถูกบันทึกหรือส่งไปที่ระบบใด ๆ
-      </p>
-    </header>
-  );
-}
-
-function GatewayFooter() {
-  return (
-    <footer className="border-t border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-500 md:text-base">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5">
-          <ShieldCheck className="size-3.5 text-green-700" />
-          256-bit SSL · PCI DSS Compliant (mock)
-        </span>
-        <span className="flex items-center gap-1.5 font-mono font-bold text-slate-400">
-          <span className="rounded bg-slate-200 px-1.5 py-0.5">VISA</span>
-          <span className="rounded bg-slate-200 px-1.5 py-0.5">MC</span>
-          <span className="rounded bg-slate-200 px-1.5 py-0.5">JCB</span>
-        </span>
-      </div>
-    </footer>
-  );
-}
-
-// ─────────────────────────────────────────────────────────
-// Credit/Debit Card (mock — ไม่ส่งข้อมูลบัตรไป server)
-// ─────────────────────────────────────────────────────────
-function CardPanel({
-  amountBaht,
-  bookingCode,
-  phoneValue,
-  formAction,
-  pending,
-}: {
-  amountBaht: number;
-  bookingCode: string;
-  phoneValue: string;
-  formAction: (fd: FormData) => void;
-  pending: boolean;
-}) {
-  const [cardNumber, setCardNumber] = useState("");
-  const [holder, setHolder] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvv, setCvv] = useState("");
-  const [processing, setProcessing] = useState<null | "authorizing" | "confirming">(null);
-
-  const digits = cardNumber.replace(/\D/g, "");
-  const brand = detectBrand(digits);
-  const canSubmit =
-    digits.length >= 13 &&
-    digits.length <= 19 &&
-    holder.trim().length >= 2 &&
-    /^\d{2}\/\d{2}$/.test(expiry) &&
-    /^\d{3,4}$/.test(cvv) &&
-    !pending &&
-    !processing;
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!canSubmit) return;
-
-    // MOCK flow — จำลอง 2 stage: authorize → confirm
-    // ข้อมูลบัตรอยู่แค่ใน component state → ไม่มี network request
-    setProcessing("authorizing");
-    await sleep(900);
-    setProcessing("confirming");
-    await sleep(600);
-
-    // ส่งแค่ bookingCode + phone ไป server action (ไม่ส่งข้อมูลบัตร)
-    const fd = new FormData();
-    fd.set("bookingCode", bookingCode);
-    fd.set("phone", phoneValue);
-    // ต้องอยู่ใน startTransition — เพราะเรียก formAction programmatically
-    // (ไม่ได้ผ่าน <form action={formAction}>)
-    startTransition(() => formAction(fd));
-    // ไม่ต้อง setProcessing(null) — pending จะ takeover, redirect หลังสำเร็จ
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
-      <MockPreviewCard
-        digits={digits}
-        holder={holder}
-        expiry={expiry}
-        brand={brand}
-      />
-
-      <div className="space-y-4">
-        <Field label="หมายเลขบัตร" htmlFor="cc-number">
-          <div className="relative">
-            <input
-              id="cc-number"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="4242 4242 4242 4242"
-              value={formatCardNumber(cardNumber)}
-              onChange={(e) => setCardNumber(e.target.value.slice(0, 23))}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 pr-16 font-mono text-lg tracking-wider outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20 md:text-xl"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-slate-100 px-2 py-1 font-mono text-xs font-bold text-slate-600 md:text-sm">
-              {brand}
-            </span>
-          </div>
-        </Field>
-
-        <Field label="ชื่อบนบัตร" htmlFor="cc-holder">
-          <input
-            id="cc-holder"
-            autoComplete="off"
-            placeholder="SOMCHAI CHAIYO"
-            value={holder}
-            onChange={(e) => setHolder(e.target.value.toUpperCase().slice(0, 40))}
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-lg uppercase tracking-wider outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20 md:text-xl"
-          />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="วันหมดอายุ" htmlFor="cc-exp">
-            <input
-              id="cc-exp"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="MM/YY"
-              value={expiry}
-              onChange={(e) => setExpiry(formatExpiry(e.target.value))}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 font-mono text-lg outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20 md:text-xl"
-            />
-          </Field>
-          <Field label="CVV" htmlFor="cc-cvv" hint="3 หลักด้านหลังบัตร">
-            <input
-              id="cc-cvv"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="•••"
-              value={cvv}
-              onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 font-mono text-lg tracking-widest outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20 md:text-xl"
-            />
-          </Field>
-        </div>
-      </div>
-
-      <p className="flex items-start gap-2 rounded-md bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-500 md:text-base">
-        <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
-        ข้อมูลบัตรจะไม่ถูกส่งไปที่เซิร์ฟเวอร์หรือบันทึกในระบบ — นี่เป็นโหมดจำลองสำหรับการพัฒนา
-      </p>
-
-      <PayButton
-        pending={pending || !!processing}
-        canSubmit={canSubmit}
-        amountBaht={amountBaht}
-        stage={processing}
-      />
-    </form>
-  );
-}
-
-function MockPreviewCard({
-  digits,
-  holder,
-  expiry,
-  brand,
-}: {
-  digits: string;
-  holder: string;
-  expiry: string;
-  brand: string;
-}) {
-  const masked = (digits.padEnd(16, "•").match(/.{1,4}/g) ?? []).slice(0, 4).join(" ");
-  return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-900 via-green-800 to-emerald-700 p-6 text-white shadow-lg">
-      <div className="absolute -right-8 -top-8 size-40 rounded-full bg-yellow-300/10" />
-      <div className="absolute -bottom-10 -left-6 size-32 rounded-full bg-yellow-300/10" />
-      <div className="relative flex items-start justify-between">
-        <span className="text-sm font-bold uppercase tracking-widest text-yellow-300/80 md:text-base">
-          Pattani FC · Card
-        </span>
-        <span className="rounded bg-white/10 px-2 py-0.5 font-mono text-xs font-bold text-yellow-200 md:text-sm">
-          {brand}
-        </span>
-      </div>
-      <div className="relative mt-8 font-mono text-xl tracking-[0.25em] text-white/95 md:text-2xl">
-        {masked}
-      </div>
-      <div className="relative mt-4 flex items-end justify-between text-sm uppercase tracking-widest text-white/80 md:text-base">
-        <span>
-          <span className="block text-[11px] text-white/50 md:text-xs">Cardholder</span>
-          <span className="font-semibold text-white">
-            {holder || " "}
-          </span>
-        </span>
-        <span>
-          <span className="block text-[11px] text-white/50 md:text-xs">Expires</span>
-          <span className="font-mono font-semibold text-white">{expiry || "MM/YY"}</span>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function PayButton({
-  pending,
-  canSubmit,
-  amountBaht,
-  stage,
-}: {
-  pending: boolean;
-  canSubmit: boolean;
-  amountBaht: number;
-  stage: null | "authorizing" | "confirming";
-}) {
-  const label = stage === "authorizing"
-    ? "กำลังตรวจสอบบัตร..."
-    : stage === "confirming"
-      ? "กำลังยืนยันการชำระ..."
-      : pending
-        ? "กำลังยืนยันการชำระ..."
-        : `ชำระเงิน ${amountBaht.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท`;
-
-  return (
-    <button
-      type="submit"
-      disabled={!canSubmit}
-      className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-4 text-lg font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.005] hover:bg-yellow-300 disabled:opacity-50 disabled:hover:scale-100 md:text-xl"
-    >
-      {(pending || stage) && <Loader2 className="size-4 animate-spin" />}
-      {label}
-    </button>
-  );
-}
-
-// ─────────────────────────────────────────────────────────
-// PromptPay QR
-// ─────────────────────────────────────────────────────────
-function PromptPayPanel({
-  amountBaht,
-  promptpay,
-  qrSvg,
-  bookingCode,
-  phoneValue,
-  formAction,
-  pending,
-}: {
-  amountBaht: number;
-  promptpay: string;
-  qrSvg: string;
-  bookingCode: string;
-  phoneValue: string;
-  formAction: (fd: FormData) => void;
-  pending: boolean;
-}) {
-  return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-green-100 bg-green-50/50 p-4">
-        <p className="text-base font-semibold text-green-900 md:text-lg">วิธีชำระ</p>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-base text-slate-700 md:text-lg">
-          <li>เปิดแอปธนาคาร → สแกน QR Code ด้านล่าง</li>
-          <li>ตรวจสอบยอด {amountBaht.toLocaleString("th-TH")} บาท แล้วยืนยันการโอน</li>
-          <li>กดปุ่ม &quot;ฉันชำระเงินแล้ว&quot; เพื่อรับ E-Ticket</li>
-        </ol>
-      </div>
-
-      <div className="flex flex-col items-center gap-3">
-        <div
-          className="rounded-xl border-2 border-green-800 bg-white p-4"
-          dangerouslySetInnerHTML={{ __html: qrSvg }}
-        />
-        <p className="text-base text-slate-500 md:text-lg">
-          พร้อมเพย์: <span className="font-mono font-bold text-green-900">{promptpay}</span>
-        </p>
-        <p className="text-3xl font-black text-green-900 md:text-4xl">
-          {amountBaht.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท
-        </p>
-      </div>
-
-      <form action={formAction}>
-        <input type="hidden" name="bookingCode" value={bookingCode} />
-        <input type="hidden" name="phone" value={phoneValue} />
-        <button
-          type="submit"
-          disabled={pending}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-4 text-lg font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.005] hover:bg-yellow-300 disabled:opacity-60 md:text-xl"
-        >
-          {pending && <Loader2 className="size-4 animate-spin" />}
-          {pending ? "กำลังตรวจสอบการชำระ..." : "ฉันชำระเงินแล้ว"}
-        </button>
-      </form>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────
-// Mobile Banking (mock — จำลองการเปิดแอปธนาคาร)
-// ─────────────────────────────────────────────────────────
-const BANKS = [
-  { id: "kbank", name: "K PLUS", brand: "กสิกรไทย", color: "bg-green-600" },
-  { id: "scb", name: "SCB EASY", brand: "ไทยพาณิชย์", color: "bg-purple-700" },
-  { id: "bbl", name: "Bualuang", brand: "กรุงเทพ", color: "bg-blue-700" },
-  { id: "ktb", name: "Krungthai NEXT", brand: "กรุงไทย", color: "bg-sky-600" },
-  { id: "bay", name: "KMA", brand: "กรุงศรี", color: "bg-yellow-500" },
-  { id: "ttb", name: "ttb touch", brand: "ทีทีบี", color: "bg-blue-500" },
-];
-
-function BankingPanel({
-  amountBaht,
-  bookingCode,
-  phoneValue,
-  formAction,
-  pending,
-}: {
-  amountBaht: number;
-  bookingCode: string;
-  phoneValue: string;
-  formAction: (fd: FormData) => void;
-  pending: boolean;
-}) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [stage, setStage] = useState<null | "opening" | "waiting">(null);
-  const selectedBank = useMemo(() => BANKS.find((b) => b.id === selected), [selected]);
-
-  async function handleContinue() {
-    if (!selectedBank) return;
-    setStage("opening");
-    await sleep(900);
-    setStage("waiting");
-    await sleep(1400);
-    const fd = new FormData();
-    fd.set("bookingCode", bookingCode);
-    fd.set("phone", phoneValue);
-    startTransition(() => formAction(fd));
-  }
-
-  return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-base font-semibold text-slate-800 md:text-lg">เลือกธนาคารของคุณ</p>
-        <p className="mt-0.5 text-sm text-slate-500 md:text-base">
-          ระบบจะจำลองการเปิดแอปธนาคาร — ยอด {amountBaht.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        {BANKS.map((b) => {
-          const active = selected === b.id;
-          return (
+        {state.status !== "ready" ? (
+          <div className="space-y-5">
+            <div className="rounded-xl border border-green-100 bg-green-50/60 p-5">
+              <div className="flex items-center gap-3">
+                <span className="grid size-11 place-items-center rounded-xl bg-green-800 text-yellow-300"><QrCode className="size-6" /></span>
+                <div>
+                  <p className="text-lg font-bold text-green-950 md:text-xl">ชำระด้วย PromptPay QR</p>
+                  <p className="text-base text-slate-600 md:text-lg">สแกนผ่านแอปธนาคารได้ทันที</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-4xl font-black text-green-900 md:text-5xl">
+              {amountBaht.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท
+            </p>
             <button
-              key={b.id}
               type="button"
-              onClick={() => setSelected(b.id)}
-              disabled={!!stage || pending}
-              className={`flex items-center gap-3 rounded-xl border-2 p-3 text-left transition disabled:opacity-60 ${
-                active
-                  ? "border-green-800 bg-green-50 shadow-sm"
-                  : "border-slate-200 bg-white hover:border-slate-300"
-              }`}
+              onClick={createPayment}
+              disabled={state.status === "loading"}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-4 text-lg font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:bg-yellow-300 disabled:opacity-60 md:text-xl"
             >
-              <span className={`grid size-10 shrink-0 place-items-center rounded-lg ${b.color} text-sm font-black text-white`}>
-                {b.brand.slice(0, 2)}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-base font-semibold text-slate-900 md:text-lg">{b.name}</span>
-                <span className="block truncate text-sm text-slate-500 md:text-base">{b.brand}</span>
-              </span>
+              {state.status === "loading" && <Loader2 className="size-5 animate-spin" />}
+              {state.status === "loading" ? "กำลังสร้าง QR ชำระเงิน..." : "สร้าง PromptPay QR"}
             </button>
-          );
-        })}
+          </div>
+        ) : (
+          <div className="space-y-5 text-center">
+            <div className="rounded-xl border border-green-100 bg-green-50/60 p-4 text-left">
+              <p className="text-base font-semibold text-green-900 md:text-lg">วิธีชำระเงิน</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-base text-slate-700 md:text-lg">
+                <li>เปิดแอปธนาคารแล้วสแกน QR Code</li>
+                <li>ตรวจสอบยอด {amountBaht.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท แล้วกดยืนยัน</li>
+                <li>รอสักครู่ ระบบจะเปิด E-Ticket ให้อัตโนมัติ</li>
+              </ol>
+            </div>
+            <div className="mx-auto w-fit rounded-xl border-2 border-green-800 bg-white p-4" dangerouslySetInnerHTML={{ __html: state.qrSvg }} />
+            <div className="flex items-center justify-center gap-2 text-base text-slate-500 md:text-lg">
+              <Loader2 className="size-4 animate-spin text-green-800" /> กำลังรอผลการชำระเงินจาก Xendit
+            </div>
+            <p className="text-sm text-slate-400">เลขอ้างอิง: {state.paymentRequestId}</p>
+          </div>
+        )}
       </div>
 
-      {stage && selectedBank && (
-        <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4">
-          <Loader2 className="size-5 shrink-0 animate-spin text-green-800" />
-          <div className="min-w-0 text-base md:text-lg">
-            <p className="font-semibold text-green-900">
-              {stage === "opening" ? "กำลังเปิดแอป " : "รอการยืนยันจากแอป "}
-              {selectedBank.name}...
-            </p>
-            <p className="text-sm text-green-800/70 md:text-base">
-              โหมดจำลอง — ระบบจะยืนยันอัตโนมัติภายในไม่กี่วินาที
-            </p>
-          </div>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={handleContinue}
-        disabled={!selected || !!stage || pending}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-yellow-400 px-5 py-4 text-lg font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-[1.005] hover:bg-yellow-300 disabled:opacity-50 disabled:hover:scale-100 md:text-xl"
-      >
-        {(stage || pending) && <Loader2 className="size-4 animate-spin" />}
-        {stage || pending
-          ? "กำลังดำเนินการ..."
-          : selectedBank
-            ? `ดำเนินการต่อผ่าน ${selectedBank.name}`
-            : "เลือกธนาคารก่อน"}
-      </button>
+      <footer className="border-t border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-500 md:text-base">
+        <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-4 text-green-700" /> ระบบจะไม่ยืนยันการจองจากการกดปุ่มหน้าเว็บไซต์</span>
+      </footer>
     </div>
   );
-}
-
-// ─────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────
-function Field({
-  label,
-  htmlFor,
-  hint,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label htmlFor={htmlFor} className="mb-1.5 flex items-center justify-between text-sm font-semibold uppercase tracking-wider text-slate-600 md:text-base">
-        <span>{label}</span>
-        {hint && <span className="text-xs font-normal text-slate-400 md:text-sm">{hint}</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function formatCardNumber(v: string): string {
-  const d = v.replace(/\D/g, "").slice(0, 19);
-  return d.replace(/(.{4})/g, "$1 ").trim();
-}
-
-function formatExpiry(v: string): string {
-  const d = v.replace(/\D/g, "").slice(0, 4);
-  if (d.length < 3) return d;
-  return `${d.slice(0, 2)}/${d.slice(2)}`;
-}
-
-function detectBrand(digits: string): string {
-  if (!digits) return "CARD";
-  if (/^4/.test(digits)) return "VISA";
-  if (/^(5[1-5]|2[2-7])/.test(digits)) return "MASTERCARD";
-  if (/^35/.test(digits)) return "JCB";
-  if (/^3[47]/.test(digits)) return "AMEX";
-  return "CARD";
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
 }

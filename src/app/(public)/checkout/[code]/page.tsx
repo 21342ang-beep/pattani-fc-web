@@ -1,13 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import { buildPromptPayPayload } from "@/lib/promptpay";
-import QRCode from "qrcode";
 import PaymentGateway from "./PaymentGateway";
 
 export const dynamic = "force-dynamic";
-
-const CLUB_PROMPTPAY = "0812345678";
 
 export default async function CheckoutPage({
   params,
@@ -50,16 +46,6 @@ export default async function CheckoutPage({
   }
 
   const amountBaht = booking.totalAmount / 100;
-  const ppPayload = buildPromptPayPayload({
-    target: CLUB_PROMPTPAY,
-    amountBaht,
-  });
-  const qrSvg = await QRCode.toString(ppPayload, {
-    type: "svg",
-    margin: 1,
-    width: 280,
-    color: { dark: "#052e1b", light: "#ffffff" },
-  });
 
   return (
     <div className="bg-slate-50 py-12 md:py-16">
@@ -80,10 +66,7 @@ export default async function CheckoutPage({
           <div>
             <PaymentGateway
               bookingCode={booking.bookingCode}
-              phone={booking.customerPhone}
               amountBaht={amountBaht}
-              qrSvg={qrSvg}
-              promptpay={CLUB_PROMPTPAY}
             />
           </div>
 
