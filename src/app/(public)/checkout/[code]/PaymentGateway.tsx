@@ -12,25 +12,34 @@ type PaymentState =
 
 export default function PaymentGateway({
   bookingCode,
+  seasonPassCode,
   amountBaht,
 }: {
-  bookingCode: string;
+  bookingCode?: string;
+  seasonPassCode?: string;
   amountBaht: number;
 }) {
   const router = useRouter();
   const [state, setState] = useState<PaymentState>({ status: "idle" });
+  const paymentParams = seasonPassCode
+    ? `seasonPassCode=${encodeURIComponent(seasonPassCode)}`
+    : `bookingCode=${encodeURIComponent(bookingCode ?? "")}`;
+  const paymentBody = seasonPassCode ? { seasonPassCode } : { bookingCode };
+  const successUrl = seasonPassCode
+    ? `/tickets/season/${encodeURIComponent(seasonPassCode)}`
+    : `/tickets/${encodeURIComponent(bookingCode ?? "")}`;
 
   useEffect(() => {
     if (state.status !== "ready") return;
     const timer = window.setInterval(async () => {
-      const response = await fetch(`/api/payments/xendit/status?bookingCode=${encodeURIComponent(bookingCode)}`, {
+      const response = await fetch(`/api/payments/xendit/status?${paymentParams}`, {
         cache: "no-store",
       });
       const result = (await response.json().catch(() => null)) as { confirmed?: boolean } | null;
-      if (result?.confirmed) router.replace(`/tickets/${bookingCode}`);
+      if (result?.confirmed) router.replace(successUrl);
     }, 3000);
     return () => window.clearInterval(timer);
-  }, [bookingCode, router, state.status]);
+  }, [paymentParams, router, state.status, successUrl]);
 
   async function createPayment() {
     setState({ status: "loading" });
@@ -38,7 +47,7 @@ export default function PaymentGateway({
       const response = await fetch("/api/payments/xendit/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingCode }),
+        body: JSON.stringify(paymentBody),
       });
       const result = (await response.json().catch(() => null)) as {
         qrSvg?: string;

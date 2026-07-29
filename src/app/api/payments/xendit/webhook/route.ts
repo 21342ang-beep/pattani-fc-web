@@ -11,50 +11,59 @@ function isValidToken(received: string | null) {
   return expectedBuffer.length === receivedBuffer.length && timingSafeEqual(expectedBuffer, receivedBuffer);
 }
 
+type Payment = {
+  id: string;
+  bookingId: string | null;
+  seasonPassOrderId: string | null;
+  referenceId: string;
+  amount: number;
+  bookingCode: string | null;
+  passCode: string | null;
+};
+
 export async function POST(request: Request) {
-  if (!isValidToken(request.headers.get("x-callback-token"))) {
-    return new Response("Invalid callback token", { status: 401 });
-  }
+  if (!isValidToken(request.headers.get("x-callback-token"))) return new Response("Invalid callback token", { status: 401 });
 
-  let payload: {
-    event?: string;
-    data?: { payment_request_id?: string; payment_id?: string; reference_id?: string };
-  };
-  try {
-    payload = await request.json();
-  } catch {
-    return new Response("Invalid payload", { status: 400 });
-  }
-
+  let payload: { event?: string; data?: { payment_request_id?: string; payment_id?: string; reference_id?: string } };
+  try { payload = await request.json(); } catch { return new Response("Invalid payload", { status: 400 }); }
   if (!payload.data?.payment_request_id) return Response.json({ ok: true });
 
-  const payments = await prisma.$queryRaw<Array<{ id: string; bookingId: string; referenceId: string; amount: number; bookingCode: string }>>(
-    Prisma.sql`SELECT xp."id", xp."bookingId", xp."referenceId", xp."amount", b."bookingCode"
-      FROM "XenditPayment" xp INNER JOIN "Booking" b ON b."id" = xp."bookingId"
-      WHERE xp."paymentRequestId" = ${payload.data.payment_request_id} LIMIT 1`
-  );
+  const payments = await prisma.$queryRaw<Payment[]>(Prisma.sql`SELECT xp."id", xp."bookingId", xp."seasonPassOrderId", xp."referenceId", xp."amount",
+      b."bookingCode", s."passCode"
+    FROM "XenditPayment" xp
+    LEFT JOIN "Booking" b ON b."id" = xp."bookingId"
+    LEFT JOIN "SeasonPassOrder" s ON s."id" = xp."seasonPassOrderId"
+    WHERE xp."paymentRequestId" = ${payload.data.payment_request_id} LIMIT 1`);
   const payment = payments[0];
-  if (!payment || payload.data.reference_id !== payment.referenceId) {
-    return Response.json({ ok: true });
-  }
+  if (!payment || payload.data.reference_id !== payment.referenceId) return Response.json({ ok: true });
 
   if (payload.event === "payment.capture") {
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`UPDATE "XenditPayment"
         SET "status" = 'SUCCEEDED', "paymentId" = COALESCE(${payload.data?.payment_id ?? null}, "paymentId"), "updatedAt" = NOW()
         WHERE "id" = ${payment.id}`);
-      await tx.booking.updateMany({
-        where: { id: payment.bookingId, status: "PENDING", totalAmount: payment.amount },
-        data: {
-          status: "CONFIRMED",
-          paymentMethod: "XENDIT_PROMPTPAY",
-          paidAt: new Date(),
-          seatNumbers: [],
-        },
-      });
+      if (payment.bookingId) {
+        await tx.booking.updateMany({
+          where: { id: payment.bookingId, status: "PENDING", totalAmount: payment.amount },
+          data: { status: "CONFIRMED", paymentMethod: "XENDIT_PROMPTPAY", paidAt: new Date(), seatNumbers: [] },
+        });
+      }
+      if (payment.seasonPassOrderId) {
+        await tx.seasonPassOrder.updateMany({
+          where: { id: payment.seasonPassOrderId, status: "PENDING", priceBaht: { gte: 0 } },
+          data: { status: "CONFIRMED", paymentMethod: "XENDIT_PROMPTPAY" },
+        });
+      }
     });
-    revalidatePath(`/tickets/${payment.bookingCode}`);
-    revalidatePath(`/checkout/${payment.bookingCode}`);
+    if (payment.bookingCode) {
+      revalidatePath(`/tickets/${payment.bookingCode}`);
+      revalidatePath(`/checkout/${payment.bookingCode}`);
+    }
+    if (payment.passCode) {
+      revalidatePath(`/tickets/season/${payment.passCode}`);
+      revalidatePath(`/checkout/season/${payment.passCode}`);
+    }
+    revalidatePath("/member/bookings");
   } else if (payload.event === "payment.failure") {
     await prisma.$executeRaw(Prisma.sql`UPDATE "XenditPayment"
       SET "status" = 'FAILED', "paymentId" = COALESCE(${payload.data.payment_id ?? null}, "paymentId"), "updatedAt" = NOW()

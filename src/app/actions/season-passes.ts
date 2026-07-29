@@ -196,7 +196,8 @@ export async function createSeasonPassOrder(
         shipNote: parsed.data.shipNote || null,
         pickupLocation: parsed.data.pickupLocation || null,
         paymentMethod: parsed.data.paymentMethod,
-        status: "CONFIRMED",
+        // The pass remains unavailable until the Xendit webhook confirms payment.
+        status: "PENDING",
       },
       });
       const claimed = await tx.seasonPassBarcode.updateMany({

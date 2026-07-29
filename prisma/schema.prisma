@@ -200,8 +200,10 @@ model Booking {
 // สำหรับตรวจสอบ callback และกันการยืนยันการชำระเงินจากฝั่ง browser
 model XenditPayment {
   id               String   @id @default(cuid())
-  bookingId        String
-  booking          Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId        String?
+  booking          Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seasonPassOrderId String?
+  seasonPassOrder   SeasonPassOrder? @relation(fields: [seasonPassOrderId], references: [id], onDelete: Cascade)
   referenceId      String   @unique
   paymentRequestId String   @unique
   paymentId        String?  @unique
@@ -212,6 +214,7 @@ model XenditPayment {
   updatedAt        DateTime @updatedAt
 
   @@index([bookingId, status])
+  @@index([seasonPassOrderId, status])
 }
 
 // OTP สำหรับยืนยันเบอร์โทรก่อนแสดงรายการจองและ E-Ticket
@@ -360,6 +363,7 @@ model SeasonPassOrder {
   status           SeasonPassOrderStatus     @default(CONFIRMED)
   notes            String?
   barcode          SeasonPassBarcode?
+  xenditPayments   XenditPayment[]
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
 

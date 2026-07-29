@@ -161,8 +161,8 @@ export default function SeasonPassWizard({
       setSaveError(res.error);
       return false;
     }
-    setPassCode(res.passCode);
-    setStep("success");
+    // The order remains pending until Xendit sends a verified payment callback.
+    window.location.assign(`/checkout/season/${encodeURIComponent(res.passCode)}`);
     return true;
   }
 
