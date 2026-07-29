@@ -117,7 +117,7 @@ export default function FeaturedMatches({
                         : ""
                     }
                   >
-                    <Link href={`/matches/${m.id}`}>
+                    <Link href={isOnSale ? "/tickets#matches" : `/matches/${m.id}`}>
                       {isOnSale ? "จอง" : "ดู"}
                       <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
                     </Link>

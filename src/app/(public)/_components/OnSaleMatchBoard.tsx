@@ -46,7 +46,7 @@ export default function OnSaleMatchBoard({
           </p>
           {showBookingButton ? (
             <Link
-              href={`/matches/${match.id}`}
+              href="/tickets#matches"
               className="mt-6 flex w-full items-center justify-center rounded-xl bg-yellow-300 px-5 py-3.5 text-xl font-black text-green-950 transition hover:bg-yellow-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300"
             >
               จองตั๋วตอนนี้
