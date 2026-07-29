@@ -43,7 +43,7 @@ import { createSeasonPassOrder } from "@/app/actions/season-passes";
 // ผังสนามไฮไลต์โซนของแต่ละระดับบัตร — ช่วยให้เลือกโซนที่นั่งถูก (VVIP ยังไม่มีภาพ)
 const ZONE_MAP_IMAGE: Partial<Record<SeasonTierId, string>> = {
   "vip-advanced": "/season-pass-zone-map-vip-v2.png",
-  premium: "/season-pass-zone-map-premium-v2.png",
+  premium: "/season-pass-zone-map-premium-v3.png",
   gold: "/season-pass-zone-map-gold-v2.png",
 };
 

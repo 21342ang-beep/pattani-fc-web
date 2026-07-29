@@ -30,7 +30,7 @@ const TIER_ICONS: Record<SeasonTierId, React.ReactNode> = {
 
 const TIER_MOCKUPS: Partial<Record<SeasonTierId, string>> = {
   "vip-advanced": "/season-pass-vip-mockup.png",
-  premium: "/season-pass-premium-mockup.png",
+  premium: "/season-pass-premium-mockup-v2.png",
   gold: "/season-pass-gold-mockup.png",
 };
 
@@ -52,7 +52,7 @@ export default async function SeasonTicketsPage() {
           </div>
           <div className="relative aspect-[1463/1058] w-full">
               <Image
-                src="/stadium-zones-season-2026-27-v3.png"
+                src="/stadium-zones-season-2026-27-v4.png"
                 alt="แผนผังโซนที่นั่ง Rainbow Stadium — Pattani FC"
                 fill
                 sizes="(max-width: 768px) 100vw, 1152px"

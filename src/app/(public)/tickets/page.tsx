@@ -20,12 +20,12 @@ type StadiumZone = {
   note?: string;
 };
 const STADIUM_ZONES: StadiumZone[] = [
-  { code: "A", label: "อัฒจันทร์เหนือ · A", priceBaht: 150, capacity: null, color: "green" },
-  { code: "B", label: "อัฒจันทร์เหนือ · B", priceBaht: 150, capacity: null, color: "green" },
+  { code: "A", label: "อัฒจันทร์เหนือ · A", priceBaht: 150, capacity: null, color: "blue" },
+  { code: "B", label: "อัฒจันทร์เหนือ · B", priceBaht: 150, capacity: null, color: "blue" },
   { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", priceBaht: 120, capacity: null, color: "yellow" },
   { code: "D", label: "อัฒจันทร์ฝั่งตะวันออก · D", priceBaht: 100, capacity: null, color: "orange" },
   { code: "E", label: "อัฒจันทร์ใต้ · E", priceBaht: 120, capacity: null, color: "yellow" },
-  { code: "F", label: "อัฒจันทร์ใต้ · F", priceBaht: 150, capacity: null, color: "green" },
+  { code: "F", label: "อัฒจันทร์ใต้ · F", priceBaht: 150, capacity: null, color: "blue" },
   { code: "G", label: "อัฒจันทร์ใต้ · G", priceBaht: 120, capacity: null, color: "yellow" },
   { code: "I", label: "อัฒจันทร์ฝั่งตะวันตก · I", priceBaht: 100, capacity: null, color: "orange" },
   { code: "J", label: "อัฒจันทร์ฝั่งตะวันตก · J", priceBaht: 120, capacity: null, color: "yellow" },
@@ -86,7 +86,7 @@ export default async function TicketsPage() {
         {/* แผนผังสนาม — โชว์บนสุด ให้คนดูมุมมองก่อนเลือกโซน */}
         <div className="relative aspect-[1463/1058] w-full">
             <Image
-                src="/stadium-zones-match-2026-27-v4.png"
+                src="/stadium-zones-match-2026-27-v5.png"
               alt="แผนผังโซนที่นั่งของ Rainbow Stadium — Pattani FC (ความจุ 10,700)"
               fill
               sizes="(min-width: 1024px) 1024px, 100vw"
@@ -198,11 +198,11 @@ const ZONE_COLORS: Record<
     pill: "bg-green-600 text-white",
   },
   blue: {
-    wrap: "border-blue-400 bg-blue-50/50",
-    header: "bg-blue-600",
-    headerText: "text-white",
-    price: "text-blue-700",
-    pill: "bg-blue-600 text-white",
+    wrap: "border-[#7DD3F7] bg-[#7DD3F7]/15",
+    header: "bg-[#7DD3F7]",
+    headerText: "text-slate-950",
+    price: "text-cyan-700",
+    pill: "bg-[#7DD3F7] text-slate-950",
   },
   purple: {
     wrap: "border-fuchsia-400 bg-fuchsia-50/50",
