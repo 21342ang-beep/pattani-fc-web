@@ -169,14 +169,14 @@ function PlayerCard({ player: p }: { player: PlayerDoc }) {
 
         {/* position pill */}
         <span
-          className={`absolute left-3 top-3 rounded-full bg-gradient-to-br ${accent} px-2.5 py-1 text-[10px] font-black tracking-widest text-green-950 shadow-md`}
+          className={`absolute left-3 top-3 rounded-full bg-gradient-to-br ${accent} px-3 py-1.5 text-sm font-black tracking-widest text-green-950 shadow-md md:text-base`}
         >
           {p.position}
         </span>
 
         {/* jersey badge */}
         {p.jerseyNumber !== undefined && (
-          <span className="absolute right-3 top-3 rounded-lg bg-yellow-400 px-2.5 py-1 text-base font-black text-green-950 shadow-lg shadow-yellow-400/20 ring-1 ring-yellow-300">
+          <span className="absolute right-3 top-3 rounded-lg bg-yellow-400 px-3 py-1.5 text-lg font-black text-green-950 shadow-lg shadow-yellow-400/20 ring-1 ring-yellow-300 md:text-xl">
             #{p.jerseyNumber}
           </span>
         )}
@@ -207,14 +207,14 @@ function PlayerCard({ player: p }: { player: PlayerDoc }) {
 
         {/* bottom overlay with name */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-green-950 via-green-950/85 to-transparent px-4 pb-4 pt-14">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-yellow-300/85">
+          <p className="text-xs font-bold uppercase tracking-widest text-yellow-300/85 md:text-sm">
             {POSITION_LABEL[p.position]}
           </p>
-          <h3 className="mt-0.5 line-clamp-1 text-base font-black text-white md:text-lg">
+          <h3 className="mt-0.5 line-clamp-1 text-xl font-black text-white md:text-2xl">
             {p.name}
           </h3>
           {p.nationality && (
-            <p className="mt-0.5 text-[11px] font-medium text-green-100/70">
+            <p className="mt-0.5 text-sm font-medium text-green-100/70 md:text-base">
               {p.nationality}
             </p>
           )}
