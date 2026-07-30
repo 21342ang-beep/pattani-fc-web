@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Gift, Sparkles, Calendar, ArrowRight } from "lucide-react";
+import { Gift, Sparkles, Calendar, ArrowRight, ChevronDown } from "lucide-react";
 import { verifyCustomer } from "@/lib/customer-dal";
 import { prisma } from "@/lib/prisma";
 import { payload } from "@/lib/payload";
@@ -122,12 +122,7 @@ export default async function MemberPage(props: {
             title="ตั๋วของฉัน"
             desc={`บัตรรายปี ${seasonPassCount} ใบ · ตั๋วรายแมตช์ ${bookingCount} รายการ`}
           />
-          <QuickCard
-            href="/matches"
-            icon="🎟️"
-            title="จองตั๋วเข้าชม"
-            desc="ดูตารางแมตช์และจองที่นั่ง"
-          />
+          <BookingMenuCard />
           <QuickCard
             href="/bookings/search"
             icon="🔍"
@@ -201,6 +196,29 @@ function QuickCard({
       </div>
       <ArrowRight className="size-5 shrink-0 text-green-700 transition group-hover:translate-x-0.5" />
     </Link>
+  );
+}
+
+function BookingMenuCard() {
+  return (
+    <details className="group rounded-2xl border border-green-200 bg-white shadow-sm transition hover:border-green-400 hover:shadow-lg">
+      <summary className="flex cursor-pointer list-none items-start gap-4 p-5 [&::-webkit-details-marker]:hidden">
+        <span className="text-3xl">🎟️</span>
+        <div className="flex-1">
+          <h3 className="font-bold text-green-900">จองตั๋วเข้าชม</h3>
+          <p className="mt-0.5 text-sm text-slate-600">เลือกการจองรายแมตช์ หรือบัตรสมาชิกรายปี</p>
+        </div>
+        <ChevronDown className="size-5 shrink-0 text-green-700 transition group-open:rotate-180" />
+      </summary>
+      <div className="grid gap-2 border-t border-green-100 bg-green-50/50 p-3 sm:grid-cols-2">
+        <Link href="/tickets#matches" className="flex items-center justify-between rounded-xl bg-green-800 px-4 py-3 text-sm font-bold text-yellow-300 transition hover:bg-green-900">
+          จองรายแมตช์ <ArrowRight className="size-4" />
+        </Link>
+        <Link href="/tickets/season" className="flex items-center justify-between rounded-xl border border-green-200 bg-white px-4 py-3 text-sm font-bold text-green-900 transition hover:bg-green-50">
+          จองบัตรรายปี <ArrowRight className="size-4" />
+        </Link>
+      </div>
+    </details>
   );
 }
 
