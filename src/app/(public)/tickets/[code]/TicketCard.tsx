@@ -52,6 +52,24 @@ const METHOD_LABEL: Record<string, string> = {
   CREDIT_CARD: "Credit Card",
 };
 
+const GATE_BY_ZONE: Record<string, string> = {
+  A: "A",
+  B: "B",
+  C: "C",
+  D: "D",
+  E: "E",
+  F: "F1 / F2",
+  G: "G",
+  I: "I",
+  J: "J",
+  AWAY: "H",
+};
+
+function getGateForZone(zone: string | null) {
+  if (!zone) return "ตรวจสอบกับเจ้าหน้าที่";
+  return GATE_BY_ZONE[zone.trim().toUpperCase()] ?? "ตรวจสอบกับเจ้าหน้าที่";
+}
+
 export default function TicketCard({ booking, barcodeSvg }: Props) {
   const ticketRef = useRef<HTMLElement>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -61,6 +79,7 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
   const away = resolveLogo(booking.match.awayTeamLogo, booking.match.awayTeam);
   const ticketReference = `${booking.zone ?? "GENERAL"} · ${booking.unitPrice}`;
   const barcodeReference = `${booking.zone ?? "GENERAL"}-${booking.unitPrice.replace(/\D/g, "")}-${booking.bookingCode.slice(-8).toUpperCase()}`;
+  const gate = getGateForZone(booking.zone);
 
   async function saveTicket() {
     if (!ticketRef.current || isSaving) return;
@@ -314,6 +333,7 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
 
               <div className="border-y border-white/10 py-2 text-[11px]">
                 <StubRow label="Stadium" value={booking.match.venue} />
+                <StubRow label="Entrance" value={`Gate ${gate}`} />
               </div>
             </div>
           </aside>
