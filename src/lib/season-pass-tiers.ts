@@ -59,6 +59,10 @@ export interface SeasonTier {
   name: string;
   tagline: string;
   priceBaht: number; // ราคาเต็มบาท (ไม่ใช่สตางค์ — ไว้ display อย่างเดียว)
+  inventory?: {
+    total: number;
+    sponsorReserved: number;
+  };
   allowedSeatZones: readonly SeasonPassSeatZone[];
   benefits: string[];
   highlight?: boolean;
@@ -88,6 +92,7 @@ export const SEASON_TIERS: SeasonTier[] = [
     name: "VIP ADVANCED MEMBER",
     tagline: "สแตนด์ VIP มีหลังคา ที่นั่งสบาย",
     priceBaht: 2500,
+    inventory: { total: 386, sponsorReserved: 35 },
     allowedSeatZones: ["VIP-A", "VIP-B"],
     benefits: [
       `เข้าชม ${SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล`,
@@ -105,6 +110,7 @@ export const SEASON_TIERS: SeasonTier[] = [
     name: "PREMIUM MEMBER",
     tagline: "โซนพรีเมียม บรรยากาศพร้อมเชียร์",
     priceBaht: 2000,
+    inventory: { total: 1000, sponsorReserved: 12 },
     allowedSeatZones: ["PRIMIUM-A", "PRIMIUM-B", "PRIMIUM-F"],
     benefits: [
       `เข้าชม ${SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล`,
@@ -118,6 +124,7 @@ export const SEASON_TIERS: SeasonTier[] = [
     name: "GOLD MEMBER",
     tagline: "จุดเริ่มต้นของแฟนพันธุ์แท้",
     priceBaht: 1500,
+    inventory: { total: 800, sponsorReserved: 21 },
     allowedSeatZones: ["GOLD-C", "GOLD-E", "GOLD-G", "GOLD-J"],
     benefits: [
       `เข้าชม ${SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล`,
@@ -130,4 +137,9 @@ export const SEASON_TIERS: SeasonTier[] = [
 export function getSeasonTier(id: string | undefined | null): SeasonTier | null {
   if (!id) return null;
   return SEASON_TIERS.find((t) => t.id === id) ?? null;
+}
+
+export function getSeasonPublicSaleLimit(tier: SeasonTier): number | null {
+  if (!tier.inventory) return null;
+  return Math.max(0, tier.inventory.total - tier.inventory.sponsorReserved);
 }

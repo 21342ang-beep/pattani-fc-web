@@ -14,6 +14,7 @@ import {
   SEASON_PASS_SEAT_ZONES,
   SEASON_PASS_SHIPPING_FEE_BAHT,
   SEASON_TIERS,
+  getSeasonPublicSaleLimit,
 } from "@/lib/season-pass-tiers";
 
 // ─── Customer-facing: สร้างออเดอร์บัตรรายปี ─────────────────
@@ -155,6 +156,12 @@ export async function createSeasonPassOrder(
 
   const tier = SEASON_TIERS.find((t) => t.id === parsed.data.tierId);
   if (!tier) return { ok: false, error: "ไม่พบระดับบัตรที่เลือก" };
+  const publicSaleLimit = getSeasonPublicSaleLimit(tier);
+  const barcodePrefix = `PFC26-${tier.priceBaht}-`;
+  const publicBarcodeUpperBound =
+    publicSaleLimit == null
+      ? null
+      : `${barcodePrefix}${String(publicSaleLimit).padStart(4, "0")}`;
 
   const session = await readCustomerSession();
   const email = parsed.data.email || session?.email || null;
@@ -168,8 +175,17 @@ export async function createSeasonPassOrder(
       const barcode = await tx.seasonPassBarcode.findFirst({
         where: {
           tierId: parsed.data.tierId,
+          seasonLabel: SEASON_LABEL,
           orderId: null,
           isGenerated: true,
+          ...(publicBarcodeUpperBound
+            ? {
+                barcode: {
+                  startsWith: barcodePrefix,
+                  lte: publicBarcodeUpperBound,
+                },
+              }
+            : {}),
         },
         orderBy: { barcode: "asc" },
         select: { id: true, barcode: true },
