@@ -163,12 +163,7 @@ export async function createSeasonPassOrder(
 
   const tier = SEASON_TIERS.find((t) => t.id === parsed.data.tierId);
   if (!tier) return { ok: false, error: "ไม่พบระดับบัตรที่เลือก" };
-  const publicSaleLimit = getSeasonPublicSaleLimit(tier);
   const barcodePrefix = `PFC26-${tier.priceBaht}-`;
-  const publicBarcodeUpperBound =
-    publicSaleLimit == null
-      ? null
-      : `${barcodePrefix}${String(publicSaleLimit).padStart(4, "0")}`;
 
   const session = await readCustomerSession();
   const email = parsed.data.email || session?.email || null;
@@ -190,9 +185,19 @@ export async function createSeasonPassOrder(
           seatZone: { in: [...tier.allowedSeatZones] },
         },
       });
+      const hasCompleteZoneAllocation = configuredQuotas.length === tier.allowedSeatZones.length;
+      const publicSaleLimit = hasCompleteZoneAllocation
+        ? configuredQuotas.reduce(
+            (sum, quota) => sum + Math.max(0, quota.totalSeats - quota.sponsorReserved),
+            0,
+          )
+        : getSeasonPublicSaleLimit(tier);
+      const publicBarcodeUpperBound = publicSaleLimit == null
+        ? null
+        : `${barcodePrefix}${String(publicSaleLimit).padStart(4, "0")}`;
       // Enforce per-zone quota after the package has a complete allocation.
       // Packages not configured yet keep the existing package-wide barcode limit.
-      if (configuredQuotas.length === tier.allowedSeatZones.length) {
+      if (hasCompleteZoneAllocation) {
         const selectedQuota = configuredQuotas.find(
           (quota) => quota.seatZone === parsed.data.seatZone,
         );

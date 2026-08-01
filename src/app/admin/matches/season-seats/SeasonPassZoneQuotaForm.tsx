@@ -18,14 +18,12 @@ export default function SeasonPassZoneQuotaForm({
   badge,
   priceBaht,
   targetTotal,
-  targetSponsor,
   zones,
 }: {
   tierId: string;
   badge: string;
   priceBaht: number;
   targetTotal: number;
-  targetSponsor: number;
   zones: ZoneRow[];
 }) {
   const [state, action, pending] = useActionState<SeasonPassZoneQuotaState, FormData>(
@@ -53,7 +51,7 @@ export default function SeasonPassZoneQuotaForm({
           <p className="mt-1 text-sm text-slate-600">แพ็กเกจ {priceBaht.toLocaleString("th-TH")} บาท</p>
         </div>
         <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
-          เป้าหมายรวม {targetTotal.toLocaleString("th-TH")} · สปอนเซอร์ {targetSponsor.toLocaleString("th-TH")}
+          จำนวนที่นั่งรวม {targetTotal.toLocaleString("th-TH")} · สปอนเซอร์รวม {summary.sponsor.toLocaleString("th-TH")}
         </div>
       </div>
 
@@ -105,8 +103,8 @@ export default function SeasonPassZoneQuotaForm({
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-        <p className={`text-sm font-semibold ${summary.total === targetTotal && summary.sponsor === targetSponsor ? "text-emerald-700" : "text-amber-700"}`}>
-          จัดสรรรวม {summary.total.toLocaleString("th-TH")} / {targetTotal.toLocaleString("th-TH")} · สปอนเซอร์ {summary.sponsor.toLocaleString("th-TH")} / {targetSponsor.toLocaleString("th-TH")}
+        <p className={`text-sm font-semibold ${summary.total === targetTotal ? "text-emerald-700" : "text-amber-700"}`}>
+          จัดสรรรวม {summary.total.toLocaleString("th-TH")} / {targetTotal.toLocaleString("th-TH")} · สปอนเซอร์รวมตามที่กรอก {summary.sponsor.toLocaleString("th-TH")}
         </p>
         <button disabled={pending} className="rounded-md bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">
           {pending ? "กำลังบันทึก..." : "บันทึกแพ็กเกจนี้"}

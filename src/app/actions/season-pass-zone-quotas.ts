@@ -49,10 +49,9 @@ export async function updateSeasonPassZoneQuotas(
   }
 
   const totalSeats = rows.reduce((sum, row) => sum + row.totalSeats!, 0);
-  const sponsorReserved = rows.reduce((sum, row) => sum + row.sponsorReserved!, 0);
-  if (totalSeats !== tier.inventory.total || sponsorReserved !== tier.inventory.sponsorReserved) {
+  if (totalSeats !== tier.inventory.total) {
     return {
-      error: `แพ็กเกจนี้ต้องจัดสรรรวม ${tier.inventory.total.toLocaleString("th-TH")} ที่ และกันสปอนเซอร์รวม ${tier.inventory.sponsorReserved.toLocaleString("th-TH")} ที่`,
+      error: `แพ็กเกจนี้ต้องจัดสรรจำนวนที่นั่งรวม ${tier.inventory.total.toLocaleString("th-TH")} ที่`,
     };
   }
 

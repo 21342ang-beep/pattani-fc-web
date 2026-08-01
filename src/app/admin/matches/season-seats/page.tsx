@@ -39,7 +39,6 @@ export default async function SeasonPassZoneQuotasPage() {
               badge={tier.badge}
               priceBaht={tier.priceBaht}
               targetTotal={inventory.total}
-              targetSponsor={inventory.sponsorReserved}
               zones={tier.allowedSeatZones.map((seatZone) => {
                 const quota = quotas.find((row) => row.tierId === tier.id && row.seatZone === seatZone);
                 const sold = soldGroups.find((row) => row.tierId === tier.id && row.seatZone === seatZone)?._count._all ?? 0;
