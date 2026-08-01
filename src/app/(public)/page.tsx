@@ -47,7 +47,7 @@ export default async function HomePage() {
   const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
   const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
   const seatSummary = summarizeSeatAvailability(availabilityByMatch);
-  const totalReserved = seatSummary.matchBooked + seatSummary.seasonReserved;
+  const totalReserved = seatSummary.matchBooked;
   const homePlayers = playersResult.docs as unknown as HomePlayer[];
 
   return (
@@ -87,7 +87,7 @@ export default async function HomePage() {
           <StatsRow
             stats={[
               {
-                label: "จองแล้วและสำรองรายปี",
+                label: "จองรายแมตช์แล้ว",
                 value: totalReserved.toLocaleString("th-TH"),
                 highlight: true,
               },

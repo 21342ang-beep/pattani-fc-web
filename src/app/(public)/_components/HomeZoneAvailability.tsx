@@ -24,9 +24,6 @@ export default function HomeZoneAvailability({
             <p className="mt-1 text-sm font-medium text-slate-500 sm:text-xs xl:text-sm">
               {zone.capacity == null ? "ยังไม่เปิด" : "ที่นั่งคงเหลือ"}
             </p>
-            {zone.seasonReserved > 0 && (
-              <p className="mt-1 text-xs font-semibold text-amber-700 xl:text-sm">รายปี {zone.seasonReserved}</p>
-            )}
             <span className="sr-only">{STADIUM_ZONES[code].label}</span>
           </Link>
         );

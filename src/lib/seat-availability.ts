@@ -2,8 +2,6 @@ import "server-only";
 
 import type { Match } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { SEASON_LABEL } from "@/lib/season-pass-tiers";
-import { isPattaniHomeTeam } from "@/lib/season-pass-home-match";
 import {
   getZoneCapacity,
   getZoneCapacityScope,
@@ -44,23 +42,10 @@ export type ZoneAvailability = {
 
 export type AggregatedZoneAvailability = Omit<ZoneAvailability, "poolKey">;
 
-export function seasonPassSeatZoneToMatchZone(seatZone: string): StadiumZoneCode | null {
-  const suffix = seatZone.trim().toUpperCase().split("-").at(-1);
-  return suffix && STADIUM_ZONE_CODES.includes(suffix as StadiumZoneCode)
-    ? (suffix as StadiumZoneCode)
-    : null;
-}
-
-export function matchUsesSeasonPassCapacity(match: Pick<Match, "homeTeam" | "competitionType">) {
-  return match.competitionType === "LEAGUE" && isPattaniHomeTeam(match.homeTeam);
-}
-
 export function calculateMatchAvailability(
   match: MatchForAvailability,
   bookings: { zone: string | null; quantity: number }[],
-  seasonReservations: ReadonlyMap<StadiumZoneCode, number>,
 ) {
-  const usesSeasonPasses = matchUsesSeasonPassCapacity(match);
   return Object.fromEntries(
     STADIUM_ZONE_CODES.map((code) => {
       const scope = getZoneCapacityScope(match, code);
@@ -71,17 +56,14 @@ export function calculateMatchAvailability(
           : sum,
         0,
       );
-      const seasonReserved = usesSeasonPasses
-        ? scope.reduce((sum, zone) => sum + (seasonReservations.get(zone) ?? 0), 0)
-        : 0;
       const remaining = capacity == null
         ? 0
-        : Math.max(0, capacity - matchBooked - seasonReserved);
+        : Math.max(0, capacity - matchBooked);
       const value: ZoneAvailability = {
         code,
         capacity,
         matchBooked,
-        seasonReserved,
+        seasonReserved: 0,
         remaining,
         sharedCapacity: scope.length > 1,
         poolKey: scope.length > 1 ? `shared:${scope.join("-")}` : `zone:${code}`,
@@ -96,36 +78,20 @@ export async function getSeatAvailabilityForMatches(matches: MatchForAvailabilit
     return new Map<string, Record<StadiumZoneCode, ZoneAvailability>>();
   }
 
-  const [bookingGroups, seasonGroups] = await Promise.all([
-    prisma.booking.groupBy({
-      by: ["matchId", "zone"],
-      where: {
-        matchId: { in: matches.map((match) => match.id) },
-        status: { in: ["PENDING", "CONFIRMED"] },
-      },
-      _sum: { quantity: true },
-    }),
-    prisma.seasonPassOrder.groupBy({
-      by: ["seatZone"],
-      where: {
-        seasonLabel: SEASON_LABEL,
-        status: { in: ["PENDING", "CONFIRMED"] },
-      },
-      _count: { _all: true },
-    }),
-  ]);
-
-  const seasonReservations = new Map<StadiumZoneCode, number>();
-  for (const group of seasonGroups) {
-    const code = seasonPassSeatZoneToMatchZone(group.seatZone);
-    if (code) seasonReservations.set(code, (seasonReservations.get(code) ?? 0) + group._count._all);
-  }
+  const bookingGroups = await prisma.booking.groupBy({
+    by: ["matchId", "zone"],
+    where: {
+      matchId: { in: matches.map((match) => match.id) },
+      status: { in: ["PENDING", "CONFIRMED"] },
+    },
+    _sum: { quantity: true },
+  });
 
   return new Map(matches.map((match) => {
     const bookings = bookingGroups
       .filter((group) => group.matchId === match.id)
       .map((group) => ({ zone: group.zone, quantity: group._sum.quantity ?? 0 }));
-    return [match.id, calculateMatchAvailability(match, bookings, seasonReservations)];
+    return [match.id, calculateMatchAvailability(match, bookings)];
   }));
 }
 

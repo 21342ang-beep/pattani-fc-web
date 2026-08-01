@@ -65,7 +65,7 @@ export default function OnSaleMatchBoard({
       </div>
       {zoneAvailability && (
         <div className="border-t border-white/15 bg-black/15 px-5 py-4 sm:px-8">
-          <p className="mb-4 text-base font-semibold text-emerald-100 sm:text-lg lg:text-xl">ที่นั่งคงเหลือแยกตามโซน (หักสิทธิ์บัตรรายปีแล้ว)</p>
+          <p className="mb-4 text-base font-semibold text-emerald-100 sm:text-lg lg:text-xl">ที่นั่งรายแมตช์คงเหลือแยกตามโซน</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 xl:grid-cols-10">
             {STADIUM_ZONE_CODES.map((code) => {
               const zone = zoneAvailability[code];

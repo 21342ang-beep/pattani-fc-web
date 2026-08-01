@@ -6,16 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { bookingCreateSchema } from "@/lib/validations";
 import { verifyPermission } from "@/lib/dal";
 import { readCustomerSession } from "@/lib/customer-session";
-import { SEASON_LABEL } from "@/lib/season-pass-tiers";
-import {
-  matchUsesSeasonPassCapacity,
-  seasonPassSeatZoneToMatchZone,
-} from "@/lib/seat-availability";
 import {
   getStadiumZone,
   getZoneCapacity,
   getZoneCapacityScope,
-  type StadiumZoneCode,
 } from "@/lib/stadium-zones";
 
 export type BookingFormState = {
@@ -75,24 +69,7 @@ export async function createBooking(
           },
           _sum: { quantity: true },
         });
-        let seasonReserved = 0;
-        if (matchUsesSeasonPassCapacity(match)) {
-          const seasonGroups = await tx.seasonPassOrder.groupBy({
-            by: ["seatZone"],
-            where: {
-              seasonLabel: SEASON_LABEL,
-              status: { in: ["PENDING", "CONFIRMED"] },
-            },
-            _count: { _all: true },
-          });
-          seasonReserved = seasonGroups.reduce((sum, group) => {
-            const code = seasonPassSeatZoneToMatchZone(group.seatZone);
-            return code && capacityScope.includes(code as StadiumZoneCode)
-              ? sum + group._count._all
-              : sum;
-          }, 0);
-        }
-        const remaining = Math.max(0, capacity - (sold._sum.quantity ?? 0) - seasonReserved);
+        const remaining = Math.max(0, capacity - (sold._sum.quantity ?? 0));
         if (parsed.data.quantity > remaining) {
           throw new Error(`ที่นั่งเหลือ ${remaining} ที่ ไม่พอ`);
         }

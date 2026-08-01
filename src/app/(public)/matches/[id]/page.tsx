@@ -97,11 +97,6 @@ export default async function MatchDetailPage(props: {
               {capacity != null
                 ? `${remaining.toLocaleString("th-TH")} ที่นั่ง`
                 : "ยังไม่กำหนด"}
-              {selectedAvailability && selectedAvailability.seasonReserved > 0 && (
-                <span className="block text-base text-slate-500 md:text-lg">
-                  หักสิทธิ์บัตรรายปีแล้ว {selectedAvailability.seasonReserved.toLocaleString("th-TH")} ที่
-                </span>
-              )}
             </dd>
           </div>
         </dl>

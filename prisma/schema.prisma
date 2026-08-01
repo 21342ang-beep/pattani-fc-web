@@ -382,6 +382,22 @@ model SeasonPassOrder {
   @@index([customerId])
 }
 
+// โควตาบัตรรายปีแยกตามฤดูกาล แพ็กเกจ และโซน
+// แยกจากความจุรายแมตช์โดยสิ้นเชิง เพื่อกันที่นั่งสปอนเซอร์และเปิดขายแต่ละฝั่งได้อิสระ
+model SeasonPassZoneQuota {
+  id              String   @id @default(cuid())
+  seasonLabel     String
+  tierId          String
+  seatZone        String
+  totalSeats      Int
+  sponsorReserved Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([seasonLabel, tierId, seatZone])
+  @@index([seasonLabel, tierId])
+}
+
 model SeasonPassBarcode {
   id            String            @id @default(cuid())
   barcode       String            @unique

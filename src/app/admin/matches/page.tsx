@@ -36,7 +36,7 @@ export default async function AdminMatchesPage(props: {
       <div>
         <h1 className="text-xl font-bold">จัดการแมตช์</h1>
         <p className="mt-1 text-sm text-slate-600">เลือกประเภทการแข่งขันที่ต้องการจัดการ</p>
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MatchManagementCard
             href="/admin/matches?competition=LEAGUE"
             title="จัดการแมตช์บอลลีก"
@@ -48,6 +48,12 @@ export default async function AdminMatchesPage(props: {
             title="จัดการแมตช์บอลถ้วย"
             description="เพิ่ม แก้ไข และดูรายการแมตช์ฟุตบอลถ้วย"
             className="border-amber-200 bg-amber-50 hover:border-amber-400"
+          />
+          <MatchManagementCard
+            href="/admin/matches/season-seats"
+            title="จัดสรรที่นั่งบัตรรายปี"
+            description="กำหนดโควตารวม ที่นั่งสปอนเซอร์ และจำนวนเปิดขายแยกตามแพ็กเกจและโซน"
+            className="border-blue-200 bg-blue-50 hover:border-blue-400"
           />
         </div>
       </div>
@@ -185,7 +191,7 @@ function ZoneAvailabilityCell({
             <div
               key={code}
               title={zone
-                ? `จองรายแมตช์ ${zone.matchBooked} · บัตรรายปี ${zone.seasonReserved}${zone.sharedCapacity ? " · ใช้โควตาร่วมเดิม" : ""}`
+                ? `จองรายแมตช์ ${zone.matchBooked}${zone.sharedCapacity ? " · ใช้โควตาร่วมเดิม" : ""}`
                 : undefined}
               className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2.5 text-center text-sm"
             >
@@ -195,9 +201,6 @@ function ZoneAvailabilityCell({
                   ? "—"
                   : `${zone.remaining.toLocaleString("th-TH")} / ${zone.capacity.toLocaleString("th-TH")}`}
               </p>
-              {zone && zone.seasonReserved > 0 && (
-                <p className="text-xs font-semibold text-amber-700">รายปี {zone.seasonReserved}</p>
-              )}
               {zone?.sharedCapacity && <p className="text-xs text-slate-500">โควตาร่วม</p>}
             </div>
           );

@@ -260,11 +260,6 @@ function ZoneCard({ zone }: { zone: StadiumZone }) {
             {zone.sharedCapacity ? " · โควตาร่วมเดิม" : ""}
           </span>
         )}
-        {zone.seasonReserved > 0 && (
-          <span className="mt-1 text-base font-semibold text-amber-700 md:text-lg">
-            หักสิทธิ์บัตรรายปีแล้ว {zone.seasonReserved.toLocaleString("th-TH")} ที่
-          </span>
-        )}
         {zone.note && (
           <span
             className={`mt-4 inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-bold ${s.pill}`}

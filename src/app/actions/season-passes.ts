@@ -18,10 +18,9 @@ import {
 } from "@/lib/season-pass-tiers";
 
 function revalidateSeatAvailability() {
-  revalidatePath("/");
-  revalidatePath("/tickets");
-  revalidatePath("/matches");
-  revalidatePath("/admin/matches");
+  revalidatePath("/season-pass");
+  revalidatePath("/season-pass/apply");
+  revalidatePath("/admin/matches/season-seats");
   revalidateTag("bookings", { expire: 0 });
 }
 
@@ -180,6 +179,37 @@ export async function createSeasonPassOrder(
 
   try {
     const order = await prisma.$transaction(async (tx) => {
+      // Serialize orders in the same annual package/zone so concurrent payments cannot oversell.
+      const quotaLockKey = `${SEASON_LABEL}:${parsed.data.tierId}:${parsed.data.seatZone}`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))`;
+
+      const configuredQuotas = await tx.seasonPassZoneQuota.findMany({
+        where: {
+          seasonLabel: SEASON_LABEL,
+          tierId: parsed.data.tierId,
+          seatZone: { in: [...tier.allowedSeatZones] },
+        },
+      });
+      // Enforce per-zone quota after the package has a complete allocation.
+      // Packages not configured yet keep the existing package-wide barcode limit.
+      if (configuredQuotas.length === tier.allowedSeatZones.length) {
+        const selectedQuota = configuredQuotas.find(
+          (quota) => quota.seatZone === parsed.data.seatZone,
+        );
+        const publicZoneLimit = selectedQuota
+          ? Math.max(0, selectedQuota.totalSeats - selectedQuota.sponsorReserved)
+          : 0;
+        const zoneSold = await tx.seasonPassOrder.count({
+          where: {
+            seasonLabel: SEASON_LABEL,
+            tierId: parsed.data.tierId,
+            seatZone: parsed.data.seatZone,
+            status: { in: ["PENDING", "CONFIRMED"] },
+          },
+        });
+        if (zoneSold >= publicZoneLimit) throw new Error("ZONE_SOLD_OUT");
+      }
+
       const barcode = await tx.seasonPassBarcode.findFirst({
         where: {
           tierId: parsed.data.tierId,
@@ -235,6 +265,9 @@ export async function createSeasonPassOrder(
     revalidateSeatAvailability();
     return { ok: true, passCode: order.passCode };
   } catch (error) {
+    if (error instanceof Error && error.message === "ZONE_SOLD_OUT") {
+      return { ok: false, error: "บัตรรายปีโซนที่เลือกจำหน่ายหมดแล้ว กรุณาเลือกโซนอื่น" };
+    }
     if (error instanceof Error && error.message === "SOLD_OUT") {
       return { ok: false, error: "บัตรประเภทนี้จำหน่ายหมดแล้ว" };
     }
@@ -260,14 +293,49 @@ export async function updateSeasonPassStatus(
     return { error: "สถานะไม่ถูกต้อง" };
   }
   try {
-    await prisma.seasonPassOrder.update({
-      where: { id: orderId },
-      data: { status },
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.seasonPassOrder.findUnique({ where: { id: orderId } });
+      if (!order) throw new Error("NOT_FOUND");
+
+      const becomesActive = ["PENDING", "CONFIRMED"].includes(status)
+        && !["PENDING", "CONFIRMED"].includes(order.status);
+      if (becomesActive) {
+        const quotaLockKey = `${order.seasonLabel}:${order.tierId}:${order.seatZone}`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))`;
+        const tier = SEASON_TIERS.find((item) => item.id === order.tierId);
+        if (tier) {
+          const quotas = await tx.seasonPassZoneQuota.findMany({
+            where: {
+              seasonLabel: order.seasonLabel,
+              tierId: order.tierId,
+              seatZone: { in: [...tier.allowedSeatZones] },
+            },
+          });
+          if (quotas.length === tier.allowedSeatZones.length) {
+            const quota = quotas.find((item) => item.seatZone === order.seatZone);
+            const limit = quota ? Math.max(0, quota.totalSeats - quota.sponsorReserved) : 0;
+            const active = await tx.seasonPassOrder.count({
+              where: {
+                seasonLabel: order.seasonLabel,
+                tierId: order.tierId,
+                seatZone: order.seatZone,
+                status: { in: ["PENDING", "CONFIRMED"] },
+              },
+            });
+            if (active >= limit) throw new Error("ZONE_SOLD_OUT");
+          }
+        }
+      }
+
+      await tx.seasonPassOrder.update({ where: { id: orderId }, data: { status } });
     });
     revalidatePath("/admin/season-passes");
     revalidateSeatAvailability();
     return { ok: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "ZONE_SOLD_OUT") {
+      return { error: "โซนนี้เต็มตามโควตาบัตรรายปีแล้ว ไม่สามารถเปิดรายการนี้กลับมาได้" };
+    }
     return { error: "อัปเดตไม่สำเร็จ" };
   }
 }
