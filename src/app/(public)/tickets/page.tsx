@@ -71,7 +71,6 @@ export default async function TicketsPage() {
                 key={match.id}
                 match={match}
                 showBookingButton={false}
-                zoneAvailability={availabilityByMatch.get(match.id)}
               />
             ))}
           </div>
