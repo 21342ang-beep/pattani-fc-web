@@ -31,17 +31,19 @@ export type SeasonPassSearchResult = {
   createdAt: string;
 };
 
-type SearchTarget = "match" | "season";
-
 export type RequestBookingSearchOtpState =
   | { error: string }
-  | { requested: true; phone: string; customerName: string; reference: string | null; target: SearchTarget }
+  | { requested: true; phone: string; reference: string | null }
   | undefined;
+
+export type BookingSearchResults = {
+  bookings: BookingSearchResult[];
+  seasonPasses: SeasonPassSearchResult[];
+};
 
 export type VerifyBookingSearchOtpState =
   | { error: string }
-  | { verified: true; target: "match"; results: BookingSearchResult[] }
-  | { verified: true; target: "season"; results: SeasonPassSearchResult[] }
+  | { verified: true; results: BookingSearchResults }
   | undefined;
 
 function getCredentials() {
@@ -77,7 +79,7 @@ function logOtpProviderFailure(status: number, data: unknown) {
   });
 }
 
-async function findBookings(phone: string, customerName: string): Promise<BookingSearchResult[]> {
+async function findBookings(phone: string): Promise<BookingSearchResult[]> {
   const [domesticPhone, internationalPhone] = bookingSearchPhoneVariants(phone);
   const bookingRows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM "Booking"
@@ -89,12 +91,8 @@ async function findBookings(phone: string, customerName: string): Promise<Bookin
   const bookings = await prisma.booking.findMany({
     where: {
       id: { in: bookingRows.map((row) => row.id) },
-      ...(customerName
-        ? { customerName: { contains: customerName, mode: "insensitive" } }
-        : {}),
     },
     orderBy: { createdAt: "desc" },
-    take: 10,
     select: {
       bookingCode: true,
       status: true,
@@ -119,7 +117,7 @@ async function findBookings(phone: string, customerName: string): Promise<Bookin
   }));
 }
 
-async function findSeasonPasses(phone: string, customerName: string): Promise<SeasonPassSearchResult[]> {
+async function findSeasonPasses(phone: string): Promise<SeasonPassSearchResult[]> {
   const [domesticPhone, internationalPhone] = bookingSearchPhoneVariants(phone);
   const orderRows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM "SeasonPassOrder"
@@ -131,12 +129,8 @@ async function findSeasonPasses(phone: string, customerName: string): Promise<Se
   const orders = await prisma.seasonPassOrder.findMany({
     where: {
       id: { in: orderRows.map((row) => row.id) },
-      ...(customerName
-        ? { customerName: { contains: customerName, mode: "insensitive" } }
-        : {}),
     },
     orderBy: { createdAt: "desc" },
-    take: 10,
     select: {
       passCode: true,
       status: true,
@@ -171,7 +165,6 @@ export async function requestBookingSearchOtp(
   if (!parsedPhone.success) {
     return { error: "กรุณากรอกเบอร์โทรศัพท์ที่ใช้จองให้ถูกต้อง" };
   }
-  const target: SearchTarget = formData.get("target") === "season" ? "season" : "match";
   const credentials = getCredentials();
   if (!credentials) {
     return { error: "ระบบยืนยัน OTP ยังไม่ได้ตั้งค่า" };
@@ -222,9 +215,7 @@ export async function requestBookingSearchOtp(
     return {
       requested: true,
       phone: parsedPhone.data,
-      customerName: String(formData.get("customerName") ?? "").trim(),
       reference,
-      target,
     };
   } catch {
     return { error: "ไม่สามารถเชื่อมต่อระบบ OTP ได้ กรุณาลองใหม่" };
@@ -291,12 +282,11 @@ export async function verifyBookingSearchOtp(
       SET "verifiedAt" = NOW()
       WHERE "id" = ${request.id}
     `;
-    const customerName = String(formData.get("customerName") ?? "").trim();
-    const target: SearchTarget = formData.get("target") === "season" ? "season" : "match";
-    if (target === "season") {
-      return { verified: true, target, results: await findSeasonPasses(request.phone, customerName) };
-    }
-    return { verified: true, target, results: await findBookings(request.phone, customerName) };
+    const [bookings, seasonPasses] = await Promise.all([
+      findBookings(request.phone),
+      findSeasonPasses(request.phone),
+    ]);
+    return { verified: true, results: { bookings, seasonPasses } };
   } catch {
     return { error: "ไม่สามารถยืนยันรหัส OTP ได้ กรุณาลองใหม่" };
   }

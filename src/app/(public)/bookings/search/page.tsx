@@ -8,7 +8,7 @@ export default function BookingSearchPage() {
       <header>
         <p className="text-lg font-bold uppercase tracking-widest text-yellow-600 md:text-xl">Booking search</p>
         <h1 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">ตรวจสอบการจอง</h1>
-        <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">ลืมบันทึกบาร์โค้ด? กรอกชื่อผู้จอง หรือเบอร์โทรศัพท์ที่ใช้จอง เพื่อเรียกดู E-ticket ของคุณ</p>
+        <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">กรอกเบอร์โทรศัพท์ที่ใช้จองและยืนยัน OTP เพียงครั้งเดียว เพื่อดูตั๋วรายแมตช์และบัตรรายปีทั้งหมดของคุณ</p>
       </header>
       <BookingSearchTabs />
     </div>

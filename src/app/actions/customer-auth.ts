@@ -26,7 +26,7 @@ const registerSchema = z.object({
     .string()
     .trim()
     .regex(/^[0-9+\-\s]{9,15}$/, "เบอร์โทรไม่ถูกต้อง"),
-  gender: z.enum(["MALE", "FEMALE", "NON_BINARY", "PREFER_NOT_TO_SAY"], {
+  gender: z.enum(["MALE", "FEMALE"], {
     message: "กรุณาเลือกเพศ",
   }),
   birthDate: z

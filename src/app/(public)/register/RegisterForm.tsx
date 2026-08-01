@@ -99,8 +99,6 @@ export default function RegisterForm({
               <option value="" disabled>เลือกเพศ</option>
               <option value="MALE">ชาย</option>
               <option value="FEMALE">หญิง</option>
-              <option value="NON_BINARY">ไม่ระบุเพศตามกำเนิด</option>
-              <option value="PREFER_NOT_TO_SAY">ไม่ประสงค์ระบุ</option>
             </select>
           </SelectField>
           <SelectField label="ปีเกิด" error={fe.birthDate} required>
