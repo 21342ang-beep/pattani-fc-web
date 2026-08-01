@@ -60,6 +60,13 @@ export type ShippingProvince = {
   }[];
 };
 
+export type SeasonPassZoneOption = {
+  seatZone: SeasonPassSeatZone;
+  publicStartSequence: number | null;
+  publicEndSequence: number | null;
+  remaining: number | null;
+};
+
 interface CustomerData {
   name: string;
   phone: string;
@@ -92,6 +99,7 @@ export default function SeasonPassWizard({
   defaultDistrict,
   defaultPostalCode,
   shippingProvinces,
+  zoneOptions,
 }: {
   tier: SeasonTier;
   memberEmail: string | null;
@@ -102,6 +110,7 @@ export default function SeasonPassWizard({
   defaultDistrict: string;
   defaultPostalCode: string;
   shippingProvinces: ShippingProvince[];
+  zoneOptions: SeasonPassZoneOption[];
 }) {
   const [step, setStep] = useState<Step>("form");
   const [customer, setCustomer] = useState<CustomerData>({
@@ -207,6 +216,7 @@ export default function SeasonPassWizard({
               initial={customer}
               memberEmail={memberEmail}
               shippingProvinces={shippingProvinces}
+              zoneOptions={zoneOptions}
               onSubmit={handleFormSubmit}
               onDeliveryMethodChange={(m) =>
                 setCustomer((c) => ({ ...c, deliveryMethod: m }))
@@ -294,6 +304,7 @@ function FormStep({
   initial,
   memberEmail,
   shippingProvinces,
+  zoneOptions,
   onSubmit,
   onDeliveryMethodChange,
 }: {
@@ -301,6 +312,7 @@ function FormStep({
   initial: CustomerData;
   memberEmail: string | null;
   shippingProvinces: ShippingProvince[];
+  zoneOptions: SeasonPassZoneOption[];
   onSubmit: (data: CustomerData) => void;
   onDeliveryMethodChange: (method: DeliveryMethod) => void;
 }) {
@@ -326,6 +338,7 @@ function FormStep({
   const selectedDistrict = selectedProvince?.districts.find(
     (district) => district.name === shipCity,
   );
+  const selectedZoneOption = zoneOptions.find((option) => option.seatZone === seatZone);
 
   function handleProvinceChange(province: string) {
     setShipProvince(province);
@@ -467,10 +480,28 @@ function FormStep({
           className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-base outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
         >
           <option value="">เลือกโซนที่นั่ง</option>
-          {tier.allowedSeatZones.map((zone) => (
-            <option key={zone} value={zone}>{zone}</option>
-          ))}
+          {zoneOptions.map((option) => {
+            const hasRange = option.publicStartSequence != null && option.publicEndSequence != null;
+            const rangeLabel = hasRange
+              ? ` · เลข ${String(option.publicStartSequence).padStart(4, "0")}–${String(option.publicEndSequence).padStart(4, "0")}`
+              : "";
+            const remainingLabel = option.remaining == null
+              ? ""
+              : option.remaining > 0
+                ? ` · เหลือ ${option.remaining.toLocaleString("th-TH")}`
+                : " · เต็มแล้ว";
+            return (
+              <option key={option.seatZone} value={option.seatZone} disabled={option.remaining === 0}>
+                {option.seatZone}{rangeLabel}{remainingLabel}
+              </option>
+            );
+          })}
         </select>
+        {selectedZoneOption?.publicStartSequence != null && selectedZoneOption.publicEndSequence != null && (
+          <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+            รหัสการจองโซนนี้อยู่ในช่วง {String(selectedZoneOption.publicStartSequence).padStart(4, "0")}–{String(selectedZoneOption.publicEndSequence).padStart(4, "0")} ระบบจะใช้เลขว่างลำดับแรก
+          </p>
+        )}
       </Field>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">

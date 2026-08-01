@@ -16,6 +16,10 @@ import {
   SEASON_TIERS,
   getSeasonPublicSaleLimit,
 } from "@/lib/season-pass-tiers";
+import {
+  calculateSeasonPassZoneRanges,
+  formatSeasonPassSequence,
+} from "@/lib/season-pass-zone-ranges";
 
 function revalidateSeatAvailability() {
   revalidatePath("/season-pass");
@@ -186,24 +190,27 @@ export async function createSeasonPassOrder(
         },
       });
       const hasCompleteZoneAllocation = configuredQuotas.length === tier.allowedSeatZones.length;
-      const publicSaleLimit = hasCompleteZoneAllocation
-        ? configuredQuotas.reduce(
-            (sum, quota) => sum + Math.max(0, quota.totalSeats - quota.sponsorReserved),
-            0,
-          )
-        : getSeasonPublicSaleLimit(tier);
-      const publicBarcodeUpperBound = publicSaleLimit == null
+      const zoneRanges = hasCompleteZoneAllocation
+        ? calculateSeasonPassZoneRanges(tier.allowedSeatZones, configuredQuotas)
+        : [];
+      const selectedRange = zoneRanges.find(
+        (range) => range.seatZone === parsed.data.seatZone,
+      );
+      const legacyPublicSaleLimit = hasCompleteZoneAllocation
         ? null
-        : `${barcodePrefix}${String(publicSaleLimit).padStart(4, "0")}`;
+        : getSeasonPublicSaleLimit(tier);
+      const publicBarcodeLowerBound = selectedRange
+        ? `${barcodePrefix}${formatSeasonPassSequence(selectedRange.publicStartSequence)}`
+        : null;
+      const publicBarcodeUpperBound = selectedRange
+        ? `${barcodePrefix}${formatSeasonPassSequence(selectedRange.publicEndSequence)}`
+        : legacyPublicSaleLimit == null
+          ? null
+          : `${barcodePrefix}${formatSeasonPassSequence(legacyPublicSaleLimit)}`;
       // Enforce per-zone quota after the package has a complete allocation.
       // Packages not configured yet keep the existing package-wide barcode limit.
       if (hasCompleteZoneAllocation) {
-        const selectedQuota = configuredQuotas.find(
-          (quota) => quota.seatZone === parsed.data.seatZone,
-        );
-        const publicZoneLimit = selectedQuota
-          ? Math.max(0, selectedQuota.totalSeats - selectedQuota.sponsorReserved)
-          : 0;
+        const publicZoneLimit = selectedRange?.publicSeatCount ?? 0;
         const zoneSold = await tx.seasonPassOrder.count({
           where: {
             seasonLabel: SEASON_LABEL,
@@ -225,6 +232,7 @@ export async function createSeasonPassOrder(
             ? {
                 barcode: {
                   startsWith: barcodePrefix,
+                  ...(publicBarcodeLowerBound ? { gte: publicBarcodeLowerBound } : {}),
                   lte: publicBarcodeUpperBound,
                 },
               }

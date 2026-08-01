@@ -3,8 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import { getAllProvinces } from "geothai";
 import { prisma } from "@/lib/prisma";
 import { readCustomerSession } from "@/lib/customer-session";
-import { getSeasonTier } from "@/lib/season-pass-tiers";
-import SeasonPassWizard, { type ShippingProvince } from "./SeasonPassWizard";
+import { SEASON_LABEL, getSeasonTier } from "@/lib/season-pass-tiers";
+import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
+import SeasonPassWizard, {
+  type SeasonPassZoneOption,
+  type ShippingProvince,
+} from "./SeasonPassWizard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "สมัครบัตรสมาชิกรายปี — Pattani FC" };
@@ -23,17 +27,42 @@ export default async function SeasonPassApplyPage(props: {
     // ต้องเป็นสมาชิกก่อนจอง — เข้าสู่ระบบ (หรือกดสมัครจากหน้า login) แล้วเด้งกลับมาต่อ
     redirect(`/member/login?returnTo=${encodeURIComponent(`/tickets/season/apply?tier=${tier.id}`)}`);
   }
-  const customer = await prisma.customer.findUnique({
-    where: { id: session.customerId },
-    select: {
-      name: true,
-      email: true,
-      phone: true,
-      address: true,
-      province: true,
-      district: true,
-      postalCode: true,
-    },
+  const [customer, quotas, soldGroups] = await Promise.all([
+    prisma.customer.findUnique({
+      where: { id: session.customerId },
+      select: {
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        province: true,
+        district: true,
+        postalCode: true,
+      },
+    }),
+    prisma.seasonPassZoneQuota.findMany({
+      where: { seasonLabel: SEASON_LABEL, tierId: tier.id },
+    }),
+    prisma.seasonPassOrder.groupBy({
+      by: ["seatZone"],
+      where: {
+        seasonLabel: SEASON_LABEL,
+        tierId: tier.id,
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+      _count: { _all: true },
+    }),
+  ]);
+  const ranges = calculateSeasonPassZoneRanges(tier.allowedSeatZones, quotas);
+  const zoneOptions: SeasonPassZoneOption[] = tier.allowedSeatZones.map((seatZone) => {
+    const range = ranges.find((item) => item.seatZone === seatZone);
+    const sold = soldGroups.find((item) => item.seatZone === seatZone)?._count._all ?? 0;
+    return {
+      seatZone,
+      publicStartSequence: range?.publicStartSequence ?? null,
+      publicEndSequence: range?.publicEndSequence ?? null,
+      remaining: range ? Math.max(0, range.publicSeatCount - sold) : null,
+    };
   });
   const memberEmail = customer?.email.endsWith("@accounts.pattanifc.local")
     ? null
@@ -76,6 +105,7 @@ export default async function SeasonPassApplyPage(props: {
         defaultDistrict={customer?.district ?? ""}
         defaultPostalCode={customer?.postalCode ?? ""}
         shippingProvinces={shippingProvinces}
+        zoneOptions={zoneOptions}
       />
     </div>
   );
