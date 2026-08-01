@@ -4,7 +4,8 @@ import { Shield } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
-import { getStadiumZone } from "@/lib/stadium-zones";
+import { getSeatAvailabilityForMatches, type ZoneAvailability } from "@/lib/seat-availability";
+import { STADIUM_ZONE_CODES, type StadiumZoneCode } from "@/lib/stadium-zones";
 import DeleteMatchButton from "./DeleteMatchButton";
 
 export const dynamic = "force-dynamic";
@@ -66,13 +67,8 @@ export default async function AdminMatchesPage(props: {
         }
       : undefined,
     orderBy: { kickoffAt: "asc" },
-    include: {
-      bookings: {
-        where: { status: { in: ["PENDING", "CONFIRMED"] } },
-        select: { zone: true, quantity: true },
-      },
-    },
   });
+  const availabilityByMatch = await getSeatAvailabilityForMatches(matches);
 
   return (
     <div>
@@ -92,17 +88,14 @@ export default async function AdminMatchesPage(props: {
       </div>
 
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-slate-50 text-xs uppercase">
+        <table className="w-full text-sm md:text-base">
+          <thead className="border-b bg-slate-50 text-sm uppercase md:text-base">
             <tr>
               <th className="px-3 py-2 text-left">แมตช์</th>
               <th className="px-3 py-2 text-left">ประเภท</th>
               <th className="px-3 py-2 text-left">เวลา</th>
               <th className="px-3 py-2 text-left">สถานะ</th>
-              <th className="px-3 py-2 text-right">150 บาท/จอง</th>
-              <th className="px-3 py-2 text-right">120 บาท/จอง</th>
-              <th className="px-3 py-2 text-right">100 บาท/จอง</th>
-              <th className="px-3 py-2 text-right">AWAY 200/จอง</th>
+              <th className="min-w-[720px] px-3 py-3 text-left">คงเหลือรายโซน / ความจุ</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -115,14 +108,14 @@ export default async function AdminMatchesPage(props: {
                     <span className="text-xs text-slate-400">vs</span>
                     <TeamBadge logo={m.awayTeamLogo} name={m.awayTeam} />
                   </div>
-                  <div className="mt-0.5 text-xs text-slate-500">{m.venue ?? "— ยังไม่กำหนดสนาม"}</div>
+                  <div className="mt-1 text-sm text-slate-500 md:text-base">{m.venue ?? "— ยังไม่กำหนดสนาม"}</div>
                 </td>
                 <td className="px-3 py-2">
                   <span className="rounded bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
                     {competitionLabel[m.competitionType] ?? m.competitionType}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs">
+                <td className="px-3 py-2 text-sm md:text-base">
                   {m.kickoffAt ? formatDateTime(m.kickoffAt) : <span className="text-slate-400">— ยังไม่กำหนด</span>}
                 </td>
                 <td className="px-3 py-2">
@@ -130,10 +123,7 @@ export default async function AdminMatchesPage(props: {
                     {statusLabel[m.status] ?? m.status}
                   </span>
                 </td>
-                <ZoneBookingCell capacity={m.zone150Seats} bookings={m.bookings} price={150} />
-                <ZoneBookingCell capacity={m.zone120Seats} bookings={m.bookings} price={120} />
-                <ZoneBookingCell capacity={m.zone100Seats} bookings={m.bookings} price={100} />
-                <ZoneBookingCell capacity={m.zoneAwaySeats} bookings={m.bookings} zoneCode="AWAY" />
+                <ZoneAvailabilityCell availability={availabilityByMatch.get(m.id)} />
                 <td className="px-3 py-2 text-right">
                   <div className="flex justify-end gap-2">
                     <Link
@@ -149,7 +139,7 @@ export default async function AdminMatchesPage(props: {
             ))}
             {matches.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-6 text-center text-slate-500">
+                <td colSpan={6} className="p-6 text-center text-slate-500">
                   ยังไม่มีแมตช์ — เริ่มเพิ่มได้เลย
                 </td>
               </tr>
@@ -181,25 +171,38 @@ function MatchManagementCard({
   );
 }
 
-function ZoneBookingCell({
-  capacity,
-  bookings,
-  price,
-  zoneCode,
+function ZoneAvailabilityCell({
+  availability,
 }: {
-  capacity: number | null;
-  bookings: { zone: string | null; quantity: number }[];
-  price?: 150 | 120 | 100;
-  zoneCode?: "AWAY";
+  availability?: Record<StadiumZoneCode, ZoneAvailability>;
 }) {
-  const booked = bookings.reduce((sum, booking) => {
-    if (zoneCode) return booking.zone === zoneCode ? sum + booking.quantity : sum;
-    const zone = getStadiumZone(booking.zone);
-    return zone && zone.priceSatang / 100 === price ? sum + booking.quantity : sum;
-  }, 0);
   return (
-    <td className="px-3 py-2 text-right text-xs">
-      {capacity == null ? "—" : `${capacity.toLocaleString("th-TH")} / ${booked.toLocaleString("th-TH")}`}
+    <td className="px-3 py-2">
+      <div className="grid grid-cols-5 gap-2">
+        {STADIUM_ZONE_CODES.map((code) => {
+          const zone = availability?.[code];
+          return (
+            <div
+              key={code}
+              title={zone
+                ? `จองรายแมตช์ ${zone.matchBooked} · บัตรรายปี ${zone.seasonReserved}${zone.sharedCapacity ? " · ใช้โควตาร่วมเดิม" : ""}`
+                : undefined}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2.5 text-center text-sm"
+            >
+              <p className="font-bold text-slate-700">โซน {code}</p>
+              <p className="mt-0.5 text-base font-bold text-emerald-700">
+                {zone?.capacity == null
+                  ? "—"
+                  : `${zone.remaining.toLocaleString("th-TH")} / ${zone.capacity.toLocaleString("th-TH")}`}
+              </p>
+              {zone && zone.seasonReserved > 0 && (
+                <p className="text-xs font-semibold text-amber-700">รายปี {zone.seasonReserved}</p>
+              )}
+              {zone?.sharedCapacity && <p className="text-xs text-slate-500">โควตาร่วม</p>}
+            </div>
+          );
+        })}
+      </div>
     </td>
   );
 }

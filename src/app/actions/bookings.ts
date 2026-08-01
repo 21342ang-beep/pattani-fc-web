@@ -6,7 +6,17 @@ import { prisma } from "@/lib/prisma";
 import { bookingCreateSchema } from "@/lib/validations";
 import { verifyPermission } from "@/lib/dal";
 import { readCustomerSession } from "@/lib/customer-session";
-import { getStadiumZone, getZoneCapacity, getZonePriceGroup, getZonesForPriceGroup } from "@/lib/stadium-zones";
+import { SEASON_LABEL } from "@/lib/season-pass-tiers";
+import {
+  matchUsesSeasonPassCapacity,
+  seasonPassSeatZoneToMatchZone,
+} from "@/lib/seat-availability";
+import {
+  getStadiumZone,
+  getZoneCapacity,
+  getZoneCapacityScope,
+  type StadiumZoneCode,
+} from "@/lib/stadium-zones";
 
 export type BookingFormState = {
   error?: string;
@@ -52,20 +62,37 @@ export async function createBooking(
         }
 
         const capacity = getZoneCapacity(match, parsed.data.zone);
-        const priceGroup = getZonePriceGroup(parsed.data.zone);
-        if (capacity == null || priceGroup == null) {
+        if (capacity == null) {
           throw new Error("โซนนี้ยังไม่เปิดขายสำหรับแมตช์นี้");
         }
 
+        const capacityScope = getZoneCapacityScope(match, parsed.data.zone);
         const sold = await tx.booking.aggregate({
           where: {
             matchId: match.id,
-            zone: { in: getZonesForPriceGroup(priceGroup) },
+            zone: { in: capacityScope },
             status: { in: ["PENDING", "CONFIRMED"] },
           },
           _sum: { quantity: true },
         });
-        const remaining = capacity - (sold._sum.quantity ?? 0);
+        let seasonReserved = 0;
+        if (matchUsesSeasonPassCapacity(match)) {
+          const seasonGroups = await tx.seasonPassOrder.groupBy({
+            by: ["seatZone"],
+            where: {
+              seasonLabel: SEASON_LABEL,
+              status: { in: ["PENDING", "CONFIRMED"] },
+            },
+            _count: { _all: true },
+          });
+          seasonReserved = seasonGroups.reduce((sum, group) => {
+            const code = seasonPassSeatZoneToMatchZone(group.seatZone);
+            return code && capacityScope.includes(code as StadiumZoneCode)
+              ? sum + group._count._all
+              : sum;
+          }, 0);
+        }
+        const remaining = Math.max(0, capacity - (sold._sum.quantity ?? 0) - seasonReserved);
         if (parsed.data.quantity > remaining) {
           throw new Error(`ที่นั่งเหลือ ${remaining} ที่ ไม่พอ`);
         }
@@ -90,6 +117,8 @@ export async function createBooking(
       { maxWait: 10000, timeout: 15000 }
     );
     revalidatePath("/");
+    revalidatePath("/tickets");
+    revalidatePath("/matches");
     revalidatePath(`/matches/${parsed.data.matchId}`);
     // invalidate unstable_cache queries — ที่นั่งเหลือต้องอัปเดตทันที
     revalidateTag("bookings", { expire: 0 });
@@ -113,8 +142,12 @@ export async function updateBookingStatus(
 ): Promise<{ ok: true } | { error: string }> {
   await verifyPermission("BOOKINGS");
   try {
-    await prisma.booking.update({ where: { id: bookingId }, data: { status } });
+    const booking = await prisma.booking.update({ where: { id: bookingId }, data: { status } });
     revalidatePath("/admin/bookings");
+    revalidatePath("/");
+    revalidatePath("/tickets");
+    revalidatePath(`/matches/${booking.matchId}`);
+    revalidateTag("bookings", { expire: 0 });
     return { ok: true };
   } catch {
     return { error: "อัปเดตไม่สำเร็จ" };
@@ -131,8 +164,12 @@ export async function deleteBooking(
     return { error: "รหัสไม่ถูกต้อง" };
   }
   try {
-    await prisma.booking.delete({ where: { id: bookingId } });
+    const booking = await prisma.booking.delete({ where: { id: bookingId } });
     revalidatePath("/admin/bookings");
+    revalidatePath("/");
+    revalidatePath("/tickets");
+    revalidatePath(`/matches/${booking.matchId}`);
+    revalidateTag("bookings", { expire: 0 });
     return { ok: true };
   } catch {
     return { error: "ลบไม่สำเร็จ" };
@@ -147,6 +184,9 @@ export async function deleteAllBookings(): Promise<
   try {
     const result = await prisma.booking.deleteMany();
     revalidatePath("/admin/bookings");
+    revalidatePath("/");
+    revalidatePath("/tickets");
+    revalidatePath("/matches");
     revalidateTag("bookings", { expire: 0 });
     return { ok: true, deleted: result.count };
   } catch {

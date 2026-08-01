@@ -118,6 +118,15 @@ model Match {
   venue         String?
   kickoffAt     DateTime?
   totalSeats    Int?
+  zoneASeats    Int?
+  zoneBSeats    Int?
+  zoneCSeats    Int?
+  zoneDSeats    Int?
+  zoneESeats    Int?
+  zoneFSeats    Int?
+  zoneGSeats    Int?
+  zoneISeats    Int?
+  zoneJSeats    Int?
   zone170Seats  Int?
   zone150Seats  Int?
   zone120Seats  Int?

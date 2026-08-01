@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { getAllProvinces } from "geothai";
 import type { SeasonPassOrderStatus } from "@prisma/client";
@@ -16,6 +16,14 @@ import {
   SEASON_TIERS,
   getSeasonPublicSaleLimit,
 } from "@/lib/season-pass-tiers";
+
+function revalidateSeatAvailability() {
+  revalidatePath("/");
+  revalidatePath("/tickets");
+  revalidatePath("/matches");
+  revalidatePath("/admin/matches");
+  revalidateTag("bookings", { expire: 0 });
+}
 
 // ─── Customer-facing: สร้างออเดอร์บัตรรายปี ─────────────────
 // ยังใช้ mock payment gateway — บันทึกออเดอร์เป็น CONFIRMED ทันที
@@ -224,6 +232,7 @@ export async function createSeasonPassOrder(
       return created;
     });
     revalidatePath("/admin/season-passes");
+    revalidateSeatAvailability();
     return { ok: true, passCode: order.passCode };
   } catch (error) {
     if (error instanceof Error && error.message === "SOLD_OUT") {
@@ -256,6 +265,7 @@ export async function updateSeasonPassStatus(
       data: { status },
     });
     revalidatePath("/admin/season-passes");
+    revalidateSeatAvailability();
     return { ok: true };
   } catch {
     return { error: "อัปเดตไม่สำเร็จ" };
@@ -272,6 +282,7 @@ export async function deleteSeasonPassOrder(
   try {
     await prisma.seasonPassOrder.delete({ where: { id: orderId } });
     revalidatePath("/admin/season-passes");
+    revalidateSeatAvailability();
     return { ok: true };
   } catch {
     return { error: "ลบไม่สำเร็จ" };
@@ -320,6 +331,7 @@ export async function deleteAllSeasonPassOrders(): Promise<
 
     revalidatePath("/admin/season-passes");
     revalidatePath("/admin/season-passes/check");
+    revalidateSeatAvailability();
     return { ok: true, deleted };
   } catch {
     return { error: "ลบการจองทั้งหมดไม่สำเร็จ" };

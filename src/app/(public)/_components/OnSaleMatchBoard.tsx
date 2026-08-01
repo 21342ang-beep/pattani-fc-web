@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown, Calendar, MapPin, Shield } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
+import type { ZoneAvailability } from "@/lib/seat-availability";
+import { STADIUM_ZONE_CODES, type StadiumZoneCode } from "@/lib/stadium-zones";
 
 export type OnSaleMatch = {
   id: string;
@@ -16,9 +18,11 @@ export type OnSaleMatch = {
 export default function OnSaleMatchBoard({
   match,
   showBookingButton = true,
+  zoneAvailability,
 }: {
   match: OnSaleMatch;
   showBookingButton?: boolean;
+  zoneAvailability?: Record<StadiumZoneCode, ZoneAvailability>;
 }) {
   return (
     <article className="overflow-hidden rounded-2xl bg-green-950 bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-[length:200%_auto] bg-[position:22%_-10%] bg-no-repeat text-white shadow-xl md:bg-[length:100%_100%] md:bg-center">
@@ -59,6 +63,29 @@ export default function OnSaleMatchBoard({
           )}
         </div>
       </div>
+      {zoneAvailability && (
+        <div className="border-t border-white/15 bg-black/15 px-5 py-4 sm:px-8">
+          <p className="mb-4 text-base font-semibold text-emerald-100 sm:text-lg lg:text-xl">ที่นั่งคงเหลือแยกตามโซน (หักสิทธิ์บัตรรายปีแล้ว)</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 xl:grid-cols-10">
+            {STADIUM_ZONE_CODES.map((code) => {
+              const zone = zoneAvailability[code];
+              return (
+                <Link
+                  key={code}
+                  href={`/matches/${match.id}?zone=${code}`}
+                  className="group rounded-lg bg-white/10 px-3 py-3 text-center transition hover:bg-yellow-300 hover:text-green-950"
+                >
+                  <span className="block text-sm font-bold sm:text-base">โซน {code}</span>
+                  <span className="mt-1 block text-2xl font-black sm:text-xl lg:text-2xl">
+                    {zone.capacity == null ? "—" : zone.remaining.toLocaleString("th-TH")}
+                  </span>
+                  <span className="block text-xs font-medium text-emerald-100 group-hover:text-green-950 sm:text-sm">ที่นั่ง</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </article>
   );
 }

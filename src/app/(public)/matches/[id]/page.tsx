@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { getMatchById } from "@/lib/cached-queries";
 import { readCustomerSession } from "@/lib/customer-session";
 import { formatBaht, formatDateTime } from "@/lib/format";
+import { getSeatAvailabilityForMatches } from "@/lib/seat-availability";
 import BookingForm from "./BookingForm";
-import { getStadiumZone, getZoneCapacity, getZonePriceGroup, getZonesForPriceGroup, type StadiumZoneCode } from "@/lib/stadium-zones";
+import { getStadiumZone, type StadiumZoneCode } from "@/lib/stadium-zones";
 
 // whitelist โซน — กัน XSS ผ่าน URL
 const ALLOWED_ZONES = [
@@ -23,24 +24,18 @@ export default async function MatchDetailPage(props: {
     : undefined;
   const selectedZone = getStadiumZone(zone);
 
-  const [match, session, sold] = await Promise.all([
+  const [match, session] = await Promise.all([
     getMatchById(id),
     readCustomerSession(),
-    zone && getZonePriceGroup(zone as StadiumZoneCode)
-      ? prisma.booking.aggregate({
-          where: {
-            matchId: id,
-            zone: { in: getZonesForPriceGroup(getZonePriceGroup(zone as StadiumZoneCode)!) },
-            status: { in: ["PENDING", "CONFIRMED"] },
-          },
-          _sum: { quantity: true },
-        })
-      : Promise.resolve({ _sum: { quantity: 0 } }),
   ]);
   if (!match) notFound();
 
-  const capacity = zone ? getZoneCapacity(match, zone as StadiumZoneCode) : null;
-  const remaining = capacity != null ? capacity - (sold._sum.quantity ?? 0) : 0;
+  const availabilityByMatch = await getSeatAvailabilityForMatches([match]);
+  const selectedAvailability = zone
+    ? availabilityByMatch.get(match.id)?.[zone as StadiumZoneCode]
+    : undefined;
+  const capacity = selectedAvailability?.capacity ?? null;
+  const remaining = selectedAvailability?.remaining ?? 0;
   const canBook =
     match.status === "ON_SALE" &&
     remaining > 0 &&
@@ -98,10 +93,15 @@ export default async function MatchDetailPage(props: {
           </div>
           <div className="flex gap-3">
             <dt className="w-24 shrink-0 text-slate-500">เหลือ</dt>
-            <dd>
+            <dd className="space-y-0.5">
               {capacity != null
                 ? `${remaining.toLocaleString("th-TH")} ที่นั่ง`
                 : "ยังไม่กำหนด"}
+              {selectedAvailability && selectedAvailability.seasonReserved > 0 && (
+                <span className="block text-base text-slate-500 md:text-lg">
+                  หักสิทธิ์บัตรรายปีแล้ว {selectedAvailability.seasonReserved.toLocaleString("th-TH")} ที่
+                </span>
+              )}
             </dd>
           </div>
         </dl>

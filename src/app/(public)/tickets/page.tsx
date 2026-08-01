@@ -4,6 +4,8 @@ import { MapPin, Users } from "lucide-react";
 import PageHero from "../_components/PageHero";
 import OnSaleMatchBoard from "../_components/OnSaleMatchBoard";
 import { prisma } from "@/lib/prisma";
+import { aggregateZoneAvailability, getSeatAvailabilityForMatches } from "@/lib/seat-availability";
+import { type StadiumZoneCode } from "@/lib/stadium-zones";
 
 export const metadata = { title: "จองตั๋วรายแมตช์ — Pattani FC" };
 
@@ -12,43 +14,41 @@ export const metadata = { title: "จองตั๋วรายแมตช์ 
 // AWAY = สำหรับแฟนทีมเยือนเท่านั้น
 type ZoneColor = "yellow" | "orange" | "red" | "green" | "blue" | "purple";
 type StadiumZone = {
-  code: string;
+  code: StadiumZoneCode;
   label: string;
   priceBaht: number;
   capacity: number | null;
+  remaining: number;
+  seasonReserved: number;
+  sharedCapacity: boolean;
   color: ZoneColor;
   note?: string;
 };
 const STADIUM_ZONES: StadiumZone[] = [
-  { code: "A", label: "อัฒจันทร์เหนือ · A", priceBaht: 150, capacity: null, color: "blue" },
-  { code: "B", label: "อัฒจันทร์เหนือ · B", priceBaht: 150, capacity: null, color: "blue" },
-  { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", priceBaht: 120, capacity: null, color: "yellow" },
-  { code: "D", label: "อัฒจันทร์ฝั่งตะวันออก · D", priceBaht: 100, capacity: null, color: "orange" },
-  { code: "E", label: "อัฒจันทร์ใต้ · E", priceBaht: 120, capacity: null, color: "yellow" },
-  { code: "F", label: "อัฒจันทร์ใต้ · F", priceBaht: 150, capacity: null, color: "blue" },
-  { code: "G", label: "อัฒจันทร์ใต้ · G", priceBaht: 120, capacity: null, color: "yellow" },
-  { code: "I", label: "อัฒจันทร์ฝั่งตะวันตก · I", priceBaht: 100, capacity: null, color: "orange" },
-  { code: "J", label: "อัฒจันทร์ฝั่งตะวันตก · J", priceBaht: 120, capacity: null, color: "yellow" },
-  { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: null, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
+  { code: "A", label: "อัฒจันทร์เหนือ · A", priceBaht: 150, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
+  { code: "B", label: "อัฒจันทร์เหนือ · B", priceBaht: 150, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
+  { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", priceBaht: 120, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
+  { code: "D", label: "อัฒจันทร์ฝั่งตะวันออก · D", priceBaht: 100, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
+  { code: "E", label: "อัฒจันทร์ใต้ · E", priceBaht: 120, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
+  { code: "F", label: "อัฒจันทร์ใต้ · F", priceBaht: 150, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
+  { code: "G", label: "อัฒจันทร์ใต้ · G", priceBaht: 120, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
+  { code: "I", label: "อัฒจันทร์ฝั่งตะวันตก · I", priceBaht: 100, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
+  { code: "J", label: "อัฒจันทร์ฝั่งตะวันตก · J", priceBaht: 120, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
+  { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
 ];
 
 export default async function TicketsPage() {
   const onSaleMatches = await prisma.match.findMany({
     where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
   });
-  const capacityFor = (field: "zone150Seats" | "zone120Seats" | "zone100Seats" | "zoneAwaySeats") => {
-    const capacities = onSaleMatches.map((match) => match[field]).filter((capacity): capacity is number => capacity != null);
-    return capacities.length > 0 ? capacities.reduce((sum, capacity) => sum + capacity, 0) : null;
-  };
-  const capacitiesByPrice = {
-    100: capacityFor("zone100Seats"),
-    120: capacityFor("zone120Seats"),
-    150: capacityFor("zone150Seats"),
-    200: capacityFor("zoneAwaySeats"),
-  } as const;
+  const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
+  const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
   const displayZones = STADIUM_ZONES.map((zone) => ({
     ...zone,
-    capacity: capacitiesByPrice[zone.priceBaht as 100 | 120 | 150 | 200],
+    capacity: availabilityByZone[zone.code].capacity,
+    remaining: availabilityByZone[zone.code].remaining,
+    seasonReserved: availabilityByZone[zone.code].seasonReserved,
+    sharedCapacity: availabilityByZone[zone.code].sharedCapacity,
   }));
   return (
     <>
@@ -65,7 +65,16 @@ export default async function TicketsPage() {
             <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">โปรแกรมที่เปิดจอง</h2>
             <p className="mt-2 text-lg text-slate-600 md:text-xl lg:text-2xl">เลือกแมตช์ที่ต้องการ แล้วจองตั๋วได้ทันที</p>
           </div>
-          <div className="space-y-4">{onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} showBookingButton={false} />)}</div>
+          <div className="space-y-4">
+            {onSaleMatches.map((match) => (
+              <OnSaleMatchBoard
+                key={match.id}
+                match={match}
+                showBookingButton={false}
+                zoneAvailability={availabilityByMatch.get(match.id)}
+              />
+            ))}
+          </div>
         </section>
       )}
 
@@ -243,8 +252,19 @@ function ZoneCard({ zone }: { zone: StadiumZone }) {
           <span className="ml-1 text-base font-medium text-slate-500">บาท</span>
         </span>
         <span className="mt-3 text-xl font-semibold leading-tight text-slate-500 md:text-2xl">
-          {zone.capacity == null ? "ยังไม่เปิดขาย" : `${zone.capacity.toLocaleString("th-TH")} ที่นั่งเปิดขาย`}
+          {zone.capacity == null ? "ยังไม่เปิดขาย" : `คงเหลือ ${zone.remaining.toLocaleString("th-TH")} ที่นั่ง`}
         </span>
+        {zone.capacity != null && (
+          <span className="mt-1 text-base font-medium text-slate-500 md:text-lg">
+            จาก {zone.capacity.toLocaleString("th-TH")} ที่นั่ง
+            {zone.sharedCapacity ? " · โควตาร่วมเดิม" : ""}
+          </span>
+        )}
+        {zone.seasonReserved > 0 && (
+          <span className="mt-1 text-base font-semibold text-amber-700 md:text-lg">
+            หักสิทธิ์บัตรรายปีแล้ว {zone.seasonReserved.toLocaleString("th-TH")} ที่
+          </span>
+        )}
         {zone.note && (
           <span
             className={`mt-4 inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-bold ${s.pill}`}

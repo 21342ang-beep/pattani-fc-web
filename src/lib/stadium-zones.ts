@@ -12,8 +12,30 @@ export const STADIUM_ZONES = {
 } as const;
 
 export type StadiumZoneCode = keyof typeof STADIUM_ZONES;
+export const STADIUM_ZONE_CODES = Object.keys(STADIUM_ZONES) as StadiumZoneCode[];
 
+export const MATCH_ZONE_CAPACITY_FIELDS = {
+  A: "zoneASeats",
+  B: "zoneBSeats",
+  C: "zoneCSeats",
+  D: "zoneDSeats",
+  E: "zoneESeats",
+  F: "zoneFSeats",
+  G: "zoneGSeats",
+  I: "zoneISeats",
+  J: "zoneJSeats",
+  AWAY: "zoneAwaySeats",
+} as const satisfies Record<StadiumZoneCode, string>;
+
+export type MatchZoneCapacityField = (typeof MATCH_ZONE_CAPACITY_FIELDS)[StadiumZoneCode];
 export type ZonePriceGroup = 200 | 170 | 150 | 120 | 100;
+
+export type MatchCapacity = Record<MatchZoneCapacityField, number | null> & {
+  zone170Seats: number | null;
+  zone150Seats: number | null;
+  zone120Seats: number | null;
+  zone100Seats: number | null;
+};
 
 export function getZonePriceGroup(code: StadiumZoneCode): ZonePriceGroup | null {
   const priceBaht = STADIUM_ZONES[code].priceSatang / 100;
@@ -23,28 +45,34 @@ export function getZonePriceGroup(code: StadiumZoneCode): ZonePriceGroup | null 
 }
 
 export function getZonesForPriceGroup(group: ZonePriceGroup): StadiumZoneCode[] {
-  return (Object.keys(STADIUM_ZONES) as StadiumZoneCode[]).filter(
-    (code) => getZonePriceGroup(code) === group
-  );
+  return STADIUM_ZONE_CODES.filter((code) => getZonePriceGroup(code) === group);
 }
 
-export function getZoneCapacity(
-  match: {
-    zone170Seats: number | null;
-    zone150Seats: number | null;
-    zone120Seats: number | null;
-    zone100Seats: number | null;
-    zoneAwaySeats: number | null;
-  },
-  code: StadiumZoneCode
-) {
+function getLegacyZoneCapacity(match: MatchCapacity, code: StadiumZoneCode) {
   const group = getZonePriceGroup(code);
   if (group === 170) return match.zone170Seats;
   if (group === 150) return match.zone150Seats;
   if (group === 120) return match.zone120Seats;
   if (group === 100) return match.zone100Seats;
-  if (code === "AWAY") return match.zoneAwaySeats;
-  return null;
+  return code === "AWAY" ? match.zoneAwaySeats : null;
+}
+
+export function getExactZoneCapacity(match: MatchCapacity, code: StadiumZoneCode) {
+  return match[MATCH_ZONE_CAPACITY_FIELDS[code]];
+}
+
+export function getZoneCapacity(match: MatchCapacity, code: StadiumZoneCode) {
+  return getExactZoneCapacity(match, code) ?? getLegacyZoneCapacity(match, code);
+}
+
+export function getZoneCapacityScope(match: MatchCapacity, code: StadiumZoneCode) {
+  if (getExactZoneCapacity(match, code) != null || code === "AWAY") return [code];
+  const group = getZonePriceGroup(code);
+  return group == null ? [code] : getZonesForPriceGroup(group);
+}
+
+export function hasAllExactZoneCapacities(match: MatchCapacity) {
+  return STADIUM_ZONE_CODES.every((code) => getExactZoneCapacity(match, code) != null);
 }
 
 export function getStadiumZone(code: string | null | undefined) {

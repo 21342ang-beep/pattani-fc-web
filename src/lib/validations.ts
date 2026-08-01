@@ -20,6 +20,15 @@ const matchBaseSchema = z.object({
   venue: z.string().trim().min(1).max(200).nullish(),
   kickoffAt: z.coerce.date().nullish(),
   totalSeats: z.number().int().positive().max(200000).nullish(),
+  zoneASeats: z.number().int().nonnegative().max(200000).nullish(),
+  zoneBSeats: z.number().int().nonnegative().max(200000).nullish(),
+  zoneCSeats: z.number().int().nonnegative().max(200000).nullish(),
+  zoneDSeats: z.number().int().nonnegative().max(200000).nullish(),
+  zoneESeats: z.number().int().nonnegative().max(200000).nullish(),
+  zoneFSeats: z.number().int().nonnegative().max(200000).nullish(),
+  zoneGSeats: z.number().int().nonnegative().max(200000).nullish(),
+  zoneISeats: z.number().int().nonnegative().max(200000).nullish(),
+  zoneJSeats: z.number().int().nonnegative().max(200000).nullish(),
   zone170Seats: z.number().int().nonnegative().max(200000).nullish(),
   zone150Seats: z.number().int().nonnegative().max(200000).nullish(),
   zone120Seats: z.number().int().nonnegative().max(200000).nullish(),
@@ -37,6 +46,16 @@ type MatchShape = {
   venue?: string | null;
   kickoffAt?: Date | null;
   totalSeats?: number | null;
+  zoneASeats?: number | null;
+  zoneBSeats?: number | null;
+  zoneCSeats?: number | null;
+  zoneDSeats?: number | null;
+  zoneESeats?: number | null;
+  zoneFSeats?: number | null;
+  zoneGSeats?: number | null;
+  zoneISeats?: number | null;
+  zoneJSeats?: number | null;
+  zoneAwaySeats?: number | null;
   status?: string;
 };
 function requireFullDataForOnSale(d: MatchShape, ctx: z.RefinementCtx) {
@@ -45,6 +64,20 @@ function requireFullDataForOnSale(d: MatchShape, ctx: z.RefinementCtx) {
   if (!d.venue) missing.push("สนาม");
   if (!d.kickoffAt) missing.push("วันเวลาแข่ง");
   if (d.totalSeats == null) missing.push("จำนวนที่นั่ง");
+  if ([
+    d.zoneASeats,
+    d.zoneBSeats,
+    d.zoneCSeats,
+    d.zoneDSeats,
+    d.zoneESeats,
+    d.zoneFSeats,
+    d.zoneGSeats,
+    d.zoneISeats,
+    d.zoneJSeats,
+    d.zoneAwaySeats,
+  ].some((capacity) => capacity == null)) {
+    missing.push("จำนวนที่นั่งแยกทุกโซน");
+  }
   if (missing.length > 0) {
     ctx.addIssue({
       code: "custom",

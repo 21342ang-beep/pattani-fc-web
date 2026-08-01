@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -64,6 +64,11 @@ export async function POST(request: Request) {
       revalidatePath(`/checkout/season/${payment.passCode}`);
     }
     revalidatePath("/member/bookings");
+    revalidatePath("/");
+    revalidatePath("/tickets");
+    revalidatePath("/matches");
+    revalidatePath("/admin/matches");
+    revalidateTag("bookings", { expire: 0 });
   } else if (payload.event === "payment.failure") {
     await prisma.$executeRaw(Prisma.sql`UPDATE "XenditPayment"
       SET "status" = 'FAILED', "paymentId" = COALESCE(${payload.data.payment_id ?? null}, "paymentId"), "updatedAt" = NOW()

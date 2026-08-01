@@ -75,13 +75,33 @@ async function parseFormToMatchInput(formData: FormData) {
     "awayTeamLogoExisting"
   );
 
-  const zone150Seats = numOrNull(formData.get("zone150Seats"));
-  const zone120Seats = numOrNull(formData.get("zone120Seats"));
-  const zone100Seats = numOrNull(formData.get("zone100Seats"));
+  const zoneASeats = numOrNull(formData.get("zoneASeats"));
+  const zoneBSeats = numOrNull(formData.get("zoneBSeats"));
+  const zoneCSeats = numOrNull(formData.get("zoneCSeats"));
+  const zoneDSeats = numOrNull(formData.get("zoneDSeats"));
+  const zoneESeats = numOrNull(formData.get("zoneESeats"));
+  const zoneFSeats = numOrNull(formData.get("zoneFSeats"));
+  const zoneGSeats = numOrNull(formData.get("zoneGSeats"));
+  const zoneISeats = numOrNull(formData.get("zoneISeats"));
+  const zoneJSeats = numOrNull(formData.get("zoneJSeats"));
   const zoneAwaySeats = numOrNull(formData.get("zoneAwaySeats"));
-  const zoneCapacities = [zone150Seats, zone120Seats, zone100Seats, zoneAwaySeats].filter(
+  const homeZoneCapacities = [
+    zoneASeats,
+    zoneBSeats,
+    zoneCSeats,
+    zoneDSeats,
+    zoneESeats,
+    zoneFSeats,
+    zoneGSeats,
+    zoneISeats,
+    zoneJSeats,
+  ];
+  const hasPerZoneCapacities = homeZoneCapacities.some((capacity) => capacity != null);
+  const zoneCapacities = [...homeZoneCapacities, zoneAwaySeats].filter(
     (capacity): capacity is number => capacity != null
   );
+  const sum = (...capacities: Array<number | null>) =>
+    capacities.reduce<number>((total, capacity) => total + (capacity ?? 0), 0);
 
   const data = {
     homeTeam: formData.get("homeTeam"),
@@ -90,12 +110,30 @@ async function parseFormToMatchInput(formData: FormData) {
     awayTeamLogo: away.path,
     venue: emptyToNull(formData.get("venue")),
     kickoffAt: parseBangkokDateTime(formData.get("kickoffAt")),
-    totalSeats: zoneCapacities.length > 0
+    totalSeats: hasPerZoneCapacities
       ? zoneCapacities.reduce((sum, capacity) => sum + capacity, 0)
       : numOrNull(formData.get("totalSeats")),
-    zone150Seats,
-    zone120Seats,
-    zone100Seats,
+    zoneASeats,
+    zoneBSeats,
+    zoneCSeats,
+    zoneDSeats,
+    zoneESeats,
+    zoneFSeats,
+    zoneGSeats,
+    zoneISeats,
+    zoneJSeats,
+    // Keep the old grouped columns in sync for rollback compatibility. Until
+    // exact per-zone values are entered, preserve the existing shared pools.
+    zone170Seats: hasPerZoneCapacities ? 0 : numOrNull(formData.get("legacyZone170Seats")),
+    zone150Seats: hasPerZoneCapacities
+      ? sum(zoneASeats, zoneBSeats, zoneFSeats)
+      : numOrNull(formData.get("legacyZone150Seats")),
+    zone120Seats: hasPerZoneCapacities
+      ? sum(zoneCSeats, zoneESeats, zoneGSeats, zoneJSeats)
+      : numOrNull(formData.get("legacyZone120Seats")),
+    zone100Seats: hasPerZoneCapacities
+      ? sum(zoneDSeats, zoneISeats)
+      : numOrNull(formData.get("legacyZone100Seats")),
     zoneAwaySeats,
     // ราคาเป็นของโซน ไม่ใช่ของแมตช์ และล้างค่าเก่าจากข้อมูลเดิมด้วย
     pricePerSeat: null,

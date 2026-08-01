@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { MatchFormState } from "@/app/actions/matches";
+import { STADIUM_ZONE_CODES, STADIUM_ZONES, MATCH_ZONE_CAPACITY_FIELDS } from "@/lib/stadium-zones";
 import LogoUpload from "./LogoUpload";
 
 type Match = {
@@ -12,6 +13,16 @@ type Match = {
   venue: string | null;
   kickoffAt: Date | string | null;
   totalSeats: number | null;
+  zoneASeats: number | null;
+  zoneBSeats: number | null;
+  zoneCSeats: number | null;
+  zoneDSeats: number | null;
+  zoneESeats: number | null;
+  zoneFSeats: number | null;
+  zoneGSeats: number | null;
+  zoneISeats: number | null;
+  zoneJSeats: number | null;
+  zone170Seats: number | null;
   zone150Seats: number | null;
   zone120Seats: number | null;
   zone100Seats: number | null;
@@ -53,13 +64,21 @@ export default function MatchForm({
     ? toBangkokDateTimeInput(initial.kickoffAt)
     : "";
   const [zoneSeats, setZoneSeats] = useState({
-    zone150Seats: initial?.zone150Seats?.toString() ?? "",
-    zone120Seats: initial?.zone120Seats?.toString() ?? "",
-    zone100Seats: initial?.zone100Seats?.toString() ?? "",
+    zoneASeats: initial?.zoneASeats?.toString() ?? "",
+    zoneBSeats: initial?.zoneBSeats?.toString() ?? "",
+    zoneCSeats: initial?.zoneCSeats?.toString() ?? "",
+    zoneDSeats: initial?.zoneDSeats?.toString() ?? "",
+    zoneESeats: initial?.zoneESeats?.toString() ?? "",
+    zoneFSeats: initial?.zoneFSeats?.toString() ?? "",
+    zoneGSeats: initial?.zoneGSeats?.toString() ?? "",
+    zoneISeats: initial?.zoneISeats?.toString() ?? "",
+    zoneJSeats: initial?.zoneJSeats?.toString() ?? "",
     zoneAwaySeats: initial?.zoneAwaySeats?.toString() ?? "",
   });
-  const hasZoneSeats = Object.values(zoneSeats).some((value) => value.trim() !== "");
-  const calculatedTotalSeats = hasZoneSeats
+  const hasPerZoneSeats = Object.entries(zoneSeats).some(
+    ([field, value]) => field !== "zoneAwaySeats" && value.trim() !== "",
+  );
+  const calculatedTotalSeats = hasPerZoneSeats
     ? Object.values(zoneSeats).reduce((sum, value) => sum + (Number(value) || 0), 0).toString()
     : initial?.totalSeats?.toString() ?? "";
 
@@ -69,6 +88,10 @@ export default function MatchForm({
 
   return (
     <form action={formAction} className="space-y-4 rounded-lg border bg-white p-6 shadow-sm">
+      <input type="hidden" name="legacyZone170Seats" value={initial?.zone170Seats ?? ""} />
+      <input type="hidden" name="legacyZone150Seats" value={initial?.zone150Seats ?? ""} />
+      <input type="hidden" name="legacyZone120Seats" value={initial?.zone120Seats ?? ""} />
+      <input type="hidden" name="legacyZone100Seats" value={initial?.zone100Seats ?? ""} />
       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
         <p className="font-semibold">💡 บันทึกแบบฉบับร่างได้</p>
         <p className="mt-0.5">
@@ -129,20 +152,36 @@ export default function MatchForm({
           type="number"
           value={calculatedTotalSeats}
           readOnly
-          hint="คำนวณอัตโนมัติจากจำนวนที่นั่งแยกตามราคา"
+          hint="คำนวณอัตโนมัติจากจำนวนที่นั่งแยกทุกโซน"
         />
       </div>
       <p className="rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-900">
         ราคาตั๋วกําหนดตามโซนที่ผู้ซื้อเลือก ระบบจะใช้ราคาโซนนั้นโดยอัตโนมัติ
       </p>
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-        <h2 className="text-sm font-bold text-slate-900">จำนวนที่นั่งเปิดขายแยกตามราคา</h2>
-        <p className="mt-1 text-xs text-slate-600">เว้นว่างไว้หากยังไม่เปิดขายกลุ่มราคานั้น</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="150 บาท · โซน A, B, F" name="zone150Seats" type="number" value={zoneSeats.zone150Seats} onChange={(event) => updateZoneSeats("zone150Seats", event.target.value)} hint="จำนวนที่นั่งเปิดขายรวม" />
-          <Field label="120 บาท · โซน C, E, G, J" name="zone120Seats" type="number" value={zoneSeats.zone120Seats} onChange={(event) => updateZoneSeats("zone120Seats", event.target.value)} hint="จำนวนที่นั่งเปิดขายรวม" />
-          <Field label="100 บาท · โซน D, I" name="zone100Seats" type="number" value={zoneSeats.zone100Seats} onChange={(event) => updateZoneSeats("zone100Seats", event.target.value)} hint="จำนวนที่นั่งเปิดขายรวม" />
-          <Field label="200 บาท · โซน AWAY" name="zoneAwaySeats" type="number" value={zoneSeats.zoneAwaySeats} onChange={(event) => updateZoneSeats("zoneAwaySeats", event.target.value)} hint="จำนวนที่นั่งเปิดขายทีมเยือน" />
+        <h2 className="text-lg font-bold text-slate-900 md:text-xl">จำนวนที่นั่งทั้งหมดแยกแต่ละโซน</h2>
+        <p className="mt-1 text-base text-slate-600 md:text-lg">กรอกความจุจริงของโซน ระบบจะหักตั๋วรายแมตช์และสิทธิ์บัตรรายปีให้อัตโนมัติ · หากไม่เปิดขายให้ใส่ 0</p>
+        {!hasPerZoneSeats && initial?.zone150Seats != null && (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900 md:text-lg">
+            แมตช์นี้ยังใช้จำนวนรวมแบบเดิมตามกลุ่มราคา กรุณากรอกทุกโซนก่อนบันทึกเพื่อเปลี่ยนเป็นระบบรายโซน
+          </p>
+        )}
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {STADIUM_ZONE_CODES.map((code) => {
+            const field = MATCH_ZONE_CAPACITY_FIELDS[code];
+            return (
+              <Field
+                key={code}
+                label={`โซน ${code} · ${STADIUM_ZONES[code].priceSatang / 100} บาท`}
+                name={field}
+                type="number"
+                min={0}
+                value={zoneSeats[field]}
+                onChange={(event) => updateZoneSeats(field, event.target.value)}
+                hint={STADIUM_ZONES[code].label}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -205,6 +244,7 @@ function Field({
   required,
   hint,
   readOnly,
+  min,
 }: {
   label: string;
   name: string;
@@ -215,10 +255,11 @@ function Field({
   required?: boolean;
   hint?: string;
   readOnly?: boolean;
+  min?: number;
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium">{label}</label>
+      <label className="block text-base font-medium md:text-lg">{label}</label>
       <input
         name={name}
         type={type}
@@ -226,9 +267,10 @@ function Field({
         onChange={onChange}
         required={required}
         readOnly={readOnly}
-        className="mt-1 w-full rounded-md border px-3 py-2"
+        min={min}
+        className="mt-1 w-full rounded-md border px-3 py-2.5 text-base md:text-lg"
       />
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="mt-1 text-sm text-slate-500 md:text-base">{hint}</p>}
     </div>
   );
 }

@@ -7,12 +7,18 @@ import StatsRow from "./_components/StatsRow";
 import FeaturedMatches from "./_components/FeaturedMatches";
 import OnSaleMatchBoard from "./_components/OnSaleMatchBoard";
 import HomePlayers, { type HomePlayer } from "./_components/HomePlayers";
+import HomeZoneAvailability from "./_components/HomeZoneAvailability";
+import {
+  aggregateZoneAvailability,
+  getSeatAvailabilityForMatches,
+  summarizeSeatAvailability,
+} from "@/lib/seat-availability";
 
 export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();
-  const [featured, onSaleMatches, bookingSummary, homePage, playersResult] = await Promise.all([
+  const [featured, onSaleMatches, homePage, playersResult] = await Promise.all([
     prisma.match.findMany({
       where: {
         status: { in: ["SCHEDULED", "ON_SALE"] },
@@ -27,13 +33,6 @@ export default async function HomePage() {
       take: 4,
     }),
     prisma.match.findMany({ where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" } }),
-    prisma.booking.aggregate({
-      where: {
-        status: { in: ["PENDING", "CONFIRMED"] },
-        match: { status: "ON_SALE" },
-      },
-      _sum: { quantity: true },
-    }),
     cms.findGlobal({ slug: "home-page", overrideAccess: true }),
     cms.find({
       collection: "players",
@@ -45,18 +44,11 @@ export default async function HomePage() {
       overrideAccess: true,
     }),
   ]);
-  const totalBooked = bookingSummary._sum.quantity ?? 0;
+  const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
+  const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
+  const seatSummary = summarizeSeatAvailability(availabilityByMatch);
+  const totalReserved = seatSummary.matchBooked + seatSummary.seasonReserved;
   const homePlayers = playersResult.docs as unknown as HomePlayer[];
-  const totalAvailable = onSaleMatches.reduce((sum, match) => {
-    const zoneCapacity =
-      (match.zone170Seats ?? 0) +
-      (match.zone150Seats ?? 0) +
-      (match.zone120Seats ?? 0) +
-      (match.zone100Seats ?? 0) +
-      (match.zoneAwaySeats ?? 0);
-    return sum + (match.totalSeats ?? zoneCapacity);
-  }, 0);
-  const totalRemaining = Math.max(0, totalAvailable - totalBooked);
 
   return (
     <div className="bg-white">
@@ -76,7 +68,12 @@ export default async function HomePage() {
           {onSaleMatches.length > 0 && (
             <div className="mb-10 space-y-4">
               <SectionHeader eyebrow="Book now" title="โปรแกรมที่เปิดจอง" subtitle="เลือกแมตช์และจองตั๋วได้ทันที" />
-              {onSaleMatches.map((match) => <OnSaleMatchBoard key={match.id} match={match} />)}
+              {onSaleMatches.map((match) => (
+                <OnSaleMatchBoard
+                  key={match.id}
+                  match={match}
+                />
+              ))}
             </div>
           )}
         </section>
@@ -90,13 +87,14 @@ export default async function HomePage() {
           <StatsRow
             stats={[
               {
-                label: "จำนวนการจอง",
-                value: totalBooked.toLocaleString("th-TH"),
+                label: "จองแล้วและสำรองรายปี",
+                value: totalReserved.toLocaleString("th-TH"),
                 highlight: true,
               },
-              { label: "คงเหลือ", value: totalRemaining.toLocaleString("th-TH") },
+              { label: "คงเหลือ", value: seatSummary.remaining.toLocaleString("th-TH") },
             ]}
           />
+          <HomeZoneAvailability availability={availabilityByZone} />
         </section>
 
         <HomePlayers players={homePlayers} />
