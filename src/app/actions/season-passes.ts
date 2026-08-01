@@ -176,7 +176,7 @@ export async function createSeasonPassOrder(
     const order = await prisma.$transaction(async (tx) => {
       // Serialize orders in the same annual package/zone so concurrent payments cannot oversell.
       const quotaLockKey = `${SEASON_LABEL}:${parsed.data.tierId}:${parsed.data.seatZone}`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))::text AS lock_result`;
 
       const configuredQuotas = await tx.seasonPassZoneQuota.findMany({
         where: {
@@ -306,7 +306,7 @@ export async function updateSeasonPassStatus(
         && !["PENDING", "CONFIRMED"].includes(order.status);
       if (becomesActive) {
         const quotaLockKey = `${order.seasonLabel}:${order.tierId}:${order.seatZone}`;
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))::text AS lock_result`;
         const tier = SEASON_TIERS.find((item) => item.id === order.tierId);
         if (tier) {
           const quotas = await tx.seasonPassZoneQuota.findMany({

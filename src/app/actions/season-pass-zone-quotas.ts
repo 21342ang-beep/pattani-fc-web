@@ -60,7 +60,7 @@ export async function updateSeasonPassZoneQuotas(
       // Use the same locks as checkout so an allocation cannot be reduced while an order is created.
       for (const row of rows) {
         const lockKey = `${SEASON_LABEL}:${tierId}:${row.seatZone}`;
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))::text AS lock_result`;
       }
       const soldGroups = await tx.seasonPassOrder.groupBy({
         by: ["seatZone"],
@@ -107,6 +107,7 @@ export async function updateSeasonPassZoneQuotas(
       const [, seatZone, sold = "0"] = error.message.split(":");
       return { error: `โซน ${seatZone} มีผู้จองแล้ว ${Number(sold).toLocaleString("th-TH")} ที่ จึงลดโควตาขายต่ำกว่านี้ไม่ได้` };
     }
+    console.error("Failed to update season-pass zone quotas", error);
     return { error: "บันทึกโควตาไม่สำเร็จ กรุณาลองใหม่" };
   }
 
