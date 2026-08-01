@@ -78,15 +78,19 @@ export default function SeasonPassZoneQuotaForm({
                   />
                 </label>
                 <label className="text-sm font-medium text-slate-700">
-                  กันสปอนเซอร์
+                  กันสปอนเซอร์ <span className="font-normal text-slate-500">(ถ้าไม่มีใส่ 0)</span>
                   <input
                     type="number"
                     min={0}
                     name={`sponsor:${zone.seatZone}`}
                     value={value.sponsorReserved}
                     onChange={(event) => setValues((current) => ({ ...current, [zone.seatZone]: { ...current[zone.seatZone], sponsorReserved: event.target.value } }))}
+                    onBlur={(event) => {
+                      if (event.target.value === "") {
+                        setValues((current) => ({ ...current, [zone.seatZone]: { ...current[zone.seatZone], sponsorReserved: "0" } }));
+                      }
+                    }}
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base"
-                    required
                   />
                 </label>
               </div>

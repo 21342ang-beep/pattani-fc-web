@@ -17,6 +17,11 @@ function readNonNegativeInteger(value: FormDataEntryValue | null) {
   return Number.isSafeInteger(number) ? number : null;
 }
 
+function readOptionalNonNegativeInteger(value: FormDataEntryValue | null) {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text === "" ? 0 : readNonNegativeInteger(value);
+}
+
 export async function updateSeasonPassZoneQuotas(
   _previous: SeasonPassZoneQuotaState,
   formData: FormData,
@@ -30,11 +35,14 @@ export async function updateSeasonPassZoneQuotas(
   const rows = tier.allowedSeatZones.map((seatZone) => ({
     seatZone,
     totalSeats: readNonNegativeInteger(formData.get(`total:${seatZone}`)),
-    sponsorReserved: readNonNegativeInteger(formData.get(`sponsor:${seatZone}`)),
+    sponsorReserved: readOptionalNonNegativeInteger(formData.get(`sponsor:${seatZone}`)),
   }));
 
-  if (rows.some((row) => row.totalSeats == null || row.sponsorReserved == null)) {
-    return { error: "กรุณากรอกจำนวนที่นั่งเป็นเลขจำนวนเต็มตั้งแต่ 0 ขึ้นไปให้ครบทุกโซน" };
+  if (rows.some((row) => row.totalSeats == null)) {
+    return { error: "กรุณากรอกจำนวนที่นั่งรวมเป็นเลขจำนวนเต็มตั้งแต่ 0 ขึ้นไปให้ครบทุกโซน" };
+  }
+  if (rows.some((row) => row.sponsorReserved == null)) {
+    return { error: "จำนวนที่นั่งสปอนเซอร์ต้องเป็นเลขจำนวนเต็มตั้งแต่ 0 ขึ้นไป หรือเว้นว่างเพื่อใช้ค่า 0" };
   }
   if (rows.some((row) => row.sponsorReserved! > row.totalSeats!)) {
     return { error: "จำนวนที่นั่งสปอนเซอร์ต้องไม่เกินจำนวนที่นั่งรวมของโซน" };
