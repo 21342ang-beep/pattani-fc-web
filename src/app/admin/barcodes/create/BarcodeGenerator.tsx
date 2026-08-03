@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/barcodes";
 
 const packages = [
+  { id: "vvip-elite", price: 4000, label: "VVIP ELITE · สำหรับใช้งานภายในเท่านั้น" },
   { id: "vip-advanced", price: 2500, label: "VIP ADVANCED" },
   { id: "premium", price: 2000, label: "PREMIUM" },
   { id: "gold", price: 1500, label: "GOLD" },
@@ -26,6 +27,7 @@ const initialCreateBarcodesState: CreateBarcodesState = {
 };
 
 const emptyBarcodesByTier: BarcodesByTier = {
+  "vvip-elite": [],
   "vip-advanced": [],
   premium: [],
   gold: [],

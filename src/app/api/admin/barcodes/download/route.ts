@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { withSeasonPassBarcodePrintSize } from "@/lib/season-pass-barcode-svg";
 
 const inputSchema = z.object({
-  tierId: z.enum(["vip-advanced", "premium", "gold"]),
+  tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"]),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
@@ -51,7 +51,13 @@ export async function POST(request: Request) {
       ),
     })),
   );
-  const price = parsed.data.tierId === "vip-advanced" ? 2500 : parsed.data.tierId === "premium" ? 2000 : 1500;
+  const price = parsed.data.tierId === "vvip-elite"
+    ? 4000
+    : parsed.data.tierId === "vip-advanced"
+      ? 2500
+      : parsed.data.tierId === "premium"
+        ? 2000
+        : 1500;
   const firstSequence = records[0].barcode.split("-").at(-1);
   const lastSequence = records.at(-1)?.barcode.split("-").at(-1);
 

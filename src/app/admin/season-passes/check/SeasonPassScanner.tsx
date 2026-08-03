@@ -81,7 +81,7 @@ export default function SeasonPassScanner({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-3" role="tablist" aria-label="แพ็กเกจบัตรรายปี">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="tablist" aria-label="แพ็กเกจบัตรรายปี">
         {summaries.map((summary) => {
           const isSelected = summary.id === selectedTierId;
           const scanCount = history.filter((scan) => scan.tierId === summary.id).length;

@@ -7,7 +7,7 @@ import { verifyPermission } from "@/lib/dal";
 import { SEASON_LABEL, SEASON_TIERS } from "@/lib/season-pass-tiers";
 
 const createBarcodeSchema = z.object({
-  tierId: z.enum(["vip-advanced", "premium", "gold"]),
+  tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"]),
   quantity: z.coerce.number().int().min(1).max(500),
 });
 
@@ -134,7 +134,7 @@ export async function deleteSeasonPassBarcodes(
   await verifyPermission("BARCODE_MANAGEMENT");
 
   const parsed = z
-    .array(z.string().regex(/^PFC26-(2500|2000|1500)-\d{4}$/))
+    .array(z.string().regex(/^PFC26-(4000|2500|2000|1500)-\d{4}$/))
     .min(1)
     .max(500)
     .safeParse([...new Set(barcodes)]);

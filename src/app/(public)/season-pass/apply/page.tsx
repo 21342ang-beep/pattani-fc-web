@@ -18,7 +18,7 @@ export default async function SeasonPassApplyPage(props: {
 }) {
   const { tier: tierId } = await props.searchParams;
   const tier = getSeasonTier(tierId);
-  if (!tier) notFound();
+  if (!tier || tier.id === "vvip-elite") notFound();
 
   // ⚠️ mock flow — ไม่มีการเขียน DB ใด ๆ
   // session ใช้แค่ auto-fill ฟอร์มให้สมาชิก (guest กรอกเองได้)

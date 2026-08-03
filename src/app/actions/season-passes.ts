@@ -128,6 +128,9 @@ export type CreateSeasonPassResult =
 export async function createSeasonPassOrder(
   input: z.input<typeof createSchema>,
 ): Promise<CreateSeasonPassResult> {
+  if (input.tierId === "vvip-elite") {
+    return { ok: false, error: "แพ็กเกจ VVIP 4,000 บาทสำหรับใช้งานภายในเท่านั้น ไม่เปิดจำหน่าย" };
+  }
   // กัน abuse — สมัคร spam ไม่เกิน 5 ครั้ง / 10 นาที / IP
   const rl = await rateLimit("season_pass_create", {
     max: 5,

@@ -255,7 +255,10 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
   });
   if (!pass) return { ok: false, error: "NOT_FOUND" };
   const order = pass.order;
-  if (!order || order.status !== "CONFIRMED") return { ok: false, error: "INACTIVE" };
+  const isInternalVvip = pass.tierId === "vvip-elite" && pass.isGenerated;
+  if (!isInternalVvip && (!order || order.status !== "CONFIRMED")) {
+    return { ok: false, error: "INACTIVE" };
+  }
   if (pass.usesRemaining <= 0) return { ok: false, error: "EXHAUSTED" };
 
   try {
@@ -273,11 +276,11 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
     });
     return {
       ok: true,
-      passCode: order.passCode,
-      customerName: order.customerName,
-      customerPhone: order.customerPhone,
-      customerEmail: order.customerEmail,
-      seatZone: order.seatZone,
+      passCode: order?.passCode ?? pass.barcode,
+      customerName: order?.customerName ?? "VVIP 4,000 · ใช้งานภายใน",
+      customerPhone: order?.customerPhone ?? "—",
+      customerEmail: order?.customerEmail ?? null,
+      seatZone: order?.seatZone ?? "VVIP",
       tierId: pass.tierId,
       usesRemaining: result.usesRemaining,
       scanId: result.scanId,
@@ -348,7 +351,7 @@ export async function deleteAllSeasonPassScans(): Promise<{ ok: true; deleted: n
 
 export async function deleteSeasonPassScansByTier(tierId: string): Promise<{ ok: true; deleted: number } | { error: string }> {
   await verifyPermission("SEASON_PASSES");
-  if (!z.enum(["vip-advanced", "premium", "gold"]).safeParse(tierId).success) {
+  if (!z.enum(["vvip-elite", "vip-advanced", "premium", "gold"]).safeParse(tierId).success) {
     return { error: "แพ็กเกจบัตรไม่ถูกต้อง" };
   }
 

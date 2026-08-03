@@ -12,13 +12,17 @@ export const metadata = { title: "สแกนบัตรรายปี — Ad
 export default async function SeasonPassCheckPage() {
   await verifyPermission("SEASON_PASSES");
 
-  const [matches, orders, scans] = await Promise.all([
+  const [matches, orders, activeBarcodes, scans] = await Promise.all([
     prisma.match.findMany({
       where: { competitionType: "LEAGUE" },
       orderBy: { kickoffAt: "asc" },
       select: { id: true, homeTeam: true, awayTeam: true, kickoffAt: true },
     }),
     prisma.seasonPassOrder.findMany({ select: { tierId: true } }),
+    prisma.seasonPassBarcode.findMany({
+      where: { isGenerated: true },
+      select: { tierId: true },
+    }),
     prisma.seasonPassScan.findMany({
       orderBy: { scannedAt: "desc" },
       take: 100,
@@ -26,16 +30,18 @@ export default async function SeasonPassCheckPage() {
         id: true,
         scannedAt: true,
         match: { select: { homeTeam: true, awayTeam: true } },
-        barcode: { select: { tierId: true, order: { select: { passCode: true, customerName: true } } } },
+        barcode: { select: { barcode: true, tierId: true, order: { select: { passCode: true, customerName: true } } } },
       },
     }),
   ]);
 
-  const tiers = SEASON_TIERS.filter((tier) => tier.id !== "vvip-elite");
+  const tiers = SEASON_TIERS;
   const summaries = tiers.map((tier) => ({
     id: tier.id,
     badge: tier.badge,
-    orders: orders.filter((order) => order.tierId === tier.id).length,
+    orders: tier.id === "vvip-elite"
+      ? activeBarcodes.filter((barcode) => barcode.tierId === tier.id).length
+      : orders.filter((order) => order.tierId === tier.id).length,
     scans: scans.filter((scan) => scan.barcode.tierId === tier.id).length,
   }));
 
@@ -64,8 +70,8 @@ export default async function SeasonPassCheckPage() {
           id: scan.id,
           scannedAt: scan.scannedAt.toISOString(),
           tierId: scan.barcode.tierId,
-          passCode: scan.barcode.order?.passCode ?? "—",
-          customerName: scan.barcode.order?.customerName ?? "—",
+          passCode: scan.barcode.order?.passCode ?? scan.barcode.barcode,
+          customerName: scan.barcode.order?.customerName ?? "VVIP 4,000 · ใช้งานภายใน",
           matchLabel: `${scan.match.homeTeam} vs ${scan.match.awayTeam}`,
         }))}
       />
