@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Handshake, ArrowRight } from "lucide-react";
 import { payload } from "@/lib/payload";
+import { getT } from "@/lib/i18n/server";
+import { localize } from "@/lib/i18n/text";
 
 export const revalidate = 300;
 export const metadata = { title: "พาร์ทเนอร์ — Pattani FC" };
@@ -58,12 +60,13 @@ const TIERS: Tier[] = [
 
 export default async function PartnersPage() {
   const cms = await payload();
-  const { docs } = await cms.find({
+  const [{ docs }, { locale }] = await Promise.all([cms.find({
     collection: "sponsors",
     where: { active: { equals: true } },
     limit: 200,
     overrideAccess: true,
-  });
+  }), getT()]);
+  const t = (th: string, en: string) => localize(locale, th, en);
 
   const sponsors = docs as unknown as SponsorDoc[];
   const grouped: Record<string, SponsorDoc[]> = {};
@@ -87,26 +90,25 @@ export default async function PartnersPage() {
         <div className="relative mx-auto max-w-6xl px-4 py-12 md:py-16">
           <p className="inline-flex items-center gap-2 rounded-full border border-yellow-300/30 bg-yellow-400/10 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-widest text-yellow-200 backdrop-blur-sm">
             <Handshake className="size-3.5" />
-            ร่วมเดินทางกับเรา
+            {t("ร่วมเดินทางกับเรา", "Journey With Us")}
           </p>
           <h1 className="mt-5 text-5xl font-black leading-[0.95] tracking-tight md:text-6xl">
-            <span className="block">พาร์ทเนอร์</span>
+            <span className="block">{t("พาร์ทเนอร์", "Club")}</span>
             <span className="block bg-gradient-to-r from-yellow-300 via-yellow-400 to-yellow-500 bg-clip-text text-transparent">
-              ของสโมสร
+              {t("ของสโมสร", "Partners")}
             </span>
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-green-100/85 md:text-xl">
-            ขอบคุณผู้สนับสนุนและพันธมิตรทุกท่านที่อยู่เคียงข้างปัตตานี เอฟซี
-            ในทุกเส้นทางสู่ความสำเร็จของฟุตบอลไทย
+            {t("ขอบคุณผู้สนับสนุนและพันธมิตรทุกท่านที่อยู่เคียงข้างปัตตานี เอฟซี ในทุกเส้นทางสู่ความสำเร็จของฟุตบอลไทย", "Thank you to every sponsor and partner standing alongside Pattani FC on our journey through Thai football.")}
           </p>
 
           <div className="mt-7 flex flex-wrap gap-6 border-t border-yellow-300/20 pt-6">
-            <Stat value={sponsors.length} label="พาร์ทเนอร์ทั้งหมด" />
+            <Stat value={sponsors.length} label={t("พาร์ทเนอร์ทั้งหมด", "Total Partners")} />
             <Stat
               value={(grouped.title ?? []).length + (grouped.main ?? []).length}
-              label="สปอนเซอร์หลัก"
+              label={t("สปอนเซอร์หลัก", "Main Sponsors")}
             />
-            <Stat value="2026/2027" label="ฤดูกาลปัจจุบัน" />
+            <Stat value="2026/2027" label={t("ฤดูกาลปัจจุบัน", "Current Season")} />
           </div>
         </div>
       </section>
@@ -116,7 +118,7 @@ export default async function PartnersPage() {
         <div className="mx-auto max-w-6xl space-y-12 px-4">
           {sponsors.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white py-16 text-center">
-              <p className="text-lg text-slate-500">ยังไม่มีข้อมูลผู้สนับสนุน</p>
+              <p className="text-lg text-slate-500">{t("ยังไม่มีข้อมูลผู้สนับสนุน", "No sponsor information is available")}</p>
             </div>
           ) : (
             TIERS.map((t) => {
@@ -124,7 +126,7 @@ export default async function PartnersPage() {
               if (!list || list.length === 0) return null;
               return (
                 <section key={t.key}>
-                  <TierHeader label={t.label} thai={t.thai} count={list.length} />
+                  <TierHeader label={t.label} thai={locale === "th" ? t.thai : t.label} count={list.length} locale={locale} />
                   <ul className={`mt-5 grid gap-4 ${t.grid}`}>
                     {list.map((s) => (
                       <li key={String(s.id)}>
@@ -148,21 +150,20 @@ export default async function PartnersPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-start gap-5 px-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-bold uppercase tracking-widest text-yellow-300/80">
-              สนใจเป็นพาร์ทเนอร์
+              {t("สนใจเป็นพาร์ทเนอร์", "Become a Partner")}
             </p>
             <h3 className="mt-1.5 text-2xl font-black md:text-3xl">
-              ร่วมเดินทางสู่ความสำเร็จไปกับ Pattani FC
+              {t("ร่วมเดินทางสู่ความสำเร็จไปกับ Pattani FC", "Join Pattani FC on the Journey to Success")}
             </h3>
             <p className="mt-2 max-w-2xl text-base text-green-100/80">
-              เปิดรับผู้สนับสนุนทุกระดับ — Title / Main / Official Partner /
-              Supporter พร้อมแพ็กเกจที่ตอบโจทย์ธุรกิจของคุณ
+              {t("เปิดรับผู้สนับสนุนทุกระดับ — Title / Main / Official Partner / Supporter พร้อมแพ็กเกจที่ตอบโจทย์ธุรกิจของคุณ", "Sponsorship opportunities are available at every level, with packages tailored to your business.")}
             </p>
           </div>
           <Link
             href="/contact"
             className="inline-flex items-center gap-2 rounded-full bg-yellow-400 px-6 py-3.5 text-base font-bold text-green-950 shadow-lg shadow-yellow-400/20 transition hover:scale-105 hover:bg-yellow-300"
           >
-            ติดต่อทีมพาร์ทเนอร์ <ArrowRight className="size-5" />
+            {t("ติดต่อทีมพาร์ทเนอร์", "Contact Partnerships Team")} <ArrowRight className="size-5" />
           </Link>
         </div>
       </section>
@@ -183,10 +184,12 @@ function TierHeader({
   label,
   thai,
   count,
+  locale,
 }: {
   label: string;
   thai: string;
   count: number;
+  locale: "th" | "en" | "ms";
 }) {
   return (
     <div className="flex items-end justify-between gap-3 border-b-2 border-yellow-400/60 pb-3">
@@ -199,7 +202,7 @@ function TierHeader({
         </h2>
       </div>
       <span className="rounded-full bg-green-800 px-3 py-1 text-xs font-bold text-yellow-300">
-        {count} ราย
+        {count} {locale === "th" ? "ราย" : "partners"}
       </span>
     </div>
   );

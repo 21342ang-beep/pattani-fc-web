@@ -5,6 +5,9 @@ import { formatBaht } from "@/lib/format";
 import PageHero from "../_components/PageHero";
 import AddToCartButton from "./_components/AddToCartButton";
 import CartLink from "./_components/CartLink";
+import { getT } from "@/lib/i18n/server";
+import { intlLocale, localize } from "@/lib/i18n/text";
+import type { Locale } from "@/lib/i18n/dict";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "ร้านค้า — Pattani FC" };
@@ -55,48 +58,49 @@ function mediaAlt(m: ProductDoc["image"], fallback: string): string {
 
 export default async function ShopPage() {
   const cms = await payload();
-  const { docs } = await cms.find({
+  const [{ docs }, { locale }] = await Promise.all([cms.find({
     collection: "products",
     where: { active: { equals: true } },
     sort: "-createdAt",
     limit: 100,
     depth: 1,
     overrideAccess: true,
-  });
+  }), getT()]);
+  const t = (th: string, en: string) => localize(locale, th, en);
 
   const products = docs as unknown as ProductDoc[];
 
   return (
     <>
       <PageHero
-        title="ร้านค้า"
-        subtitle="สินค้าทางการของสโมสรปัตตานี เอฟซี · เสื้อแข่ง ของที่ระลึก"
+        title={t("ร้านค้า", "Shop")}
+        subtitle={t("สินค้าทางการของสโมสรปัตตานี เอฟซี · เสื้อแข่ง ของที่ระลึก", "Official Pattani FC jerseys, apparel, and merchandise")}
       />
       <div className="mx-auto w-full max-w-6xl px-4 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <p className="inline-flex items-center gap-2 text-sm text-slate-600">
             <ShoppingBag className="size-4 text-green-800" />
-            ทั้งหมด{" "}
+            {t("ทั้งหมด", "Total")}{" "}
             <span className="font-bold text-green-900">{products.length}</span>{" "}
-            รายการ
+            {t("รายการ", "items")}
           </p>
-          <CartLink />
+          <CartLink locale={locale} />
         </div>
 
         {products.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-white py-16 text-center">
             <p className="text-lg text-slate-500">
-              ยังไม่มีสินค้าวางจำหน่ายในขณะนี้
+              {t("ยังไม่มีสินค้าวางจำหน่ายในขณะนี้", "No products are available right now")}
             </p>
             <p className="mt-1 text-sm text-slate-400">
-              กลับมาเยี่ยมชมใหม่อีกครั้งเร็วๆ นี้
+              {t("กลับมาเยี่ยมชมใหม่อีกครั้งเร็วๆ นี้", "Please check back again soon")}
             </p>
           </div>
         ) : (
           <ul className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {products.map((p) => (
               <li key={String(p.id)}>
-                <ProductCard product={p} />
+                <ProductCard product={p} locale={locale} />
               </li>
             ))}
           </ul>
@@ -106,7 +110,8 @@ export default async function ShopPage() {
   );
 }
 
-function ProductCard({ product }: { product: ProductDoc }) {
+function ProductCard({ product, locale }: { product: ProductDoc; locale: Locale }) {
+  const t = (th: string, en: string) => localize(locale, th, en);
   const img = mediaUrl(product.image);
   const alt = mediaAlt(product.image, product.name);
   const hasSale =
@@ -135,12 +140,12 @@ function ProductCard({ product }: { product: ProductDoc }) {
         {hasSale && (
           <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-md">
             <Tag className="size-3" />
-            ลดราคา
+            {t("ลดราคา", "Sale")}
           </span>
         )}
         {product.category && (
           <span className="absolute right-3 top-3 rounded-full bg-green-900/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-yellow-300 backdrop-blur-sm">
-            {CATEGORY_LABEL[product.category] ?? product.category}
+            {locale === "th" ? CATEGORY_LABEL[product.category] ?? product.category : ({ jersey: "Jersey", apparel: "Apparel", merch: "Merchandise", accessories: "Accessories" } as Record<string, string>)[product.category] ?? product.category}
           </span>
         )}
       </div>
@@ -154,15 +159,15 @@ function ProductCard({ product }: { product: ProductDoc }) {
           {hasSale ? (
             <>
               <span className="text-xl font-black text-red-600">
-                {formatBaht(product.salePrice! * 100)}
+                {formatBaht(product.salePrice! * 100, intlLocale(locale))}
               </span>
               <span className="text-sm text-slate-400 line-through">
-                {formatBaht(product.price * 100)}
+                {formatBaht(product.price * 100, intlLocale(locale))}
               </span>
             </>
           ) : (
             <span className="text-xl font-black text-green-900">
-              {formatBaht(product.price * 100)}
+              {formatBaht(product.price * 100, intlLocale(locale))}
             </span>
           )}
         </div>
@@ -170,7 +175,7 @@ function ProductCard({ product }: { product: ProductDoc }) {
         {sizes.length > 0 && (
           <div className="mt-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-              ไซส์
+              {t("ไซส์", "Size")}
             </p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {sizes.map((s, i) => {
@@ -186,8 +191,8 @@ function ProductCard({ product }: { product: ProductDoc }) {
                     title={
                       s.stock != null
                         ? out
-                          ? "หมด"
-                          : `คงเหลือ ${s.stock}`
+                          ? t("หมด", "Out of stock")
+                          : `${t("คงเหลือ", "Remaining")} ${s.stock}`
                         : undefined
                     }
                   >
@@ -215,6 +220,7 @@ function ProductCard({ product }: { product: ProductDoc }) {
               label: s.label,
               outOfStock: s.stock != null && s.stock <= 0,
             }))}
+            locale={locale}
           />
         </div>
       </div>

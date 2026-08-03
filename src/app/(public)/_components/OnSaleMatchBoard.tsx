@@ -4,6 +4,8 @@ import { ArrowDown, Calendar, MapPin, Shield } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import type { ZoneAvailability } from "@/lib/seat-availability";
 import { STADIUM_ZONE_CODES, type StadiumZoneCode } from "@/lib/stadium-zones";
+import { getDict, type Dict, type Locale } from "@/lib/i18n/dict";
+import { intlLocale } from "@/lib/i18n/text";
 
 export type OnSaleMatch = {
   id: string;
@@ -19,18 +21,25 @@ export default function OnSaleMatchBoard({
   match,
   showBookingButton = true,
   zoneAvailability,
+  locale = "th",
+  labels,
 }: {
   match: OnSaleMatch;
   showBookingButton?: boolean;
   zoneAvailability?: Record<StadiumZoneCode, ZoneAvailability>;
+  locale?: Locale;
+  labels?: Dict["home"];
 }) {
+  const copy = labels ?? getDict(locale).home;
+  const numberLocale = intlLocale(locale);
+
   return (
     <article className="overflow-hidden rounded-2xl bg-green-950 bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-[length:200%_auto] bg-[position:22%_-10%] bg-no-repeat text-white shadow-xl md:bg-[length:100%_100%] md:bg-center">
       <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:p-10">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-1.5 text-base font-black uppercase tracking-wider text-green-950 sm:text-lg">
             <span className="size-2 animate-pulse rounded-full bg-green-950" />
-            เปิดจองแล้ว
+            {copy.bookingOpen}
           </div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-7">
             <Team logo={match.homeTeamLogo} name={match.homeTeam} />
@@ -42,22 +51,22 @@ export default function OnSaleMatchBoard({
         <div className="border-t border-white/20 pt-5 md:min-w-60 md:border-l md:border-t-0 md:pl-8 md:pt-0">
           <p className="flex items-center gap-2 text-lg text-emerald-100 sm:text-xl">
             <Calendar className="size-4 text-yellow-300" />
-            {match.kickoffAt ? formatDateTime(match.kickoffAt) : "ยังไม่กำหนดวันแข่ง"}
+            {match.kickoffAt ? formatDateTime(match.kickoffAt, numberLocale) : copy.dateTbd}
           </p>
           <p className="mt-2 flex items-center gap-2 text-lg text-emerald-100 sm:text-xl">
             <MapPin className="size-4 text-yellow-300" />
-            {match.venue ?? "ยังไม่กำหนดสนาม"}
+            {match.venue ?? copy.venueTbd}
           </p>
           {showBookingButton ? (
             <Link
               href="/tickets#matches"
               className="mt-6 flex w-full items-center justify-center rounded-xl bg-yellow-300 px-5 py-3.5 text-xl font-black text-green-950 transition hover:bg-yellow-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300"
             >
-              จองตั๋วตอนนี้
+              {copy.bookNow}
             </Link>
           ) : (
             <p className="mt-6 flex items-center gap-2 text-2xl font-black leading-snug text-yellow-300 sm:text-3xl">
-              เลือกโซนที่นั่งและจองด้านล่างนี้
+              {copy.chooseZoneBelow}
               <ArrowDown className="size-6 shrink-0 animate-bounce" aria-hidden />
             </p>
           )}
@@ -65,7 +74,7 @@ export default function OnSaleMatchBoard({
       </div>
       {zoneAvailability && (
         <div className="border-t border-white/15 bg-black/15 px-5 py-4 sm:px-8">
-          <p className="mb-4 text-base font-semibold text-emerald-100 sm:text-lg lg:text-xl">ที่นั่งรายแมตช์คงเหลือแยกตามโซน</p>
+          <p className="mb-4 text-base font-semibold text-emerald-100 sm:text-lg lg:text-xl">{copy.zoneAvailability}</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 xl:grid-cols-10">
             {STADIUM_ZONE_CODES.map((code) => {
               const zone = zoneAvailability[code];
@@ -75,11 +84,11 @@ export default function OnSaleMatchBoard({
                   href={`/matches/${match.id}?zone=${code}`}
                   className="group rounded-lg bg-white/10 px-3 py-3 text-center transition hover:bg-yellow-300 hover:text-green-950"
                 >
-                  <span className="block text-sm font-bold sm:text-base">โซน {code}</span>
+                  <span className="block text-sm font-bold sm:text-base">{copy.zone} {code}</span>
                   <span className="mt-1 block text-2xl font-black sm:text-xl lg:text-2xl">
-                    {zone.capacity == null ? "—" : zone.remaining.toLocaleString("th-TH")}
+                    {zone.capacity == null ? "—" : zone.remaining.toLocaleString(numberLocale)}
                   </span>
-                  <span className="block text-xs font-medium text-emerald-100 group-hover:text-green-950 sm:text-sm">ที่นั่ง</span>
+                  <span className="block text-xs font-medium text-emerald-100 group-hover:text-green-950 sm:text-sm">{copy.seats}</span>
                 </Link>
               );
             })}

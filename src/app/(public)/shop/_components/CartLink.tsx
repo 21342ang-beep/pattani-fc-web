@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { cartCount, readCart } from "@/lib/shop-cart";
+import type { Locale } from "@/lib/i18n/dict";
 
-export default function CartLink() {
+export default function CartLink({ locale }: { locale: Locale }) {
   const [count, setCount] = useState(0);
   useEffect(() => {
     const refresh = () => setCount(cartCount(readCart()));
@@ -24,10 +25,10 @@ export default function CartLink() {
       className="relative inline-flex items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-green-900 transition hover:bg-green-50"
     >
       <ShoppingCart className="size-4" />
-      ตะกร้าสินค้า
+      {locale === "th" ? "ตะกร้าสินค้า" : locale === "ms" ? "Troli" : "Cart"}
       {count > 0 && (
         <span
-          aria-label={`${count} ชิ้นในตะกร้า`}
+          aria-label={locale === "th" ? `${count} ชิ้นในตะกร้า` : locale === "ms" ? `${count} barangan dalam troli` : `${count} items in cart`}
           className="ml-1 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-yellow-400 px-1.5 py-0.5 text-[11px] font-black text-green-950"
         >
           {count > 99 ? "99+" : count}

@@ -6,32 +6,35 @@ import { payload } from "@/lib/payload";
 import { formatDateTime } from "@/lib/format";
 import PageHero from "../_components/PageHero";
 import { resolveCover, type NewsDoc } from "./_helpers";
+import { getT } from "@/lib/i18n/server";
+import { intlLocale, localize } from "@/lib/i18n/text";
 
 export const revalidate = 300;
 export const metadata = { title: "ข่าวสาร — Pattani FC" };
 
 export default async function NewsPage() {
   const cms = await payload();
-  const { docs } = await cms.find({
+  const [{ docs }, { locale }] = await Promise.all([cms.find({
     collection: "news",
     where: { status: { equals: "published" } },
     sort: "-publishedAt",
     limit: 24,
     depth: 1,
     overrideAccess: true,
-  });
+  }), getT()]);
+  const t = (th: string, en: string) => localize(locale, th, en);
 
   return (
     <>
       <PageHero
-        title="ข่าวสาร"
-        subtitle="ข่าวสารและความเคลื่อนไหวล่าสุดของสโมสรปัตตานี เอฟซี"
+        title={t("ข่าวสาร", "News")}
+        subtitle={t("ข่าวสารและความเคลื่อนไหวล่าสุดของสโมสรปัตตานี เอฟซี", "The latest news and updates from Pattani FC")}
       />
       <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
         {docs.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-12 text-center text-lg text-muted-foreground md:text-xl">
-              ยังไม่มีข่าวสารที่เผยแพร่
+              {t("ยังไม่มีข่าวสารที่เผยแพร่", "No news has been published yet")}
             </CardContent>
           </Card>
         ) : (
@@ -60,8 +63,8 @@ export default async function NewsPage() {
                       <div className="flex items-center gap-2 text-sm text-muted-foreground md:text-base">
                         <Calendar className="size-4" />
                         {item.publishedAt
-                          ? formatDateTime(item.publishedAt)
-                          : "ยังไม่ระบุวันที่"}
+                          ? formatDateTime(item.publishedAt, intlLocale(locale))
+                          : t("ยังไม่ระบุวันที่", "Date not specified")}
                       </div>
                       <h3 className="line-clamp-2 text-xl font-semibold leading-snug text-green-900 md:text-2xl">
                         {item.title}
@@ -75,7 +78,7 @@ export default async function NewsPage() {
                         href={`/news/${encodeURIComponent(item.slug)}`}
                         className="inline-flex pt-1 text-base font-medium text-green-800 hover:underline md:text-lg"
                       >
-                        อ่านต่อ →
+                        {t("อ่านต่อ", "Read more")} →
                       </Link>
                     </CardContent>
                   </Card>

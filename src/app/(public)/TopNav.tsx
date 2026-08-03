@@ -87,8 +87,8 @@ export default function TopNav({
     {
       label: dict.nav.matches,
       children: [
-        { href: "/matches?competition=league", label: "บอลลีก" },
-        { href: "/matches?competition=cup", label: "บอลถ้วย" },
+        { href: "/matches?competition=league", label: dict.nav.league },
+        { href: "/matches?competition=cup", label: dict.nav.cup },
       ],
     },
     { href: "/results", label: dict.nav.results },
@@ -205,7 +205,7 @@ export default function TopNav({
             {dict.util.faq}
           </Link>
           <Link href="/privacy-policy" className="hover:underline">
-            นโยบายส่วนตัว
+            {dict.util.privacy}
           </Link>
           <Link
             href="/login"
@@ -541,7 +541,7 @@ export default function TopNav({
                     onClick={closeNavigation}
                     className="truncate rounded-xl bg-white/5 px-3 py-3 text-center text-sm font-semibold text-yellow-100 transition hover:bg-white/10"
                   >
-                    นโยบายส่วนตัว
+                    {dict.util.privacy}
                   </Link>
                   <Link
                     href="/login"

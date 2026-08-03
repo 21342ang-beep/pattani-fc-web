@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { access } from "fs/promises";
 import path from "path";
+import { getT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,9 @@ export default async function PrivacyPolicyPage() {
   } catch {
     // ใช้ไฟล์เริ่มต้นจนกว่าจะมีผู้ดูแลอัปโหลด PDF
   }
+  const { locale } = await getT();
+  if (locale === "ms") return <MalayPrivacyPolicy attachmentHref={attachmentHref} />;
+  if (locale === "en") return <EnglishPrivacyPolicy attachmentHref={attachmentHref} />;
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 md:py-16">
       <div className="mb-8">
@@ -203,6 +207,36 @@ export default async function PrivacyPolicyPage() {
           ← กลับไปหน้าสมัครสมาชิก
         </Link>
       </div>
+    </main>
+  );
+}
+
+function MalayPrivacyPolicy({ attachmentHref }: { attachmentHref: string }) {
+  return <main className="mx-auto w-full max-w-6xl px-4 py-10 md:py-16"><div className="mb-8"><p className="text-sm font-semibold uppercase tracking-widest text-yellow-600 md:text-base">Dasar Privasi · PDPA</p><h1 className="mt-1 text-4xl font-black text-green-900 md:text-5xl">Dasar Privasi</h1><p className="mt-2 text-base text-slate-600 md:text-lg">Kemas kini terakhir: 8 Julai 2026</p><div className="mt-5 rounded-lg border border-green-100 bg-green-50 p-5 text-base text-green-950 md:text-lg"><p className="font-bold">Entiti undang-undang: Pattani Football Club Limited Partnership</p><p className="mt-1">Alamat: 140/3 Jalan Yarang, Chabang Tiko, Mueang Pattani, Pattani 94000</p><p className="mt-1">Telefon: <a href="tel:0815998925" className="font-semibold hover:underline">0815998925</a></p></div></div><div className="prose prose-slate max-w-none space-y-8 text-slate-800"><Section title="1. Pengawal Data"><p>Pattani FC menghormati privasi anda dan memproses data peribadi menurut Akta Perlindungan Data Peribadi Thailand (PDPA).</p></Section><Section title="2. Maklumat yang Dikumpulkan"><p>Kami mengumpulkan maklumat yang diperlukan untuk pendaftaran, tempahan dan pembelian, termasuk nama, e-mel, nombor telefon, sejarah transaksi serta maklumat keselamatan akaun.</p></Section><Section title="3. Penggunaan Maklumat"><p>Maklumat digunakan untuk pengesahan identiti, penyediaan tiket dan kedai dalam talian, penghantaran pengesahan serta penambahbaikan perkhidmatan.</p></Section><Section title="4. Penyimpanan dan Pendedahan"><p>Data disimpan selama diperlukan oleh perkhidmatan atau undang-undang. Kami tidak menjual atau menyewakan data dan hanya berkongsi apabila perlu dengan penyedia pembayaran, penghantaran atau pihak berkuasa yang sah.</p></Section><Section title="5. Hak Anda"><p>Anda boleh meminta akses, pembetulan, pemadaman, pengehadan atau penarikan balik persetujuan mengikut hak yang diberikan oleh PDPA.</p></Section><Section title="6. Keselamatan"><p>Kami menggunakan kata laluan disulitkan, HTTPS dan kuki sesi selamat. Butiran kad tidak disimpan pada pelayan Pattani FC.</p></Section><Section title="7. Hubungi"><p>Untuk pertanyaan privasi, e-mel <a href="mailto:pattanifc2009@gmail.com" className="font-semibold text-green-800 hover:underline">pattanifc2009@gmail.com</a>.</p></Section><Section title="8. Terma Jualan dan Bayaran Balik"><p>Sila baca terma jualan penuh sebelum membeli. Permohonan bayaran balik yang layak perlu dibuat dalam tempoh tujuh hari dan biasanya diproses dalam 7–14 hari bekerja selepas pengesahan.</p><a href={attachmentHref} download className="inline-flex items-center rounded-md bg-green-800 px-4 py-2 font-semibold text-white hover:bg-green-700">Muat Turun Terma Jualan</a></Section></div><div className="mt-10 border-t border-slate-200 pt-6 text-base md:text-lg"><Link href="/register" className="font-semibold text-green-800 hover:underline">← Kembali ke Pendaftaran</Link></div></main>;
+}
+
+function EnglishPrivacyPolicy({ attachmentHref }: { attachmentHref: string }) {
+  return (
+    <main className="mx-auto w-full max-w-6xl px-4 py-10 md:py-16">
+      <div className="mb-8">
+        <p className="text-sm font-semibold uppercase tracking-widest text-yellow-600 md:text-base">Privacy Policy · PDPA</p>
+        <h1 className="mt-1 text-4xl font-black text-green-900 md:text-5xl">Privacy Policy</h1>
+        <p className="mt-2 text-base text-slate-600 md:text-lg">Last updated: 8 July 2026</p>
+        <div className="mt-5 rounded-lg border border-green-100 bg-green-50 p-5 text-base text-green-950 md:text-lg"><p className="font-bold">Legal entity: Pattani Football Club Limited Partnership</p><p className="mt-1">Address: 140/3 Yarang Road, Chabang Tiko, Mueang Pattani, Pattani 94000</p><p className="mt-1">Phone: <a href="tel:0815998925" className="font-semibold hover:underline">0815998925</a></p></div>
+      </div>
+      <div className="prose prose-slate max-w-none space-y-8 text-slate-800">
+        <Section title="1. Data Controller"><p>Pattani FC respects your privacy and processes personal data in accordance with Thailand’s Personal Data Protection Act B.E. 2562 (PDPA).</p></Section>
+        <Section title="2. Information We Collect"><ul className="list-disc space-y-1 pl-6"><li>Name, email address, and phone number supplied during registration or booking.</li><li>Information received when signing in with Google or LINE.</li><li>Ticket, merchandise, and season-pass purchase history.</li><li>Security information such as recent login time and temporarily retained IP address.</li></ul></Section>
+        <Section title="3. How We Use Information"><ul className="list-disc space-y-1 pl-6"><li>Identity verification and delivery of ticketing and online-store services.</li><li>Booking confirmations and receipts.</li><li>Club communications where consent has been provided.</li><li>Service improvement and website analytics.</li></ul></Section>
+        <Section title="4. Retention"><p>Information is retained while your account remains active or for the period required by law. Data not subject to a legal retention duty will be removed within 30 days after account deletion.</p></Section>
+        <Section title="5. Disclosure"><p>We do not sell or rent personal data. Information is shared only where necessary with payment providers, delivery providers, or public authorities acting under lawful authority.</p></Section>
+        <Section title="6. Your Rights"><p>You may request access, correction, deletion, restriction, withdrawal of consent, or exercise other rights available under the PDPA.</p></Section>
+        <Section title="7. Security"><p>We use encrypted passwords, HTTPS, secure session cookies, and payment providers designed so that card details are not stored on Pattani FC servers.</p></Section>
+        <Section title="8. Contact"><p>For privacy questions or rights requests, email <a href="mailto:pattanifc2009@gmail.com" className="font-semibold text-green-800 hover:underline">pattanifc2009@gmail.com</a>.</p></Section>
+        <Section title="9. Sales Terms and Refunds"><p>Please read the club’s full sales terms before purchasing tickets or merchandise. Eligible refund requests must be submitted within seven days of the relevant cancellation or qualifying event and are normally processed within 7–14 business days after verification.</p><a href={attachmentHref} download className="inline-flex items-center rounded-md bg-green-800 px-4 py-2 font-semibold text-white hover:bg-green-700">Download Sales Terms</a></Section>
+        <Section title="Ticket Terms"><p>Tickets are valid only for the stated match, date, time, venue, and zone. Each E-Ticket barcode may be used once. Keep it private. Match details may change, and venue entry remains subject to safety and stadium regulations.</p></Section>
+      </div>
+      <div className="mt-10 border-t border-slate-200 pt-6 text-base md:text-lg"><Link href="/register" className="font-semibold text-green-800 hover:underline">← Back to Registration</Link></div>
     </main>
   );
 }

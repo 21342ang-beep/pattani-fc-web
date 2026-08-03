@@ -1,22 +1,27 @@
 export const metadata = { title: "ติดต่อเรา — Ticket Online" };
 
-export default function ContactPage() {
+import { getT } from "@/lib/i18n/server";
+import { localize } from "@/lib/i18n/text";
+
+export default async function ContactPage() {
+  const { locale } = await getT();
+  const t = (th: string, en: string) => localize(locale, th, en);
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-12 md:space-y-10 md:py-16">
       <header>
-        <h1 className="text-3xl font-bold text-green-900 md:text-4xl">ติดต่อเรา</h1>
-        <p className="mt-2 text-base text-slate-600 md:text-lg">มีคำถามเพิ่มเติม? ติดต่อทีมงานได้ตามช่องทางนี้</p>
+        <h1 className="text-3xl font-bold text-green-900 md:text-4xl">{t("ติดต่อเรา", "Contact Us")}</h1>
+        <p className="mt-2 text-base text-slate-600 md:text-lg">{t("มีคำถามเพิ่มเติม? ติดต่อทีมงานได้ตามช่องทางนี้", "Have a question? Contact our team through the channels below.")}</p>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card icon="📧" label="อีเมล" value="pattanifc2009@gmail.com" />
-        <Card icon="📞" label="โทรศัพท์" value="+66(0) 73-123-4567" />
-        <Card icon="🕐" label="เวลาทำการ" value="จันทร์–เสาร์ 09:00–18:00" />
-        <Card icon="📍" label="ที่อยู่" value="ปัตตานี" />
+        <Card icon="📧" label={t("อีเมล", "Email")} value="pattanifc2009@gmail.com" />
+        <Card icon="📞" label={t("โทรศัพท์", "Phone")} value="+66(0) 73-123-4567" />
+        <Card icon="🕐" label={t("เวลาทำการ", "Office Hours")} value={t("จันทร์–เสาร์ 09:00–18:00", "Monday–Saturday, 09:00–18:00")} />
+        <Card icon="📍" label={t("ที่อยู่", "Location")} value={t("ปัตตานี", "Pattani")} />
       </div>
 
       <section>
-        <h2 className="text-2xl font-bold text-green-900 md:text-3xl">ติดตามปัตตานี เอฟซี</h2>
+        <h2 className="text-2xl font-bold text-green-900 md:text-3xl">{t("ติดตามปัตตานี เอฟซี", "Follow Pattani FC")}</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <SocialCard href="https://www.facebook.com/PattaniFC" symbol="f" tone="bg-[#1877f2]" label="Facebook" handle="PattaniFC" />
           <SocialCard href="https://www.instagram.com/pattanifc.official/" symbol="◎" tone="bg-[#d62976]" label="Instagram" handle="@pattanifc.official" />
@@ -25,7 +30,7 @@ export default function ContactPage() {
         </div>
       </section>
       <div className="rounded-lg border border-green-100 bg-green-50 p-5 text-base leading-relaxed text-green-900 md:p-6 md:text-lg">
-        ติดต่อและติดตามข่าวสารของสโมสรได้ผ่านช่องทางด้านบน
+        {t("ติดต่อและติดตามข่าวสารของสโมสรได้ผ่านช่องทางด้านบน", "Contact us and follow the latest club updates through the channels above.")}
       </div>
     </div>
   );

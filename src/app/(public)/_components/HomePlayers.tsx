@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { Dict } from "@/lib/i18n/dict";
 
 export type HomePlayer = {
   id: string | number;
@@ -14,13 +15,6 @@ export type HomePlayer = {
   photo?: { url?: string | null } | string | number | null;
 };
 
-const positionLabel: Record<HomePlayer["position"], string> = {
-  GK: "ผู้รักษาประตู",
-  DF: "กองหลัง",
-  MF: "กองกลาง",
-  FW: "กองหน้า",
-};
-
 const positionTone: Record<HomePlayer["position"], string> = {
   GK: "from-amber-300 to-yellow-500",
   DF: "from-sky-300 to-blue-600",
@@ -28,7 +22,7 @@ const positionTone: Record<HomePlayer["position"], string> = {
   FW: "from-rose-300 to-red-600",
 };
 
-export default function HomePlayers({ players }: { players: HomePlayer[] }) {
+export default function HomePlayers({ players, labels }: { players: HomePlayer[]; labels: Dict["home"] }) {
   const playersPerSlide = 4;
   const slides = Array.from(
     { length: Math.ceil(players.length / playersPerSlide) },
@@ -57,14 +51,14 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
       <div>
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <p className="text-lg font-bold uppercase tracking-widest text-yellow-600">Our squad</p>
-            <h2 className="mt-1 text-5xl font-black text-green-900 sm:text-6xl">ผู้เล่นปัตตานี เอฟซี</h2>
+            <p className="text-lg font-bold uppercase tracking-widest text-yellow-600">{labels.squadEyebrow}</p>
+            <h2 className="mt-1 text-5xl font-black text-green-900 sm:text-6xl">{labels.squadTitle}</h2>
           </div>
           <Link
             href="/squad"
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-green-200 px-5 py-2.5 text-lg font-bold text-green-800 transition hover:bg-green-800 hover:text-yellow-300 sm:text-xl"
           >
-            ดูทีมทั้งหมด <ArrowRight className="size-4" />
+            {labels.viewSquad} <ArrowRight className="size-4" />
           </Link>
         </div>
 
@@ -88,7 +82,7 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
               >
                 {slide.map((player) => (
                   <li key={String(player.id)}>
-                    <PlayerSpotlight player={player} />
+                    <PlayerSpotlight player={player} labels={labels} />
                   </li>
                 ))}
               </ul>
@@ -97,7 +91,7 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
         </div>
 
         {hasCarousel && (
-          <div className="mt-4 flex justify-center gap-2" aria-label="เลือกผู้เล่น">
+          <div className="mt-4 flex justify-center gap-2" aria-label={labels.playerCarouselLabel}>
             {slides.map((slide, index) => (
               <button
                 key={slide.map((player) => player.id).join("-")}
@@ -106,7 +100,7 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
                   setIsLoopReset(false);
                   setActiveSlide(index);
                 }}
-                aria-label={`แสดงผู้เล่นชุดที่ ${index + 1}`}
+                aria-label={`${labels.showPlayerSet} ${index + 1}`}
                 aria-current={index === activeSlide}
                 className={`h-2 rounded-full transition-all ${
                   index === activeSlide ? "w-6 bg-green-800" : "w-2 bg-green-200 hover:bg-green-400"
@@ -120,7 +114,7 @@ export default function HomePlayers({ players }: { players: HomePlayer[] }) {
   );
 }
 
-function PlayerSpotlight({ player }: { player: HomePlayer }) {
+function PlayerSpotlight({ player, labels }: { player: HomePlayer; labels: Dict["home"] }) {
   const photoUrl = mediaUrl(player.photo);
   const number = player.jerseyNumber?.toString().padStart(2, "0") ?? "--";
 
@@ -131,7 +125,7 @@ function PlayerSpotlight({ player }: { player: HomePlayer }) {
         {number}
       </span>
       <span className="absolute left-3 top-2 rounded-full bg-black/25 px-2 py-1 text-sm font-bold uppercase tracking-widest text-yellow-200 backdrop-blur-sm sm:text-base">
-        {positionLabel[player.position]}
+        {{ GK: labels.goalkeeper, DF: labels.defender, MF: labels.midfielder, FW: labels.forward }[player.position]}
       </span>
 
       <div className="absolute inset-x-3 bottom-12 top-9 overflow-hidden rounded-xl bg-[radial-gradient(circle_at_50%_20%,rgba(250,204,21,.26),transparent_55%)]">

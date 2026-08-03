@@ -2,6 +2,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
 import PageHero from "../_components/PageHero";
 import { Crown, Users2, Scale, Cpu, UserCog } from "lucide-react";
+import { getT } from "@/lib/i18n/server";
+import { localize } from "@/lib/i18n/text";
+import type { Locale } from "@/lib/i18n/dict";
 
 export const metadata = { title: "ผู้บริหาร — Pattani FC" };
 
@@ -101,7 +104,9 @@ function gridColsFor(columns: 1 | 2 | 3 | undefined): string {
   }
 }
 
-export default function ManagementPage() {
+export default async function ManagementPage() {
+  const { locale } = await getT();
+  const t = (th: string, en: string) => localize(locale, th, en);
   // ให้คณะผู้บริหารแสดงเป็นหัวข้อแรกของหน้า
   const orderedGroups = [...GROUPS].sort((a, b) =>
     a.key === "executive" ? -1 : b.key === "executive" ? 1 : 0,
@@ -110,8 +115,8 @@ export default function ManagementPage() {
   return (
     <>
       <PageHero
-        title="คณะกรรมการผู้บริหารสโมสร"
-        subtitle="คณะกรรมการบริหารและที่ปรึกษาสโมสรฟุตบอลปัตตานี เอฟซี"
+        title={t("คณะกรรมการผู้บริหารสโมสร", "Club Management")}
+        subtitle={t("คณะกรรมการบริหารและที่ปรึกษาสโมสรฟุตบอลปัตตานี เอฟซี", "The executive committee and advisors of Pattani FC")}
       />
       <div className="mx-auto max-w-6xl space-y-10 px-4 py-10">
         {orderedGroups.map((g) => (
@@ -122,18 +127,18 @@ export default function ManagementPage() {
                   {g.icon}
                 </span>
                 <h2 className="text-xl font-black text-green-900 md:text-2xl">
-                  {g.label}
+                      {groupLabel(g.key, locale, g.label)}
                 </h2>
               </div>
               <span className="rounded-full bg-green-800 px-3 py-1 text-xs font-bold text-yellow-300">
-                {g.people.length} คน
+                {g.people.length} {t("คน", "people")}
               </span>
             </header>
 
             <ul className={`grid gap-4 ${gridColsFor(g.columns)}`}>
               {g.people.map((p) => (
                 <li key={p.name}>
-                  <PersonCard person={p} />
+                  <PersonCard person={p} locale={locale} />
                 </li>
               ))}
             </ul>
@@ -144,7 +149,7 @@ export default function ManagementPage() {
   );
 }
 
-function PersonCard({ person }: { person: Person }) {
+function PersonCard({ person, locale }: { person: Person; locale: Locale }) {
   // ใช้ initial ตัวแรกของชื่อเป็น avatar fallback — ไม่มีรูปจาก PDF
   // (ภายหลังถ้ามีรูป สามารถเพิ่ม person.photoUrl แล้ว render <Image> ได้)
   const initial = person.name.replace(/^[^ก-๙a-zA-Z]+/, "").charAt(0) || "?";
@@ -189,10 +194,37 @@ function PersonCard({ person }: { person: Person }) {
             {person.name}
           </p>
           {person.position && (
-            <p className="mt-0.5 text-sm text-slate-600">{person.position}</p>
+            <p className="mt-0.5 text-sm text-slate-600">{positionLabel(person.position, locale)}</p>
           )}
         </CardContent>
       </div>
     </Card>
   );
+}
+
+function groupLabel(key: string, locale: Locale, fallback: string) {
+  if (locale === "th") return fallback;
+  if (locale === "ms") return ({ honorary: "Penasihat Kehormat", advisors: "Penasihat Kelab", legal: "Penasihat Undang-undang", technical: "Penasihat Teknikal", executive: "Jawatankuasa Eksekutif" } as Record<string, string>)[key] ?? fallback;
+  return ({ honorary: "Honorary Advisors", advisors: "Club Advisors", legal: "Legal Advisor", technical: "Technical Advisor", executive: "Executive Committee" } as Record<string, string>)[key] ?? fallback;
+}
+
+function positionLabel(position: string, locale: Locale) {
+  if (locale === "th") return position;
+  if (locale === "ms") {
+    const labels: Record<string, string> = {
+      "ประธานสโมสร": "Presiden Kelab", "รองประธานสโมสร": "Naib Presiden Kelab", "ประธานกรรมการบริหาร (CEO)": "Ketua Pegawai Eksekutif (CEO)", "ผู้อำนวยสำนักงานกีฬาและผู้จัดการทีม": "Pengarah Pejabat Sukan dan Pengurus Pasukan", "รองประธานสโมสรและหัวหน้าฝ่ายวิทยาศาสตร์การกีฬาฯ": "Naib Presiden Kelab dan Ketua Sains Sukan", "ผู้อำนวยการฝ่ายธุรกิจและภาพลักษณ์": "Pengarah Perniagaan dan Jenama", "ผู้อำนวยการฝ่ายบริหารสนามและการจัดการ": "Pengarah Operasi Stadium", "ผู้อำนวยการฝ่ายบริหารงานทั่วไป": "Pengarah Pentadbiran Am", "หัวหน้าผู้ฝึกสอน": "Ketua Jurulatih",
+    };
+    return labels[position] ?? position;
+  }
+  const labels: Record<string, string> = {
+    "ประธานสโมสร": "Club President", "รองประธานสโมสร": "Club Vice President",
+    "ประธานกรรมการบริหาร (CEO)": "Chief Executive Officer (CEO)",
+    "ผู้อำนวยสำนักงานกีฬาและผู้จัดการทีม": "Sports Office Director and Team Manager",
+    "รองประธานสโมสรและหัวหน้าฝ่ายวิทยาศาสตร์การกีฬาฯ": "Club Vice President and Head of Sports Science",
+    "ผู้อำนวยการฝ่ายธุรกิจและภาพลักษณ์": "Business and Brand Director",
+    "ผู้อำนวยการฝ่ายบริหารสนามและการจัดการ": "Stadium Operations Director",
+    "ผู้อำนวยการฝ่ายบริหารงานทั่วไป": "General Administration Director",
+    "หัวหน้าผู้ฝึกสอน": "Head Coach",
+  };
+  return labels[position] ?? position;
 }

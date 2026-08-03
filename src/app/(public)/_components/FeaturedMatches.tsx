@@ -12,6 +12,8 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { formatBaht, formatDateTime } from "@/lib/format";
+import type { Dict, Locale } from "@/lib/i18n/dict";
+import { intlLocale } from "@/lib/i18n/text";
 
 export type FeaturedMatch = {
   id: string;
@@ -51,14 +53,20 @@ function TeamCrest({ logo, name }: { logo: string | null; name: string }) {
 
 export default function FeaturedMatches({
   matches,
+  locale,
+  labels,
 }: {
   matches: FeaturedMatch[];
+  locale: Locale;
+  labels: Dict["home"];
 }) {
+  const numberLocale = intlLocale(locale);
+
   if (matches.length === 0) {
     return (
       <Card className="border-dashed">
         <CardContent className="py-10 text-center text-muted-foreground">
-          ยังไม่มีแมตช์ในระบบ
+          {labels.noMatches}
         </CardContent>
       </Card>
     );
@@ -81,11 +89,11 @@ export default function FeaturedMatches({
                       : "px-3 py-1.5 text-base sm:text-lg"
                   }
                 >
-                  {isOnSale ? "เปิดจอง" : "ใกล้เปิด"}
+                  {isOnSale ? labels.onSale : labels.comingSoon}
                 </Badge>
                 <span className="flex items-center gap-1.5 text-base text-muted-foreground sm:text-lg lg:text-xl">
                   <Calendar className="size-4" />
-                  {m.kickoffAt ? formatDateTime(m.kickoffAt) : "ยังไม่กำหนด"}
+                  {m.kickoffAt ? formatDateTime(m.kickoffAt, numberLocale) : labels.dateNotSet}
                 </span>
               </CardHeader>
               <CardContent className="pb-3">
@@ -97,15 +105,15 @@ export default function FeaturedMatches({
                   <TeamCrest logo={m.awayTeamLogo} name={m.awayTeam} />
                 </div>
                 <p className="mt-3 flex items-center justify-center gap-1.5 text-lg text-muted-foreground sm:text-xl lg:text-2xl">
-                  <MapPin className="size-4" /> {m.venue ?? "ยังไม่กำหนดสนาม"}
+                  <MapPin className="size-4" /> {m.venue ?? labels.venueTbd}
                 </p>
               </CardContent>
               {isPattaniHomeMatch && (
                 <CardFooter className="justify-between border-t pt-3">
                   <span className="text-lg font-medium sm:text-xl lg:text-2xl">
                     {m.pricePerSeat != null
-                      ? `เริ่มต้น ${formatBaht(m.pricePerSeat)}/ใบ`
-                      : "ราคารอประกาศ"}
+                      ? `${labels.startingAt} ${formatBaht(m.pricePerSeat, numberLocale)} ${labels.perTicket}`
+                      : labels.priceTbd}
                   </span>
                   <Button
                     asChild
@@ -118,7 +126,7 @@ export default function FeaturedMatches({
                     }
                   >
                     <Link href={isOnSale ? "/tickets#matches" : `/matches/${m.id}`}>
-                      {isOnSale ? "จอง" : "ดู"}
+                      {isOnSale ? labels.book : labels.view}
                       <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   </Button>

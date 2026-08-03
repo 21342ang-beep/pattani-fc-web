@@ -3,6 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { payload } from "@/lib/payload";
 import PageHero from "../_components/PageHero";
+import { getT } from "@/lib/i18n/server";
+import { localize } from "@/lib/i18n/text";
+import type { Locale } from "@/lib/i18n/dict";
 
 const POSITION_ACCENT: Record<string, string> = {
   GK: "from-amber-400 via-yellow-400 to-yellow-500",
@@ -32,7 +35,7 @@ const STAFF_ROLE_LABEL: Record<string, string> = {
 
 export default async function SquadPage() {
   const cms = await payload();
-  const [playersRes, staffRes] = await Promise.all([
+  const [playersRes, staffRes, { locale }] = await Promise.all([
     cms.find({
       collection: "players",
       where: { active: { equals: true } },
@@ -46,7 +49,9 @@ export default async function SquadPage() {
       limit: 50,
       overrideAccess: true,
     }),
+    getT(),
   ]);
+  const t = (th: string, en: string) => localize(locale, th, en);
 
   const players = playersRes.docs as unknown as PlayerDoc[];
   const staff = staffRes.docs as unknown as StaffDoc[];
@@ -59,8 +64,8 @@ export default async function SquadPage() {
   return (
     <>
       <PageHero
-        title="ผู้เล่นและสตาฟ"
-        subtitle="นักเตะชุดใหญ่และทีมงานสตาฟโค้ชของปัตตานี เอฟซี"
+        title={t("ผู้เล่นและสตาฟ", "Players & Staff")}
+        subtitle={t("นักเตะชุดใหญ่และทีมงานสตาฟโค้ชของปัตตานี เอฟซี", "Pattani FC first-team players and coaching staff")}
       />
       <div className="mx-auto max-w-6xl space-y-10 px-4 py-10">
         {(Object.keys(POSITION_LABEL) as Array<keyof typeof POSITION_LABEL>).map(
@@ -77,17 +82,17 @@ export default async function SquadPage() {
                       {pos}
                     </span>
                     <h2 className="text-xl font-black text-green-900 md:text-2xl">
-                      {POSITION_LABEL[pos]}
+                      {positionLabel(pos, locale)}
                     </h2>
                   </div>
                   <span className="rounded-full bg-green-900 px-3 py-1 text-xs font-bold text-yellow-300">
-                    {list.length} คน
+                    {list.length} {t("คน", "players")}
                   </span>
                 </div>
                 <ul className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {list.map((p) => (
                     <li key={String(p.id)}>
-                      <PlayerCard player={p} />
+                      <PlayerCard player={p} locale={locale} />
                     </li>
                   ))}
                 </ul>
@@ -99,14 +104,14 @@ export default async function SquadPage() {
         {players.length === 0 && (
           <Card className="border-dashed">
             <CardContent className="py-12 text-center text-muted-foreground">
-              ยังไม่มีข้อมูลผู้เล่นในระบบ
+              {t("ยังไม่มีข้อมูลผู้เล่นในระบบ", "No player information is available")}
             </CardContent>
           </Card>
         )}
 
         {staff.length > 0 && (
           <section>
-            <h2 className="mb-4 text-xl font-bold text-green-900">ทีมงานสตาฟ</h2>
+            <h2 className="mb-4 text-xl font-bold text-green-900">{t("ทีมงานสตาฟ", "Coaching Staff")}</h2>
             <ul className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
               {staff.map((s) => (
                 <li key={String(s.id)}>
@@ -126,7 +131,7 @@ export default async function SquadPage() {
                     <div>
                       <p className="font-semibold text-green-900">{s.name}</p>
                       <Badge variant="secondary" className="mt-1 text-[11px]">
-                        {STAFF_ROLE_LABEL[s.role] ?? s.role}
+                        {staffRoleLabel(s.role, locale)}
                       </Badge>
                     </div>
                   </Card>
@@ -140,7 +145,7 @@ export default async function SquadPage() {
   );
 }
 
-function PlayerCard({ player: p }: { player: PlayerDoc }) {
+function PlayerCard({ player: p, locale }: { player: PlayerDoc; locale: Locale }) {
   const accent = POSITION_ACCENT[p.position] ?? POSITION_ACCENT.MF;
   const photoUrl = mediaUrl(p.photo);
   return (
@@ -208,7 +213,7 @@ function PlayerCard({ player: p }: { player: PlayerDoc }) {
         {/* bottom overlay with name */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-green-950 via-green-950/85 to-transparent px-4 pb-4 pt-14">
           <p className="text-xs font-bold uppercase tracking-widest text-yellow-300/85 md:text-sm">
-            {POSITION_LABEL[p.position]}
+            {positionLabel(p.position, locale)}
           </p>
           <h3 className="mt-0.5 line-clamp-1 text-xl font-black text-white md:text-2xl">
             {p.name}
@@ -222,6 +227,18 @@ function PlayerCard({ player: p }: { player: PlayerDoc }) {
       </div>
     </Card>
   );
+}
+
+function positionLabel(position: string, locale: Locale) {
+  if (locale === "th") return POSITION_LABEL[position] ?? position;
+  if (locale === "ms") return ({ GK: "Penjaga Gol", DF: "Pemain Pertahanan", MF: "Pemain Tengah", FW: "Penyerang" } as Record<string, string>)[position] ?? position;
+  return ({ GK: "Goalkeeper", DF: "Defender", MF: "Midfielder", FW: "Forward" } as Record<string, string>)[position] ?? position;
+}
+
+function staffRoleLabel(role: string, locale: Locale) {
+  if (locale === "th") return STAFF_ROLE_LABEL[role] ?? role;
+  if (locale === "ms") return ({ "head-coach": "Ketua Jurulatih", "asst-coach": "Penolong Jurulatih", "gk-coach": "Jurulatih Penjaga Gol", physio: "Ahli Fisioterapi", "team-manager": "Pengurus Pasukan", other: "Lain-lain" } as Record<string, string>)[role] ?? role;
+  return ({ "head-coach": "Head Coach", "asst-coach": "Assistant Coach", "gk-coach": "Goalkeeper Coach", physio: "Physiotherapist", "team-manager": "Team Manager", other: "Other" } as Record<string, string>)[role] ?? role;
 }
 
 type PlayerDoc = {

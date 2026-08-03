@@ -11,6 +11,7 @@ import {
   Info,
 } from "lucide-react";
 import PageHero from "../_components/PageHero";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata = { title: "ทีมเยาวชน — Pattani FC" };
 
@@ -112,7 +113,10 @@ const ROADMAP: RoadmapPhase[] = [
   },
 ];
 
-export default function YouthPage() {
+export default async function YouthPage() {
+  const { locale } = await getT();
+  if (locale === "ms") return <MalayYouthPage />;
+  if (locale === "en") return <EnglishYouthPage />;
   return (
     <>
       <PageHero
@@ -304,6 +308,47 @@ export default function YouthPage() {
       </section>
     </>
   );
+}
+
+function MalayYouthPage() {
+  const groups = [["U12", "Umur 12 tahun ke bawah", "Teknik asas, keseronokan dan keyakinan"], ["U14", "Umur 14 tahun ke bawah", "Teknik, pemahaman permainan dan kerja berpasukan"], ["U16", "Umur 16 tahun ke bawah", "Pembangunan kompetitif dan persediaan fizikal"], ["U18", "Umur 18 tahun ke bawah", "Laluan menuju bola sepak profesional"]];
+  return <><PageHero title="Pembangunan Belia" subtitle="Membina pemain bola sepak dari wilayah sempadan selatan Thailand" /><div className="mx-auto max-w-6xl space-y-10 px-4 py-12 md:py-16"><section className="rounded-3xl bg-green-950 p-7 text-white md:p-10"><p className="text-lg font-bold uppercase tracking-widest text-yellow-300">Visi Masa Hadapan</p><h2 className="mt-2 text-4xl font-black md:text-5xl">Akademi Pattani FC</h2><p className="mt-4 max-w-4xl text-lg leading-relaxed text-green-100 md:text-xl">Pelan pembangunan belia kelab bertujuan memberi kanak-kanak berbakat di Pattani dan wilayah berdekatan laluan tersusun dalam bola sepak, pendidikan, disiplin dan pembangunan diri.</p></section><section><h2 className="text-3xl font-black text-green-900 md:text-4xl">Laluan Pembangunan</h2><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{groups.map(([code, age, focus]) => <article key={code} className="rounded-2xl border border-green-100 bg-white p-6 shadow-sm"><p className="text-3xl font-black text-green-900">{code}</p><p className="mt-1 font-bold text-yellow-700">{age}</p><p className="mt-3 text-lg leading-relaxed text-slate-600">{focus}</p></article>)}</div></section><div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-lg text-amber-950"><strong>Status semasa:</strong> Halaman ini menerangkan visi pembangunan masa hadapan kelab. Permohonan akademi rasmi belum dibuka.</div><Link href="/contact" className="inline-flex items-center gap-2 rounded-full bg-green-800 px-7 py-3.5 text-lg font-bold text-yellow-300">Hubungi Kelab <ArrowRight className="size-5" /></Link></div></>;
+}
+
+function EnglishYouthPage() {
+  const groups = [
+    ["U12", "Age 12 and under", "Fundamental technique, enjoyment, and confidence"],
+    ["U14", "Age 14 and under", "Technique, game awareness, and teamwork"],
+    ["U16", "Age 16 and under", "Competitive development and physical preparation"],
+    ["U18", "Age 18 and under", "Pathway toward professional football"],
+  ];
+  return (
+    <>
+      <PageHero title="Youth Development" subtitle="Building footballers from Thailand’s southern border provinces" />
+      <div className="mx-auto max-w-6xl space-y-10 px-4 py-12 md:py-16">
+        <section className="rounded-3xl bg-green-950 p-7 text-white md:p-10">
+          <p className="text-lg font-bold uppercase tracking-widest text-yellow-300">Future Vision</p>
+          <h2 className="mt-2 text-4xl font-black md:text-5xl">Pattani FC Academy</h2>
+          <p className="mt-4 max-w-4xl text-lg leading-relaxed text-green-100 md:text-xl">The club’s youth-development plan aims to give talented children in Pattani and nearby southern border provinces a structured pathway in football, education, discipline, and personal development.</p>
+        </section>
+        <section>
+          <h2 className="text-3xl font-black text-green-900 md:text-4xl">Development Pathway</h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{groups.map(([code, age, focus]) => <article key={code} className="rounded-2xl border border-green-100 bg-white p-6 shadow-sm"><p className="text-3xl font-black text-green-900">{code}</p><p className="mt-1 font-bold text-yellow-700">{age}</p><p className="mt-3 text-lg leading-relaxed text-slate-600">{focus}</p></article>)}</div>
+        </section>
+        <section className="grid gap-5 md:grid-cols-3">
+          <EnglishFeatureCard icon={<GraduationCap className="size-5" />} title="Education">Football development should progress alongside education and life skills.</EnglishFeatureCard>
+          <EnglishFeatureCard icon={<ShieldCheck className="size-5" />} title="Safe Development">Age-appropriate coaching, safeguarding, and qualified staff form the foundation of the program.</EnglishFeatureCard>
+          <EnglishFeatureCard icon={<HeartHandshake className="size-5" />} title="Community">The academy is designed to connect families, schools, local coaches, and the club.</EnglishFeatureCard>
+        </section>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-lg text-amber-950"><strong>Current status:</strong> This page presents the club’s future development vision. Official academy applications are not open yet; announcements will be published through Pattani FC channels.</div>
+        <Link href="/contact" className="inline-flex items-center gap-2 rounded-full bg-green-800 px-7 py-3.5 text-lg font-bold text-yellow-300">Contact the Club <ArrowRight className="size-5" /></Link>
+      </div>
+    </>
+  );
+}
+
+function EnglishFeatureCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return <article className="rounded-2xl border border-green-100 bg-white p-6 shadow-sm"><div className="inline-flex rounded-xl bg-green-900 p-2.5 text-yellow-300">{icon}</div><h3 className="mt-4 text-2xl font-black text-green-900">{title}</h3><p className="mt-2 text-lg leading-relaxed text-slate-700">{children}</p></article>;
 }
 
 function MetricCard({

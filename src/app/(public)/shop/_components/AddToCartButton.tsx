@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Check, Plus, ShoppingCart } from "lucide-react";
 import { addToCart, type ShopCartItem } from "@/lib/shop-cart";
+import type { Locale } from "@/lib/i18n/dict";
 
 type Props = {
   productId: string;
@@ -11,6 +12,7 @@ type Props = {
   imageUrl: string | null;
   unitPriceBaht: number;
   sizes: { label: string; outOfStock: boolean }[];
+  locale: Locale;
 };
 
 export default function AddToCartButton({
@@ -19,6 +21,7 @@ export default function AddToCartButton({
   imageUrl,
   unitPriceBaht,
   sizes,
+  locale,
 }: Props) {
   const hasSizes = sizes.length > 0;
   const firstAvailable = sizes.find((s) => !s.outOfStock)?.label ?? sizes[0]?.label ?? "";
@@ -87,17 +90,17 @@ export default function AddToCartButton({
         >
           {added ? (
             <>
-              <Check className="size-4" /> เพิ่มแล้ว
+              <Check className="size-4" /> {locale === "th" ? "เพิ่มแล้ว" : locale === "ms" ? "Ditambah" : "Added"}
             </>
           ) : (
             <>
-              <Plus className="size-4" /> ใส่ตะกร้า
+              <Plus className="size-4" /> {locale === "th" ? "ใส่ตะกร้า" : locale === "ms" ? "Tambah ke Troli" : "Add to Cart"}
             </>
           )}
         </button>
         <Link
           href="/shop/cart"
-          aria-label="ไปที่ตะกร้า"
+          aria-label={locale === "th" ? "ไปที่ตะกร้า" : locale === "ms" ? "Pergi ke troli" : "Go to cart"}
           className="inline-flex size-9 items-center justify-center rounded-full border border-green-200 text-green-800 transition hover:bg-green-50"
         >
           <ShoppingCart className="size-4" />

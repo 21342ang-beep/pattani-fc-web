@@ -10,6 +10,8 @@ import {
   MapPin,
   Stars,
 } from "lucide-react";
+import PageHero from "../_components/PageHero";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata = { title: "สโมสร — Pattani FC" };
 
@@ -54,7 +56,10 @@ const ACHIEVEMENTS: { year: string; result: string }[] = [
 
 const NICKNAMES = ["ปืนใหญ่ลังกาสุกะ", "ปืนใหญ่พญาตานี", "The Queen Cannons"];
 
-export default function ClubPage() {
+export default async function ClubPage() {
+  const { locale } = await getT();
+  if (locale === "ms") return <MalayClubPage />;
+  if (locale === "en") return <EnglishClubPage />;
   return (
     <>
       {/* Hero */}
@@ -286,6 +291,44 @@ export default function ClubPage() {
             <Fact label="เจ้าของ" value="อบจ. ปัตตานี" />
           </div>
         </FeatureCard>
+      </div>
+    </>
+  );
+}
+
+function MalayClubPage() {
+  const sections = [
+    [<Eye className="size-5" key="i" />, "01", "Visi", "Membawa kebahagiaan kepada wilayah sempadan selatan dan memimpin Pattani FC menuju kejayaan berkekalan dalam Liga Thai 1."],
+    [<Building2 className="size-5" key="i" />, "02", "Organisasi Kami", "Organisasi bola sepak berteraskan komuniti yang tidak mengagihkan keuntungan kepada pengurusan atau pemegang saham. Pulangan sebenar ialah kebahagiaan, imej positif wilayah dan sokongan kepada keamanan."],
+    [<Heart className="size-5" key="i" />, "03", "Falsafah", "Bola sepak untuk komuniti: inklusif, digerakkan secara sukarela dan komited meningkatkan kehidupan masyarakat Pattani serta wilayah sempadan selatan."],
+    [<Swords className="size-5" key="i" />, "04", "Gaya Permainan", "Bola sepak menyerang yang positif dengan usaha tanpa henti dalam setiap pertandingan."],
+    [<Music2 className="size-5" key="i" />, "05", "Identiti", "Lagu kelab: “Go Go Go Queen Cannons.” Kelab dikenali sebagai Meriam Langkasuka dan The Queen Cannons. Warna kelab ialah kuning dan hijau."],
+    [<History className="size-5" key="i" />, "06", "Sejarah Kami", "Ditubuhkan pada 2009, Pattani FC dicipta sebagai lebih daripada sebuah pasukan bola sepak—ia menjadi sumber kebahagiaan, kebanggaan, perpaduan dan harapan bagi masyarakat sempadan selatan."],
+    [<Trophy className="size-5" key="i" />, "07", "Kebangkitan Bersejarah", "Pattani menjuarai zon selatan Liga Thai 4 pada 2019, naik ke Liga Thai 3, kemudian Liga Thai 2 dan memperoleh kenaikan ke Liga Thai 1 bagi musim 2026/27."],
+    [<MapPin className="size-5" key="i" />, "08", "Rainbow Stadium", "Stadium sendiri Pattani FC yang berwarna-warni mampu menerima lebih 10,000 penyokong dan dikendalikan oleh Organisasi Pentadbiran Wilayah Pattani."],
+  ] as const;
+  return <><PageHero title="Pattani FC" subtitle="Mencipta kebahagiaan, memperkukuh maruah dan menyatukan komuniti sempadan selatan" /><div className="mx-auto grid max-w-6xl gap-6 px-4 py-12 md:grid-cols-2 md:py-16">{sections.map(([icon, number, title, body]) => <FeatureCard key={number} icon={icon} number={number} title={title}><p className="text-lg leading-relaxed text-slate-700">{body}</p></FeatureCard>)}</div></>;
+}
+
+function EnglishClubPage() {
+  const history = [
+    "Founded in 2009, Pattani FC was created as more than a football team: it became a shared source of happiness, pride, unity, and hope for people across the southern border provinces.",
+    "The club returned Pattani to Thailand’s professional football system and built its identity around community service rather than commercial profit.",
+    "Pattani won the 2019 Thai League 4 Southern Region and earned promotion to Thai League 3. The club then rose from Thai League 3 to Thai League 2 and secured promotion to Thai League 1 for the 2026/27 season.",
+    "The next objective is to establish Pattani FC in Thailand’s top flight and develop toward Asian competition, supported by one of the country’s strongest regional fan bases.",
+  ];
+  return (
+    <>
+      <PageHero title="Pattani FC" subtitle="Creating happiness, strengthening dignity, and uniting the southern border community" />
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-12 md:grid-cols-2 md:py-16">
+        <FeatureCard icon={<Eye className="size-5" />} number="01" title="Vision"><p className="text-lg leading-relaxed text-slate-700">Bring happiness to the southern border provinces and lead Pattani FC to lasting success in Thai League 1.</p></FeatureCard>
+        <FeatureCard icon={<Building2 className="size-5" />} number="02" title="Our Organization"><p className="text-lg leading-relaxed text-slate-700">A community-focused football organization operated without distributing profit to executives or shareholders. Its true return is happiness, a positive image for the region, and support for peace.</p></FeatureCard>
+        <FeatureCard icon={<Heart className="size-5" />} number="03" title="Philosophy"><p className="text-lg leading-relaxed text-slate-700">Football for the community: inclusive, volunteer-driven, and committed to improving life in Pattani and the southern border provinces.</p></FeatureCard>
+        <FeatureCard icon={<Swords className="size-5" />} number="04" title="Playing Style"><p className="text-lg leading-relaxed text-slate-700">Positive, attacking football with relentless effort in every competition.</p></FeatureCard>
+        <FeatureCard icon={<Music2 className="size-5" />} number="05" title="Identity"><p className="text-lg leading-relaxed text-slate-700">Club song: “Go Go Go Queen Cannons.” Nicknames include the Langkasuka Cannons, the Patani Queen Cannons, and The Queen Cannons. Club colors are yellow and green.</p></FeatureCard>
+        <FeatureCard icon={<History className="size-5" />} number="06" title="Our History"><div className="space-y-3 text-lg leading-relaxed text-slate-700">{history.map((p) => <p key={p}>{p}</p>)}</div></FeatureCard>
+        <FeatureCard icon={<Trophy className="size-5" />} number="07" title="Historic Rise"><p className="text-lg leading-relaxed text-slate-700">Promotion from Thai League 3 to Thai League 1 marked a defining achievement for the management, coaches, players, supporters, and the wider Pattani community.</p></FeatureCard>
+        <FeatureCard icon={<MapPin className="size-5" />} number="08" title="Rainbow Stadium"><p className="text-lg leading-relaxed text-slate-700">Pattani FC’s home ground is the colorful Rainbow Stadium, operated by the Pattani Provincial Administrative Organization and capable of welcoming more than 10,000 supporters.</p></FeatureCard>
       </div>
     </>
   );

@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { Calendar, MapPin, Shield, Ticket } from "lucide-react";
 import { getMatchesByFilter } from "@/lib/cached-queries";
 import { formatDateTime } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import { intlLocale, localize } from "@/lib/i18n/text";
+import type { Locale } from "@/lib/i18n/dict";
 
 const ALLOWED_FILTERS = ["all", "on_sale", "upcoming"] as const;
 type Filter = (typeof ALLOWED_FILTERS)[number];
@@ -31,10 +34,12 @@ export default async function MatchesListPage(props: {
     : "all";
   const competitionType = competition === "all" ? undefined : competition === "league" ? "LEAGUE" : "CUP";
 
-  const [matches, onSaleMatches] = await Promise.all([
+  const [matches, onSaleMatches, { locale }] = await Promise.all([
     getMatchesByFilter(filter, competitionType),
     getMatchesByFilter("on_sale", competitionType),
+    getT(),
   ]);
+  const t = (th: string, en: string) => localize(locale, th, en);
   const pattaniMatches = matches.filter(isPattaniFixture);
   const pattaniOnSaleMatches = onSaleMatches.filter(isPattaniFixture);
   // เลือกโซนแล้วมีแมตช์ที่เปิดขายเพียงรายการเดียว → ข้ามหน้ากดจอง
@@ -50,12 +55,12 @@ export default async function MatchesListPage(props: {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-10 md:space-y-10 md:py-16">
       <header>
-        <h1 className="text-3xl font-black text-green-950 sm:text-4xl md:text-5xl">ตารางแข่งขัน</h1>
+        <h1 className="text-3xl font-black text-green-950 sm:text-4xl md:text-5xl">{t("ตารางแข่งขัน", "Fixtures")}</h1>
         <p className="mt-2 text-lg text-slate-600 sm:text-xl md:text-2xl">
-          เลือกแมตช์ที่สนใจเพื่อจองตั๋ว
+          {t("เลือกแมตช์ที่สนใจเพื่อจองตั๋ว", "Choose a match to book tickets")}
           {zone && (
             <>
-              {" — โซนที่เลือก: "}
+              {t(" — โซนที่เลือก: ", " — Selected zone: ")}
               <span className="rounded-full bg-yellow-400 px-3 py-1 text-base font-bold text-green-950 md:text-lg">
                 {zone}
               </span>
@@ -71,39 +76,39 @@ export default async function MatchesListPage(props: {
               <Ticket className="size-5 md:size-6" />
             </span>
             <div>
-              <p className="text-sm font-bold uppercase tracking-widest text-emerald-700 md:text-base">Book now</p>
+              <p className="text-sm font-bold uppercase tracking-widest text-emerald-700 md:text-base">{t("จองเลย", "Book now")}</p>
               <h2 id="on-sale-heading" className="text-2xl font-black text-green-950 md:text-3xl">
-                โปรแกรมที่เปิดจอง
+                {t("โปรแกรมที่เปิดจอง", "Matches on Sale")}
               </h2>
             </div>
           </div>
           <div className="space-y-4">
             {pattaniOnSaleMatches.map((match) => (
-              <OnSaleMainboard key={match.id} match={match} zoneQS={zoneQS} />
+              <OnSaleMainboard key={match.id} match={match} zoneQS={zoneQS} locale={locale} />
             ))}
           </div>
         </section>
       )}
 
       <nav className="flex flex-wrap items-center gap-3">
-        <FilterTab href={competition === "all" ? "/matches" : `/matches?competition=${competition}`} active={filter === "all"} label="โปรแกรมการแข่งขัน" />
-        <FilterTab href={`/matches?filter=on_sale${competition === "all" ? "" : `&competition=${competition}`}`} active={filter === "on_sale"} label="เปิดจอง" />
-        <FilterTab href={`/matches?filter=upcoming${competition === "all" ? "" : `&competition=${competition}`}`} active={filter === "upcoming"} label="กำลังจะมาถึง" />
+        <FilterTab href={competition === "all" ? "/matches" : `/matches?competition=${competition}`} active={filter === "all"} label={t("โปรแกรมการแข่งขัน", "All Fixtures")} />
+        <FilterTab href={`/matches?filter=on_sale${competition === "all" ? "" : `&competition=${competition}`}`} active={filter === "on_sale"} label={t("เปิดจอง", "On Sale")} />
+        <FilterTab href={`/matches?filter=upcoming${competition === "all" ? "" : `&competition=${competition}`}`} active={filter === "upcoming"} label={t("กำลังจะมาถึง", "Upcoming")} />
         <form action="/matches" className="flex w-full items-center gap-3 sm:ml-auto sm:w-auto">
           {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
-          <label htmlFor="competition" className="sr-only">ประเภทการแข่งขัน</label>
+          <label htmlFor="competition" className="sr-only">{t("ประเภทการแข่งขัน", "Competition type")}</label>
           <select id="competition" name="competition" defaultValue={competition} className="min-w-0 flex-1 rounded-md border bg-white px-4 py-2.5 text-base text-slate-700 sm:flex-none md:text-lg">
-            <option value="all">ทั้งหมด</option>
-            <option value="league">บอลลีก</option>
-            <option value="cup">บอลถ้วย</option>
+            <option value="all">{t("ทั้งหมด", "All")}</option>
+            <option value="league">{t("บอลลีก", "League")}</option>
+            <option value="cup">{t("บอลถ้วย", "Cup")}</option>
           </select>
-          <button type="submit" className="rounded-md border border-slate-300 px-4 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-100 md:text-lg">แสดง</button>
+          <button type="submit" className="rounded-md border border-slate-300 px-4 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-100 md:text-lg">{t("แสดง", "Show")}</button>
         </form>
       </nav>
 
       {listMatches.length === 0 && pattaniOnSaleMatches.length === 0 ? (
         <div className="rounded-lg border bg-white p-8 text-center text-lg text-slate-500 md:text-xl">
-          ไม่พบแมตช์ในหมวดนี้
+          {t("ไม่พบแมตช์ในหมวดนี้", "No matches found in this category")}
         </div>
       ) : (
         <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -113,9 +118,9 @@ export default async function MatchesListPage(props: {
             return (
               <li key={m.id} className="flex flex-col rounded-xl border bg-white p-5 shadow-sm md:p-6">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <StatusBadge status={m.status} />
+                  <StatusBadge status={m.status} locale={locale} />
                   <span className="text-sm text-slate-500 md:text-base">
-                    {m.kickoffAt ? formatDateTime(m.kickoffAt) : "ยังไม่กำหนด"}
+                    {m.kickoffAt ? formatDateTime(m.kickoffAt, intlLocale(locale)) : t("ยังไม่กำหนด", "To be confirmed")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 py-2">
@@ -125,11 +130,11 @@ export default async function MatchesListPage(props: {
                   </span>
                   <TeamCrest logo={m.awayTeamLogo} name={m.awayTeam} />
                 </div>
-                <p className="mt-3 text-center text-base text-slate-600 md:text-lg">{m.venue ?? "ยังไม่กำหนดสนาม"}</p>
+                <p className="mt-3 text-center text-base text-slate-600 md:text-lg">{m.venue ?? t("ยังไม่กำหนดสนาม", "Venue to be confirmed")}</p>
                 {isPattaniHomeMatch && (
                   <div className="mt-auto pt-4">
                     <div className="mb-3 text-base font-semibold md:text-lg">
-                      ราคาแยกตามโซน
+                      {t("ราคาแยกตามโซน", "Prices vary by zone")}
                     </div>
                     <Link
                       href={`/matches/${m.id}${zoneQS}`}
@@ -139,7 +144,7 @@ export default async function MatchesListPage(props: {
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
-                      {isOnSale ? "จองตั๋ว" : "ดูรายละเอียด"}
+                      {isOnSale ? t("จองตั๋ว", "Book Tickets") : t("ดูรายละเอียด", "View Details")}
                     </Link>
                   </div>
                 )}
@@ -168,16 +173,19 @@ function isPattaniFixture(match: { homeTeam: string; awayTeam: string }) {
 function OnSaleMainboard({
   match,
   zoneQS,
+  locale,
 }: {
   match: Awaited<ReturnType<typeof getMatchesByFilter>>[number];
   zoneQS: string;
+  locale: Locale;
 }) {
+  const t = (th: string, en: string) => localize(locale, th, en);
   return (
     <article className="overflow-hidden rounded-2xl bg-green-950 bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-[length:200%_auto] bg-[position:22%_-10%] bg-no-repeat text-white shadow-xl md:bg-[length:100%_100%] md:bg-center">
       <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:p-10">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-1.5 text-sm font-black uppercase tracking-wider text-green-950 md:text-base">
-            <span className="size-2 animate-pulse rounded-full bg-green-950" /> เปิดจองแล้ว
+            <span className="size-2 animate-pulse rounded-full bg-green-950" /> {t("เปิดจองแล้ว", "Now on sale")}
           </div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-7">
             <MainboardTeam logo={match.homeTeamLogo} name={match.homeTeam} />
@@ -188,21 +196,21 @@ function OnSaleMainboard({
         <div className="border-t border-white/20 pt-5 md:min-w-60 md:border-l md:border-t-0 md:pl-8 md:pt-0">
           <p className="flex items-center gap-2 text-base text-emerald-100 md:text-lg">
             <Calendar className="size-5 text-yellow-300" />
-            {match.kickoffAt ? formatDateTime(match.kickoffAt) : "ยังไม่กำหนดวันแข่ง"}
+            {match.kickoffAt ? formatDateTime(match.kickoffAt, intlLocale(locale)) : t("ยังไม่กำหนดวันแข่ง", "Match date to be confirmed")}
           </p>
           <p className="mt-3 flex items-center gap-2 text-base text-emerald-100 md:text-lg">
             <MapPin className="size-5 text-yellow-300" />
-            {match.venue ?? "ยังไม่กำหนดสนาม"}
+            {match.venue ?? t("ยังไม่กำหนดสนาม", "Venue to be confirmed")}
           </p>
-          <p className="mt-5 text-base text-emerald-100 md:text-lg">เริ่มต้น</p>
+          <p className="mt-5 text-base text-emerald-100 md:text-lg">{t("เริ่มต้น", "From")}</p>
           <p className="text-3xl font-black text-yellow-300 md:text-4xl">
-            ราคาแยกตามโซน
+            {t("ราคาแยกตามโซน", "Prices vary by zone")}
           </p>
           <Link
             href={`/matches/${match.id}${zoneQS}`}
             className="mt-5 block rounded-lg bg-yellow-300 px-5 py-3.5 text-center text-base font-bold text-green-950 transition hover:bg-yellow-200 md:text-lg"
           >
-            จองตั๋วตอนนี้
+            {t("จองตั๋วตอนนี้", "Book Tickets Now")}
           </Link>
         </div>
       </div>
@@ -270,12 +278,13 @@ function TeamCrest({ logo, name }: { logo: string | null; name: string }) {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, locale }: { status: string; locale: Locale }) {
+  const t = (th: string, en: string) => localize(locale, th, en);
   const map: Record<string, { label: string; cls: string }> = {
-    SCHEDULED: { label: "ใกล้เปิด", cls: "bg-slate-100 text-slate-600" },
-    ON_SALE: { label: "เปิดจอง", cls: "bg-emerald-100 text-emerald-700" },
-    SOLD_OUT: { label: "เต็ม", cls: "bg-amber-100 text-amber-700" },
-    FINISHED: { label: "จบแล้ว", cls: "bg-slate-100 text-slate-500" },
+    SCHEDULED: { label: t("ใกล้เปิด", "Coming Soon"), cls: "bg-slate-100 text-slate-600" },
+    ON_SALE: { label: t("เปิดจอง", "On Sale"), cls: "bg-emerald-100 text-emerald-700" },
+    SOLD_OUT: { label: t("เต็ม", "Sold Out"), cls: "bg-amber-100 text-amber-700" },
+    FINISHED: { label: t("จบแล้ว", "Finished"), cls: "bg-slate-100 text-slate-500" },
   };
   const s = map[status] ?? { label: status, cls: "bg-slate-100 text-slate-600" };
   return <span className={`rounded-full px-3 py-1 text-sm font-semibold md:text-base ${s.cls}`}>{s.label}</span>;

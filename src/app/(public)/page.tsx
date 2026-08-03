@@ -8,6 +8,8 @@ import FeaturedMatches from "./_components/FeaturedMatches";
 import OnSaleMatchBoard from "./_components/OnSaleMatchBoard";
 import HomePlayers, { type HomePlayer } from "./_components/HomePlayers";
 import HomeZoneAvailability from "./_components/HomeZoneAvailability";
+import { getT } from "@/lib/i18n/server";
+import { intlLocale } from "@/lib/i18n/text";
 import {
   aggregateZoneAvailability,
   getSeatAvailabilityForMatches,
@@ -18,7 +20,7 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();
-  const [featured, onSaleMatches, homePage, playersResult] = await Promise.all([
+  const [featured, onSaleMatches, homePage, playersResult, { locale, dict }] = await Promise.all([
     prisma.match.findMany({
       where: {
         status: { in: ["SCHEDULED", "ON_SALE"] },
@@ -43,7 +45,9 @@ export default async function HomePage() {
       depth: 1,
       overrideAccess: true,
     }),
+    getT(),
   ]);
+  const numberLocale = intlLocale(locale);
   const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
   const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
   const seatSummary = summarizeSeatAvailability(availabilityByMatch);
@@ -67,11 +71,13 @@ export default async function HomePage() {
         <section>
           {onSaleMatches.length > 0 && (
             <div className="mb-10 space-y-4">
-              <SectionHeader eyebrow="Book now" title="โปรแกรมที่เปิดจอง" subtitle="เลือกแมตช์และจองตั๋วได้ทันที" />
+              <SectionHeader eyebrow={dict.home.bookNowEyebrow} title={dict.home.onSaleTitle} subtitle={dict.home.onSaleSubtitle} />
               {onSaleMatches.map((match) => (
                 <OnSaleMatchBoard
                   key={match.id}
                   match={match}
+                  locale={locale}
+                  labels={dict.home}
                 />
               ))}
             </div>
@@ -80,46 +86,46 @@ export default async function HomePage() {
 
         <section>
           <SectionHeader
-            eyebrow="ระบบจองตั๋ว"
-            title="ภาพรวมการจอง"
-            subtitle="ยอดรวมของแมตช์ที่เปิดจอง"
+            eyebrow={dict.home.bookingEyebrow}
+            title={dict.home.bookingTitle}
+            subtitle={dict.home.bookingSubtitle}
           />
           <StatsRow
             stats={[
               {
-                label: "จองรายแมตช์แล้ว",
-                value: totalReserved.toLocaleString("th-TH"),
+                label: dict.home.matchBooked,
+                value: totalReserved.toLocaleString(numberLocale),
                 highlight: true,
               },
-              { label: "คงเหลือ", value: seatSummary.remaining.toLocaleString("th-TH") },
+              { label: dict.home.remaining, value: seatSummary.remaining.toLocaleString(numberLocale) },
             ]}
           />
-          <HomeZoneAvailability availability={availabilityByZone} />
+          <HomeZoneAvailability availability={availabilityByZone} locale={locale} labels={dict.home} />
         </section>
 
-        <HomePlayers players={homePlayers} />
+        <HomePlayers players={homePlayers} labels={dict.home} />
 
         <section>
           <div className="mb-6 flex items-end justify-between gap-3">
             <div>
               <p className="text-base font-bold uppercase tracking-widest text-yellow-600 sm:text-lg">
-                Next matches
+                {dict.home.nextMatchesEyebrow}
               </p>
               <h2 className="mt-1.5 text-5xl font-black text-green-900 sm:text-6xl lg:text-7xl">
-                แมตช์ที่กำลังจะมาถึง
+                {dict.home.nextMatchesTitle}
               </h2>
               <p className="mt-2 text-lg text-muted-foreground sm:text-xl lg:text-2xl">
-                เลือกแมตช์ที่ต้องการ แล้วจองที่นั่งของคุณ
+                {dict.home.nextMatchesSubtitle}
               </p>
             </div>
             <Link
               href="/matches"
               className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-green-200 px-5 py-2.5 text-base font-medium text-green-800 transition-all hover:bg-green-800 hover:text-yellow-300 sm:inline-flex sm:text-lg"
             >
-              ดูทั้งหมด <ArrowRight className="size-5" />
+              {dict.home.viewAll} <ArrowRight className="size-5" />
             </Link>
           </div>
-          <FeaturedMatches matches={featured} />
+          <FeaturedMatches matches={featured} locale={locale} labels={dict.home} />
         </section>
 
       </div>

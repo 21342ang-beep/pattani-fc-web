@@ -17,6 +17,9 @@ import {
   type SeasonTier,
   type SeasonTierId,
 } from "@/lib/season-pass-tiers";
+import { getT } from "@/lib/i18n/server";
+import { intlLocale, localize } from "@/lib/i18n/text";
+import type { Locale } from "@/lib/i18n/dict";
 
 export const metadata = { title: "ตั๋วรายปี — Pattani FC" };
 
@@ -35,25 +38,26 @@ const TIER_MOCKUPS: Partial<Record<SeasonTierId, string>> = {
 };
 
 export default async function SeasonTicketsPage() {
-  const session = await readCustomerSession();
+  const [session, { locale }] = await Promise.all([readCustomerSession(), getT()]);
+  const t = (th: string, en: string) => localize(locale, th, en);
   return (
     <>
       <PageHero
-        title="ตั๋วรายปี"
-        subtitle="บัตรสมาชิกรายปี — ซื้อครั้งเดียว ดูทุกแมตช์เหย้าตลอดฤดูกาล พร้อมสิทธิพิเศษเฉพาะสมาชิก"
+        title={t("ตั๋วรายปี", "Season Tickets")}
+        subtitle={t("บัตรสมาชิกรายปี — ซื้อครั้งเดียว ดูทุกแมตช์เหย้าตลอดฤดูกาล พร้อมสิทธิพิเศษเฉพาะสมาชิก", "One season pass for every home match, with exclusive member benefits")}
       />
 
       <div className="mx-auto w-full max-w-6xl px-4 py-14 md:py-20">
         <section className="mb-12">
           <div className="mb-7 text-center">
             <p className="text-lg font-bold uppercase tracking-widest text-yellow-600 md:text-xl lg:text-2xl">Rainbow Stadium</p>
-            <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">แผนผังสนาม</h2>
-            <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">ตรวจสอบโซนที่นั่งก่อนเลือกแพ็กเกจสมาชิก</p>
+            <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">{t("แผนผังสนาม", "Stadium Map")}</h2>
+            <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">{t("ตรวจสอบโซนที่นั่งก่อนเลือกแพ็กเกจสมาชิก", "Review seating zones before choosing your membership package")}</p>
           </div>
           <div className="relative aspect-[1463/1058] w-full">
               <Image
                 src="/stadium-zones-season-2026-27-v4.png"
-                alt="แผนผังโซนที่นั่ง Rainbow Stadium — Pattani FC"
+                alt={t("แผนผังโซนที่นั่ง Rainbow Stadium — Pattani FC", "Rainbow Stadium seating plan — Pattani FC")}
                 fill
                 sizes="(max-width: 768px) 100vw, 1152px"
                 className="object-contain"
@@ -64,34 +68,36 @@ export default async function SeasonTicketsPage() {
         <div className="mb-10 text-center md:mb-12">
           <p className="inline-flex items-center gap-2 text-lg font-bold uppercase tracking-widest text-yellow-600 md:text-xl">
             <CalendarRange className="size-5" />
-            บัตรสมาชิกรายปี
+            {t("บัตรสมาชิกรายปี", "Season Membership")}
           </p>
           <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">
-            เลือกแพ็กเกจสมาชิกของคุณ
+            {t("เลือกแพ็กเกจสมาชิกของคุณ", "Choose Your Membership Package")}
           </h2>
           <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">
-            ซื้อครั้งเดียว · ดู {SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล
+            {t("ซื้อครั้งเดียว · ดู", "One purchase · Watch all")} {SEASON_MATCHES} {t("แมตช์เหย้าตลอดฤดูกาล", "home matches this season")}
           </p>
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {SEASON_TIERS.filter((t) => t.id !== "vvip-elite").map((t) => (
-            <TierCard key={t.id} tier={t} isMember={!!session} />
+            <TierCard key={t.id} tier={t} isMember={!!session} locale={locale} />
           ))}
         </div>
 
         <p className="mt-8 text-center text-lg leading-relaxed text-slate-500 md:text-xl lg:text-2xl">
-          * บัตรสมาชิกรายปีครอบคลุมเฉพาะแมตช์เหย้าในฤดูกาลปัจจุบัน — ไม่รวมเกมนัดพิเศษ/ทัวร์นาเมนต์นานาชาติ
+          {t("* บัตรสมาชิกรายปีครอบคลุมเฉพาะแมตช์เหย้าในฤดูกาลปัจจุบัน — ไม่รวมเกมนัดพิเศษ/ทัวร์นาเมนต์นานาชาติ", "* Season passes cover current-season home matches only and exclude special matches and international tournaments.")}
         </p>
       </div>
     </>
   );
 }
 
-function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
+function TierCard({ tier, isMember, locale }: { tier: SeasonTier; isMember: boolean; locale: Locale }) {
+  const t = (th: string, en: string) => localize(locale, th, en);
   const highlighted = tier.highlight;
-  const priceLabel = tier.priceBaht.toLocaleString("th-TH");
-  const unitLabel = `บาท / ฤดูกาล · ${SEASON_MATCHES} แมตช์`;
+  const priceLabel = tier.priceBaht.toLocaleString(intlLocale(locale));
+  const unitLabel = `${t("บาท / ฤดูกาล", "THB / season")} · ${SEASON_MATCHES} ${t("แมตช์", "matches")}`;
+  const tierCopy = locale === "ms" ? seasonTierMalay(tier.id) : seasonTierEnglish(tier.id);
   const mockup = TIER_MOCKUPS[tier.id];
   return (
     <div
@@ -104,7 +110,7 @@ function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
       {tier.ribbon && (
         <div className="absolute right-0 top-6 rounded-l-full bg-yellow-400 px-5 py-2 text-sm font-bold text-green-950 shadow md:text-base">
           <span className="inline-flex items-center gap-1">
-            <Sparkles className="size-4" /> {tier.ribbon}
+            <Sparkles className="size-4" /> {locale === "th" ? tier.ribbon : tierCopy.ribbon}
           </span>
         </div>
       )}
@@ -127,7 +133,7 @@ function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
         >
           <Image
             src={mockup}
-            alt={`ภาพตัวอย่างบัตรสมาชิก ${tier.name} Pattani FC`}
+            alt={`${t("ภาพตัวอย่างบัตรสมาชิก", "Membership card preview")} ${tier.name} Pattani FC`}
             width={1600}
             height={1600}
             sizes="(max-width: 640px) calc(100vw - 4rem), (max-width: 1024px) calc(50vw - 3rem), 360px"
@@ -155,14 +161,14 @@ function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
           highlighted ? "text-yellow-100/80" : "text-slate-600"
         }`}
       >
-        {tier.tagline}
+        {locale === "th" ? tier.tagline : tierCopy.tagline}
       </p>
       <p
         className={`mt-3 text-base font-semibold md:text-lg ${
           highlighted ? "text-yellow-200" : "text-green-800"
         }`}
       >
-        โซนที่เลือกได้: {tier.allowedSeatZones.join(" · ")}
+        {t("โซนที่เลือกได้:", "Available zones:")} {tier.allowedSeatZones.join(" · ")}
       </p>
 
       <div
@@ -189,7 +195,7 @@ function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
       </div>
 
       <ul className="mt-6 flex-1 space-y-3.5">
-        {tier.benefits.map((b) => (
+        {(locale === "th" ? tier.benefits : tierCopy.benefits).map((b) => (
           <li key={b} className="flex items-start gap-3 text-base leading-relaxed md:text-lg">
             <Check
               className={`mt-1 size-5 shrink-0 ${
@@ -215,8 +221,30 @@ function TierCard({ tier, isMember }: { tier: SeasonTier; isMember: boolean }) {
             : "bg-green-800 text-yellow-300 hover:bg-green-900"
         }`}
       >
-        ซื้อบัตรสมาชิกรายปี
+        {t("ซื้อบัตรสมาชิกรายปี", "Buy Season Membership")}
       </Link>
     </div>
   );
+}
+
+function seasonTierEnglish(id: SeasonTierId) {
+  const shared = [`Admission to all ${SEASON_MATCHES} home matches`, "Eligible for club souvenir prize draws"];
+  const tiers: Record<SeasonTierId, { tagline: string; ribbon?: string; benefits: string[] }> = {
+    "vvip-elite": { tagline: "Club-president level experience", ribbon: "Most exclusive", benefits: [shared[0], "VVIP membership card and assigned seat", "One official home jersey", "Card and jersey delivered within 2–3 days", shared[1]] },
+    "vip-advanced": { tagline: "Covered VIP stand with comfortable seating", ribbon: "Most popular · Best value", benefits: [shared[0], "VIP membership card and assigned VIP-zone seat", "One official home jersey", "Card and jersey collection details will be announced by the club", shared[1]] },
+    premium: { tagline: "Premium zone with a lively atmosphere", benefits: [shared[0], "Annual Premium membership card", shared[1]] },
+    gold: { tagline: "The starting point for true supporters", benefits: [shared[0], "Annual Gold membership card", shared[1]] },
+  };
+  return tiers[id];
+}
+
+function seasonTierMalay(id: SeasonTierId) {
+  const shared = [`Kemasukan ke semua ${SEASON_MATCHES} perlawanan di tempat sendiri`, "Layak menyertai cabutan hadiah cenderamata kelab"];
+  const tiers: Record<SeasonTierId, { tagline: string; ribbon?: string; benefits: string[] }> = {
+    "vvip-elite": { tagline: "Pengalaman bertaraf presiden kelab", ribbon: "Paling eksklusif", benefits: [shared[0], "Kad keahlian VVIP dan tempat duduk tetap", "Satu jersi rasmi tempat sendiri", "Kad dan jersi dihantar dalam 2–3 hari", shared[1]] },
+    "vip-advanced": { tagline: "Tempat duduk VIP berbumbung yang selesa", ribbon: "Paling popular · Nilai terbaik", benefits: [shared[0], "Kad keahlian VIP dan tempat duduk tetap zon VIP", "Satu jersi rasmi tempat sendiri", "Butiran pengambilan kad dan jersi akan diumumkan oleh kelab", shared[1]] },
+    premium: { tagline: "Zon premium dengan suasana meriah", benefits: [shared[0], "Kad keahlian Premium tahunan", shared[1]] },
+    gold: { tagline: "Permulaan untuk penyokong sejati", benefits: [shared[0], "Kad keahlian Gold tahunan", shared[1]] },
+  };
+  return tiers[id];
 }
