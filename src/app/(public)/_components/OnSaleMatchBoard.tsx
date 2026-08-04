@@ -2,14 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown, Calendar, MapPin, Shield } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
-import type { ZoneAvailability } from "@/lib/seat-availability";
-import {
-  getZonePrice,
-  STADIUM_ZONE_CODES,
-  type MatchZonePrices,
-  type StadiumZoneCode,
-} from "@/lib/stadium-zones";
-import { formatBaht } from "@/lib/format";
+import type { MatchZonePrices } from "@/lib/stadium-zones";
 import { getDict, type Dict, type Locale } from "@/lib/i18n/dict";
 import { intlLocale } from "@/lib/i18n/text";
 
@@ -26,13 +19,11 @@ export type OnSaleMatch = MatchZonePrices & {
 export default function OnSaleMatchBoard({
   match,
   showBookingButton = true,
-  zoneAvailability,
   locale = "th",
   labels,
 }: {
   match: OnSaleMatch;
   showBookingButton?: boolean;
-  zoneAvailability?: Record<StadiumZoneCode, ZoneAvailability>;
   locale?: Locale;
   labels?: Dict["home"];
 }) {
@@ -78,33 +69,6 @@ export default function OnSaleMatchBoard({
           )}
         </div>
       </div>
-      {zoneAvailability && (
-        <div className="border-t border-white/15 bg-black/15 px-5 py-4 sm:px-8">
-          <p className="mb-4 text-base font-semibold text-emerald-100 sm:text-lg lg:text-xl">{copy.zoneAvailability}</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 xl:grid-cols-10">
-            {STADIUM_ZONE_CODES.map((code) => {
-              const zone = zoneAvailability[code];
-              const price = getZonePrice(match, code);
-              return (
-                <Link
-                  key={code}
-                  href={`/matches/${match.id}?zone=${code}`}
-                  className="group rounded-lg bg-white/10 px-3 py-3 text-center transition hover:bg-yellow-300 hover:text-green-950"
-                >
-                  <span className="block text-sm font-bold sm:text-base">{copy.zone} {code}</span>
-                  <span className="mt-1 block text-2xl font-black sm:text-xl lg:text-2xl">
-                    {zone.capacity == null ? "—" : zone.remaining.toLocaleString(numberLocale)}
-                  </span>
-                  <span className="block text-xs font-medium text-emerald-100 group-hover:text-green-950 sm:text-sm">{copy.seats}</span>
-                  <span className="mt-1 block text-sm font-bold text-yellow-300 group-hover:text-green-950">
-                    {price == null ? "—" : formatBaht(price, numberLocale)}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </article>
   );
 }
