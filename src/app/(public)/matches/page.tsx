@@ -84,7 +84,7 @@ export default async function MatchesListPage(props: {
           </div>
           <div className="space-y-4">
             {pattaniOnSaleMatches.map((match) => (
-              <OnSaleMainboard key={match.id} match={match} zoneQS={zoneQS} locale={locale} />
+              <OnSaleMainboard key={match.id} match={match} locale={locale} />
             ))}
           </div>
         </section>
@@ -172,11 +172,9 @@ function isPattaniFixture(match: { homeTeam: string; awayTeam: string }) {
 
 function OnSaleMainboard({
   match,
-  zoneQS,
   locale,
 }: {
   match: Awaited<ReturnType<typeof getMatchesByFilter>>[number];
-  zoneQS: string;
   locale: Locale;
 }) {
   const t = (th: string, en: string) => localize(locale, th, en);
@@ -207,7 +205,7 @@ function OnSaleMainboard({
             {t("ราคาแยกตามโซน", "Prices vary by zone")}
           </p>
           <Link
-            href={`/matches/${match.id}${zoneQS}`}
+            href="/tickets#matches"
             className="mt-5 block rounded-lg bg-yellow-300 px-5 py-3.5 text-center text-base font-bold text-green-950 transition hover:bg-yellow-200 md:text-lg"
           >
             {t("จองตั๋วตอนนี้", "Book Tickets Now")}
