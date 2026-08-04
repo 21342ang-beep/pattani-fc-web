@@ -59,8 +59,6 @@ export default async function SeasonPassApplyPage(props: {
     const sold = soldGroups.find((item) => item.seatZone === seatZone)?._count._all ?? 0;
     return {
       seatZone,
-      publicStartSequence: range?.publicStartSequence ?? null,
-      publicEndSequence: range?.publicEndSequence ?? null,
       remaining: range ? Math.max(0, range.publicSeatCount - sold) : null,
     };
   });

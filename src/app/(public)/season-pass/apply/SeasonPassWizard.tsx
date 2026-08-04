@@ -62,8 +62,6 @@ export type ShippingProvince = {
 
 export type SeasonPassZoneOption = {
   seatZone: SeasonPassSeatZone;
-  publicStartSequence: number | null;
-  publicEndSequence: number | null;
   remaining: number | null;
 };
 
@@ -338,8 +336,6 @@ function FormStep({
   const selectedDistrict = selectedProvince?.districts.find(
     (district) => district.name === shipCity,
   );
-  const selectedZoneOption = zoneOptions.find((option) => option.seatZone === seatZone);
-
   function handleProvinceChange(province: string) {
     setShipProvince(province);
     setShipCity("");
@@ -481,10 +477,6 @@ function FormStep({
         >
           <option value="">เลือกโซนที่นั่ง</option>
           {zoneOptions.map((option) => {
-            const hasRange = option.publicStartSequence != null && option.publicEndSequence != null;
-            const rangeLabel = hasRange
-              ? ` · เลข ${String(option.publicStartSequence).padStart(4, "0")}–${String(option.publicEndSequence).padStart(4, "0")}`
-              : "";
             const remainingLabel = option.remaining == null
               ? ""
               : option.remaining > 0
@@ -492,16 +484,11 @@ function FormStep({
                 : " · เต็มแล้ว";
             return (
               <option key={option.seatZone} value={option.seatZone} disabled={option.remaining === 0}>
-                {option.seatZone}{rangeLabel}{remainingLabel}
+                {option.seatZone}{remainingLabel}
               </option>
             );
           })}
         </select>
-        {selectedZoneOption?.publicStartSequence != null && selectedZoneOption.publicEndSequence != null && (
-          <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
-            รหัสการจองโซนนี้อยู่ในช่วง {String(selectedZoneOption.publicStartSequence).padStart(4, "0")}–{String(selectedZoneOption.publicEndSequence).padStart(4, "0")} ระบบจะใช้เลขว่างลำดับแรก
-          </p>
-        )}
       </Field>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">

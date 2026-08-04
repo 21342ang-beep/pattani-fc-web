@@ -9,7 +9,7 @@ import {
   useMotionValueEvent,
   AnimatePresence,
 } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, X, Shield } from "lucide-react";
 import LocaleSwitcher from "./_components/LocaleSwitcher";
 import type { Dict, Locale } from "@/lib/i18n/dict";
@@ -99,12 +99,31 @@ export default function TopNav({
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const closeMenuTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   // กลุ่มที่กางอยู่ใน drawer mobile (accordion) — ลด tab รก
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const closeNavigation = () => {
+    if (closeMenuTimer.current) {
+      clearTimeout(closeMenuTimer.current);
+      closeMenuTimer.current = null;
+    }
     setOpenMenu(null);
     setMobileOpen(false);
+  };
+  const openDesktopMenu = (label: string) => {
+    if (closeMenuTimer.current) {
+      clearTimeout(closeMenuTimer.current);
+      closeMenuTimer.current = null;
+    }
+    setOpenMenu(label);
+  };
+  const scheduleDesktopMenuClose = () => {
+    if (closeMenuTimer.current) clearTimeout(closeMenuTimer.current);
+    closeMenuTimer.current = setTimeout(() => {
+      setOpenMenu(null);
+      closeMenuTimer.current = null;
+    }, 180);
   };
   const toggleGroup = (label: string) =>
     setOpenGroups((prev) =>
@@ -120,6 +139,12 @@ export default function TopNav({
     setOpenMenu(null);
     setMobileOpen(false);
   }, [path]);
+
+  useEffect(() => {
+    return () => {
+      if (closeMenuTimer.current) clearTimeout(closeMenuTimer.current);
+    };
+  }, []);
 
   // กางกลุ่ม accordion ที่มีหน้า active อยู่ (ให้ผู้ใช้เห็นตำแหน่งปัจจุบัน)
   useEffect(() => {
@@ -152,12 +177,24 @@ export default function TopNav({
         <div
           key={it.label}
           className="relative"
-          onMouseEnter={() => setOpenMenu(it.label)}
-          onMouseLeave={() => setOpenMenu(null)}
+          onMouseEnter={() => openDesktopMenu(it.label)}
+          onMouseLeave={scheduleDesktopMenuClose}
+          onFocusCapture={() => openDesktopMenu(it.label)}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              scheduleDesktopMenuClose();
+            }
+          }}
         >
           <button
             type="button"
-            onClick={() => setOpenMenu(isOpen ? null : it.label)}
+            onClick={() => {
+              if (isOpen) {
+                scheduleDesktopMenuClose();
+              } else {
+                openDesktopMenu(it.label);
+              }
+            }}
             aria-expanded={isOpen}
             aria-haspopup="menu"
             suppressHydrationWarning
@@ -171,11 +208,13 @@ export default function TopNav({
             </svg>
           </button>
           {isOpen && (
-            <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-80 overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-xl shadow-xl backdrop-blur-md 2xl:text-2xl">
-              {it.children.map((child) => {
-                const childActive = childIsActive(path, searchParams, child.href, it.children);
-                return <Link key={child.href} href={child.href} role="menuitem" onClick={closeNavigation} className={`block whitespace-nowrap px-5 py-2.5 transition-colors ${childActive ? "font-black text-white" : "font-semibold text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
-              })}
+            <div className="absolute right-0 top-full z-50 w-80 pt-2">
+              <div role="menu" className="overflow-hidden rounded-xl border border-yellow-300/20 bg-green-950/95 py-1 text-xl shadow-xl backdrop-blur-md 2xl:text-2xl">
+                {it.children.map((child) => {
+                  const childActive = childIsActive(path, searchParams, child.href, it.children);
+                  return <Link key={child.href} href={child.href} role="menuitem" onClick={closeNavigation} className={`block whitespace-nowrap px-5 py-2.5 transition-colors ${childActive ? "font-black text-white" : "font-semibold text-yellow-100 hover:bg-green-900"}`}>{child.label}</Link>;
+                })}
+              </div>
             </div>
           )}
         </div>
