@@ -33,6 +33,11 @@ function numOrNull(v: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function bahtToSatangOrNull(v: FormDataEntryValue | null): number | null {
+  const baht = numOrNull(v);
+  return baht == null ? null : Math.round(baht * 100);
+}
+
 type LogoResolveResult = {
   path: string | null;
   // ไฟล์ใหม่ที่เพิ่งเซฟ (อาจต้อง rollback ถ้า validation ตก)
@@ -85,6 +90,16 @@ async function parseFormToMatchInput(formData: FormData) {
   const zoneISeats = numOrNull(formData.get("zoneISeats"));
   const zoneJSeats = numOrNull(formData.get("zoneJSeats"));
   const zoneAwaySeats = numOrNull(formData.get("zoneAwaySeats"));
+  const zoneAPrice = bahtToSatangOrNull(formData.get("zoneAPrice"));
+  const zoneBPrice = bahtToSatangOrNull(formData.get("zoneBPrice"));
+  const zoneCPrice = bahtToSatangOrNull(formData.get("zoneCPrice"));
+  const zoneDPrice = bahtToSatangOrNull(formData.get("zoneDPrice"));
+  const zoneEPrice = bahtToSatangOrNull(formData.get("zoneEPrice"));
+  const zoneFPrice = bahtToSatangOrNull(formData.get("zoneFPrice"));
+  const zoneGPrice = bahtToSatangOrNull(formData.get("zoneGPrice"));
+  const zoneIPrice = bahtToSatangOrNull(formData.get("zoneIPrice"));
+  const zoneJPrice = bahtToSatangOrNull(formData.get("zoneJPrice"));
+  const zoneAwayPrice = bahtToSatangOrNull(formData.get("zoneAwayPrice"));
   const homeZoneCapacities = [
     zoneASeats,
     zoneBSeats,
@@ -102,6 +117,18 @@ async function parseFormToMatchInput(formData: FormData) {
   );
   const sum = (...capacities: Array<number | null>) =>
     capacities.reduce<number>((total, capacity) => total + (capacity ?? 0), 0);
+  const activePrices = [
+    [zoneASeats, zoneAPrice],
+    [zoneBSeats, zoneBPrice],
+    [zoneCSeats, zoneCPrice],
+    [zoneDSeats, zoneDPrice],
+    [zoneESeats, zoneEPrice],
+    [zoneFSeats, zoneFPrice],
+    [zoneGSeats, zoneGPrice],
+    [zoneISeats, zoneIPrice],
+    [zoneJSeats, zoneJPrice],
+    [zoneAwaySeats, zoneAwayPrice],
+  ].flatMap(([capacity, price]) => (capacity ?? 0) > 0 && price != null ? [price] : []);
 
   const data = {
     homeTeam: formData.get("homeTeam"),
@@ -135,8 +162,17 @@ async function parseFormToMatchInput(formData: FormData) {
       ? sum(zoneDSeats, zoneISeats)
       : numOrNull(formData.get("legacyZone100Seats")),
     zoneAwaySeats,
-    // ราคาเป็นของโซน ไม่ใช่ของแมตช์ และล้างค่าเก่าจากข้อมูลเดิมด้วย
-    pricePerSeat: null,
+    zoneAPrice,
+    zoneBPrice,
+    zoneCPrice,
+    zoneDPrice,
+    zoneEPrice,
+    zoneFPrice,
+    zoneGPrice,
+    zoneIPrice,
+    zoneJPrice,
+    zoneAwayPrice,
+    pricePerSeat: activePrices.length > 0 ? Math.min(...activePrices) : null,
     competitionType: (formData.get("competitionType") as string) || undefined,
     description: (formData.get("description") as string) || undefined,
     status: (formData.get("status") as string) || undefined,

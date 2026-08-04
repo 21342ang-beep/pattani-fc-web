@@ -5,7 +5,7 @@ import PageHero from "../_components/PageHero";
 import OnSaleMatchBoard from "../_components/OnSaleMatchBoard";
 import { prisma } from "@/lib/prisma";
 import { aggregateZoneAvailability, getSeatAvailabilityForMatches } from "@/lib/seat-availability";
-import { type StadiumZoneCode } from "@/lib/stadium-zones";
+import { getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
 import { getT } from "@/lib/i18n/server";
 import { intlLocale, localize } from "@/lib/i18n/text";
 import type { Locale } from "@/lib/i18n/dict";
@@ -19,7 +19,8 @@ type ZoneColor = "yellow" | "orange" | "red" | "green" | "blue" | "purple";
 type StadiumZone = {
   code: StadiumZoneCode;
   label: string;
-  priceBaht: number;
+  minPriceBaht: number | null;
+  maxPriceBaht: number | null;
   capacity: number | null;
   remaining: number;
   seasonReserved: number;
@@ -28,16 +29,16 @@ type StadiumZone = {
   note?: string;
 };
 const STADIUM_ZONES: StadiumZone[] = [
-  { code: "A", label: "อัฒจันทร์เหนือ · A", priceBaht: 150, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
-  { code: "B", label: "อัฒจันทร์เหนือ · B", priceBaht: 150, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
-  { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", priceBaht: 120, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
-  { code: "D", label: "อัฒจันทร์ฝั่งตะวันออก · D", priceBaht: 100, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
-  { code: "E", label: "อัฒจันทร์ใต้ · E", priceBaht: 120, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
-  { code: "F", label: "อัฒจันทร์ใต้ · F", priceBaht: 150, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
-  { code: "G", label: "อัฒจันทร์ใต้ · G", priceBaht: 120, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
-  { code: "I", label: "อัฒจันทร์ฝั่งตะวันตก · I", priceBaht: 100, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
-  { code: "J", label: "อัฒจันทร์ฝั่งตะวันตก · J", priceBaht: 120, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
-  { code: "AWAY", label: "ทีมเยือน", priceBaht: 200, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
+  { code: "A", label: "อัฒจันทร์เหนือ · A", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
+  { code: "B", label: "อัฒจันทร์เหนือ · B", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
+  { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
+  { code: "D", label: "อัฒจันทร์ฝั่งตะวันออก · D", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
+  { code: "E", label: "อัฒจันทร์ใต้ · E", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
+  { code: "F", label: "อัฒจันทร์ใต้ · F", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
+  { code: "G", label: "อัฒจันทร์ใต้ · G", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
+  { code: "I", label: "อัฒจันทร์ฝั่งตะวันตก · I", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
+  { code: "J", label: "อัฒจันทร์ฝั่งตะวันตก · J", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
+  { code: "AWAY", label: "ทีมเยือน", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
 ];
 
 export default async function TicketsPage() {
@@ -47,13 +48,21 @@ export default async function TicketsPage() {
   const t = (th: string, en: string) => localize(locale, th, en);
   const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
   const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
-  const displayZones = STADIUM_ZONES.map((zone) => ({
-    ...zone,
-    capacity: availabilityByZone[zone.code].capacity,
-    remaining: availabilityByZone[zone.code].remaining,
-    seasonReserved: availabilityByZone[zone.code].seasonReserved,
-    sharedCapacity: availabilityByZone[zone.code].sharedCapacity,
-  }));
+  const displayZones = STADIUM_ZONES.map((zone) => {
+    const prices = onSaleMatches
+      .map((match) => getZonePrice(match, zone.code))
+      .filter((price): price is number => price != null && price > 0)
+      .map((price) => price / 100);
+    return {
+      ...zone,
+      minPriceBaht: prices.length > 0 ? Math.min(...prices) : null,
+      maxPriceBaht: prices.length > 0 ? Math.max(...prices) : null,
+      capacity: availabilityByZone[zone.code].capacity,
+      remaining: availabilityByZone[zone.code].remaining,
+      seasonReserved: availabilityByZone[zone.code].seasonReserved,
+      sharedCapacity: availabilityByZone[zone.code].sharedCapacity,
+    };
+  });
   return (
     <>
       <PageHero
@@ -75,6 +84,7 @@ export default async function TicketsPage() {
                 key={match.id}
                 match={match}
                 showBookingButton={false}
+                zoneAvailability={availabilityByMatch.get(match.id)}
                 locale={locale}
               />
             ))}
@@ -92,7 +102,7 @@ export default async function TicketsPage() {
             {t("เลือกโซนที่นั่งของคุณ", "Choose Your Seating Zone")}
           </h2>
           <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">
-            {t("Rainbow Stadium · ปัตตานี — ความจุ 10,700 ที่นั่ง · ราคา 100–200 บาท", "Rainbow Stadium · Pattani — Capacity 10,700 · Tickets THB 100–200")}
+            {t("Rainbow Stadium · ปัตตานี — ความจุ 10,700 ที่นั่ง · ราคาเป็นไปตามแต่ละแมตช์", "Rainbow Stadium · Pattani — Capacity 10,700 · Prices vary by match")}
           </p>
         </div>
 
@@ -120,7 +130,7 @@ export default async function TicketsPage() {
               <Link
                 href={`/matches?zone=${z.code}`}
                 className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 rounded-2xl"
-                aria-label={`${t("เลือกโซน", "Choose zone")} ${z.code} · ${z.priceBaht} ${t("บาท", "THB")}`}
+                aria-label={`${t("เลือกโซน", "Choose zone")} ${z.code}`}
               >
                 <ZoneCard zone={z} locale={locale} />
               </Link>
@@ -263,8 +273,12 @@ function ZoneCard({ zone, locale }: { zone: StadiumZone; locale: Locale }) {
           {locale === "th" ? zone.label : locale === "ms" ? malayZoneLabel[zone.code] : englishZoneLabel[zone.code]}
         </span>
         <span className={`mt-3 text-3xl font-black ${s.price}`}>
-          {zone.priceBaht.toLocaleString("th-TH")}
-          <span className="ml-1 text-base font-medium text-slate-500">{t("บาท", "THB")}</span>
+          {zone.minPriceBaht == null
+            ? t("ยังไม่กำหนดราคา", "Price not set")
+            : zone.minPriceBaht === zone.maxPriceBaht
+              ? zone.minPriceBaht.toLocaleString(intlLocale(locale))
+              : `${zone.minPriceBaht.toLocaleString(intlLocale(locale))}–${zone.maxPriceBaht?.toLocaleString(intlLocale(locale))}`}
+          {zone.minPriceBaht != null && <span className="ml-1 text-base font-medium text-slate-500">{t("บาท", "THB")}</span>}
         </span>
         <span className="mt-3 text-xl font-semibold leading-tight text-slate-500 md:text-2xl">
           {zone.capacity == null ? t("ยังไม่เปิดขาย", "Not on sale yet") : `${t("คงเหลือ", "Remaining")} ${zone.remaining.toLocaleString(intlLocale(locale))} ${t("ที่นั่ง", "seats")}`}

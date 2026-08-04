@@ -132,6 +132,16 @@ model Match {
   zone120Seats    Int?
   zone100Seats    Int?
   zoneAwaySeats   Int?
+  zoneAPrice      Int? // ราคาเป็นสตางค์ (เลี่ยง floating point)
+  zoneBPrice      Int?
+  zoneCPrice      Int?
+  zoneDPrice      Int?
+  zoneEPrice      Int?
+  zoneFPrice      Int?
+  zoneGPrice      Int?
+  zoneIPrice      Int?
+  zoneJPrice      Int?
+  zoneAwayPrice   Int?
   pricePerSeat    Int? // ราคาเป็นสตางค์ (เลี่ยง floating point)
   competitionType CompetitionType  @default(LEAGUE)
   homeScore       Int?

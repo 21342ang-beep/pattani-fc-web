@@ -34,8 +34,18 @@ const matchBaseSchema = z.object({
   zone120Seats: z.number().int().nonnegative().max(200000).nullish(),
   zone100Seats: z.number().int().nonnegative().max(200000).nullish(),
   zoneAwaySeats: z.number().int().nonnegative().max(200000).nullish(),
-  // เก็บไว้ชั่วคราวเพื่อรองรับ schema เดิม แต่ไม่รับราคาในระดับแมตช์อีกต่อไป
-  pricePerSeat: z.null().optional(),
+  zoneAPrice: z.number().int().positive().max(10_000_000).nullish(),
+  zoneBPrice: z.number().int().positive().max(10_000_000).nullish(),
+  zoneCPrice: z.number().int().positive().max(10_000_000).nullish(),
+  zoneDPrice: z.number().int().positive().max(10_000_000).nullish(),
+  zoneEPrice: z.number().int().positive().max(10_000_000).nullish(),
+  zoneFPrice: z.number().int().positive().max(10_000_000).nullish(),
+  zoneGPrice: z.number().int().positive().max(10_000_000).nullish(),
+  zoneIPrice: z.number().int().positive().max(10_000_000).nullish(),
+  zoneJPrice: z.number().int().positive().max(10_000_000).nullish(),
+  zoneAwayPrice: z.number().int().positive().max(10_000_000).nullish(),
+  // ราคาต่ำสุดของแมตช์ ใช้สำหรับการ์ดประชาสัมพันธ์และคำนวณจากราคารายโซนเท่านั้น
+  pricePerSeat: z.number().int().positive().max(10_000_000).nullish(),
   competitionType: z.enum(["LEAGUE", "CUP"]).optional(),
   description: z.string().trim().max(2000).optional(),
   status: z.enum(["SCHEDULED", "ON_SALE", "SOLD_OUT", "CANCELLED", "FINISHED"]).optional(),
@@ -56,6 +66,16 @@ type MatchShape = {
   zoneISeats?: number | null;
   zoneJSeats?: number | null;
   zoneAwaySeats?: number | null;
+  zoneAPrice?: number | null;
+  zoneBPrice?: number | null;
+  zoneCPrice?: number | null;
+  zoneDPrice?: number | null;
+  zoneEPrice?: number | null;
+  zoneFPrice?: number | null;
+  zoneGPrice?: number | null;
+  zoneIPrice?: number | null;
+  zoneJPrice?: number | null;
+  zoneAwayPrice?: number | null;
   status?: string;
 };
 function requireFullDataForOnSale(d: MatchShape, ctx: z.RefinementCtx) {
@@ -77,6 +97,21 @@ function requireFullDataForOnSale(d: MatchShape, ctx: z.RefinementCtx) {
     d.zoneAwaySeats,
   ].some((capacity) => capacity == null)) {
     missing.push("จำนวนที่นั่งแยกทุกโซน");
+  }
+  const zones = [
+    [d.zoneASeats, d.zoneAPrice],
+    [d.zoneBSeats, d.zoneBPrice],
+    [d.zoneCSeats, d.zoneCPrice],
+    [d.zoneDSeats, d.zoneDPrice],
+    [d.zoneESeats, d.zoneEPrice],
+    [d.zoneFSeats, d.zoneFPrice],
+    [d.zoneGSeats, d.zoneGPrice],
+    [d.zoneISeats, d.zoneIPrice],
+    [d.zoneJSeats, d.zoneJPrice],
+    [d.zoneAwaySeats, d.zoneAwayPrice],
+  ];
+  if (zones.some(([capacity, price]) => (capacity ?? 0) > 0 && price == null)) {
+    missing.push("ราคาของทุกโซนที่เปิดขาย");
   }
   if (missing.length > 0) {
     ctx.addIssue({

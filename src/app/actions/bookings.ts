@@ -10,6 +10,7 @@ import {
   getStadiumZone,
   getZoneCapacity,
   getZoneCapacityScope,
+  getZonePrice,
 } from "@/lib/stadium-zones";
 
 export type BookingFormState = {
@@ -59,6 +60,10 @@ export async function createBooking(
         if (capacity == null) {
           throw new Error("โซนนี้ยังไม่เปิดขายสำหรับแมตช์นี้");
         }
+        const price = getZonePrice(match, parsed.data.zone);
+        if (price == null || price <= 0) {
+          throw new Error("โซนนี้ยังไม่ได้กำหนดราคา ไม่สามารถจองได้");
+        }
 
         const capacityScope = getZoneCapacityScope(match, parsed.data.zone);
         const sold = await tx.booking.aggregate({
@@ -84,7 +89,7 @@ export async function createBooking(
             customerPhone: parsed.data.customerPhone,
             quantity: parsed.data.quantity,
             zone: parsed.data.zone,
-            totalAmount: zone.priceSatang * parsed.data.quantity,
+            totalAmount: price * parsed.data.quantity,
             notes: parsed.data.notes,
           },
         });

@@ -2,7 +2,12 @@
 
 import { useActionState, useState } from "react";
 import type { MatchFormState } from "@/app/actions/matches";
-import { STADIUM_ZONE_CODES, STADIUM_ZONES, MATCH_ZONE_CAPACITY_FIELDS } from "@/lib/stadium-zones";
+import {
+  STADIUM_ZONE_CODES,
+  STADIUM_ZONES,
+  MATCH_ZONE_CAPACITY_FIELDS,
+  MATCH_ZONE_PRICE_FIELDS,
+} from "@/lib/stadium-zones";
 import LogoUpload from "./LogoUpload";
 
 type Match = {
@@ -27,6 +32,16 @@ type Match = {
   zone120Seats: number | null;
   zone100Seats: number | null;
   zoneAwaySeats: number | null;
+  zoneAPrice: number | null;
+  zoneBPrice: number | null;
+  zoneCPrice: number | null;
+  zoneDPrice: number | null;
+  zoneEPrice: number | null;
+  zoneFPrice: number | null;
+  zoneGPrice: number | null;
+  zoneIPrice: number | null;
+  zoneJPrice: number | null;
+  zoneAwayPrice: number | null;
   competitionType: string;
   status: string;
   description: string | null;
@@ -156,30 +171,43 @@ export default function MatchForm({
         />
       </div>
       <p className="rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-900">
-        ราคาตั๋วกําหนดตามโซนที่ผู้ซื้อเลือก ระบบจะใช้ราคาโซนนั้นโดยอัตโนมัติ
+        กำหนดราคาแยกตามโซนสำหรับแมตช์นี้ ระบบจะแสดงราคาและคำนวณยอดชำระจากค่าที่บันทึกไว้ที่นี่
       </p>
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-        <h2 className="text-lg font-bold text-slate-900 md:text-xl">จำนวนที่นั่งทั้งหมดแยกแต่ละโซน</h2>
-        <p className="mt-1 text-base text-slate-600 md:text-lg">กรอกความจุจริงของโซน ระบบจะหักตั๋วรายแมตช์และสิทธิ์บัตรรายปีให้อัตโนมัติ · หากไม่เปิดขายให้ใส่ 0</p>
+        <h2 className="text-lg font-bold text-slate-900 md:text-xl">จำนวนที่นั่งและราคาแยกแต่ละโซน</h2>
+        <p className="mt-1 text-base text-slate-600 md:text-lg">กรอกความจุจริงและราคาต่อใบ (บาท) · หากไม่เปิดขายให้ใส่จำนวนที่นั่งเป็น 0</p>
         {!hasPerZoneSeats && initial?.zone150Seats != null && (
           <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900 md:text-lg">
             แมตช์นี้ยังใช้จำนวนรวมแบบเดิมตามกลุ่มราคา กรุณากรอกทุกโซนก่อนบันทึกเพื่อเปลี่ยนเป็นระบบรายโซน
           </p>
         )}
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {STADIUM_ZONE_CODES.map((code) => {
             const field = MATCH_ZONE_CAPACITY_FIELDS[code];
+            const priceField = MATCH_ZONE_PRICE_FIELDS[code];
             return (
-              <Field
-                key={code}
-                label={`โซน ${code} · ${STADIUM_ZONES[code].priceSatang / 100} บาท`}
-                name={field}
-                type="number"
-                min={0}
-                value={zoneSeats[field]}
-                onChange={(event) => updateZoneSeats(field, event.target.value)}
-                hint={STADIUM_ZONES[code].label}
-              />
+              <div key={code} className="rounded-md border bg-white p-3">
+                <p className="mb-3 text-base font-bold text-slate-900 md:text-lg">โซน {code}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="จำนวนที่นั่ง"
+                    name={field}
+                    type="number"
+                    min={0}
+                    value={zoneSeats[field]}
+                    onChange={(event) => updateZoneSeats(field, event.target.value)}
+                  />
+                  <Field
+                    label="ราคา/ใบ (บาท)"
+                    name={priceField}
+                    type="number"
+                    min={0.01}
+                    step="0.01"
+                    defaultValue={initial?.[priceField] != null ? (initial[priceField] / 100).toString() : ""}
+                  />
+                </div>
+                <p className="mt-2 text-sm text-slate-500 md:text-base">{STADIUM_ZONES[code].label}</p>
+              </div>
             );
           })}
         </div>
@@ -245,6 +273,7 @@ function Field({
   hint,
   readOnly,
   min,
+  step,
 }: {
   label: string;
   name: string;
@@ -256,6 +285,7 @@ function Field({
   hint?: string;
   readOnly?: boolean;
   min?: number;
+  step?: string;
 }) {
   return (
     <div>
@@ -268,6 +298,7 @@ function Field({
         required={required}
         readOnly={readOnly}
         min={min}
+        step={step}
         className="mt-1 w-full rounded-md border px-3 py-2.5 text-base md:text-lg"
       />
       {hint && <p className="mt-1 text-sm text-slate-500 md:text-base">{hint}</p>}

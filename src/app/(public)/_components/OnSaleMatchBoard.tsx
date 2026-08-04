@@ -3,11 +3,17 @@ import Link from "next/link";
 import { ArrowDown, Calendar, MapPin, Shield } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import type { ZoneAvailability } from "@/lib/seat-availability";
-import { STADIUM_ZONE_CODES, type StadiumZoneCode } from "@/lib/stadium-zones";
+import {
+  getZonePrice,
+  STADIUM_ZONE_CODES,
+  type MatchZonePrices,
+  type StadiumZoneCode,
+} from "@/lib/stadium-zones";
+import { formatBaht } from "@/lib/format";
 import { getDict, type Dict, type Locale } from "@/lib/i18n/dict";
 import { intlLocale } from "@/lib/i18n/text";
 
-export type OnSaleMatch = {
+export type OnSaleMatch = MatchZonePrices & {
   id: string;
   homeTeam: string;
   awayTeam: string;
@@ -78,6 +84,7 @@ export default function OnSaleMatchBoard({
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 xl:grid-cols-10">
             {STADIUM_ZONE_CODES.map((code) => {
               const zone = zoneAvailability[code];
+              const price = getZonePrice(match, code);
               return (
                 <Link
                   key={code}
@@ -89,6 +96,9 @@ export default function OnSaleMatchBoard({
                     {zone.capacity == null ? "—" : zone.remaining.toLocaleString(numberLocale)}
                   </span>
                   <span className="block text-xs font-medium text-emerald-100 group-hover:text-green-950 sm:text-sm">{copy.seats}</span>
+                  <span className="mt-1 block text-sm font-bold text-yellow-300 group-hover:text-green-950">
+                    {price == null ? "—" : formatBaht(price, numberLocale)}
+                  </span>
                 </Link>
               );
             })}

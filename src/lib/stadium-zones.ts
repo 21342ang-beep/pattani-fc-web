@@ -1,14 +1,14 @@
 export const STADIUM_ZONES = {
-  A: { label: "อัฒจันทร์เหนือ · A", priceSatang: 15_000 },
-  B: { label: "อัฒจันทร์เหนือ · B", priceSatang: 15_000 },
-  C: { label: "อัฒจันทร์ฝั่งตะวันออก · C", priceSatang: 12_000 },
-  D: { label: "อัฒจันทร์ฝั่งตะวันออก · D", priceSatang: 10_000 },
-  E: { label: "อัฒจันทร์ใต้ · E", priceSatang: 12_000 },
-  F: { label: "อัฒจันทร์ใต้ · F", priceSatang: 15_000 },
-  G: { label: "อัฒจันทร์ใต้ · G", priceSatang: 12_000 },
-  I: { label: "อัฒจันทร์ฝั่งตะวันตก · I", priceSatang: 10_000 },
-  J: { label: "อัฒจันทร์ฝั่งตะวันตก · J", priceSatang: 12_000 },
-  AWAY: { label: "ทีมเยือน", priceSatang: 20_000 },
+  A: { label: "อัฒจันทร์เหนือ · A" },
+  B: { label: "อัฒจันทร์เหนือ · B" },
+  C: { label: "อัฒจันทร์ฝั่งตะวันออก · C" },
+  D: { label: "อัฒจันทร์ฝั่งตะวันออก · D" },
+  E: { label: "อัฒจันทร์ใต้ · E" },
+  F: { label: "อัฒจันทร์ใต้ · F" },
+  G: { label: "อัฒจันทร์ใต้ · G" },
+  I: { label: "อัฒจันทร์ฝั่งตะวันตก · I" },
+  J: { label: "อัฒจันทร์ฝั่งตะวันตก · J" },
+  AWAY: { label: "ทีมเยือน" },
 } as const;
 
 export type StadiumZoneCode = keyof typeof STADIUM_ZONES;
@@ -27,7 +27,21 @@ export const MATCH_ZONE_CAPACITY_FIELDS = {
   AWAY: "zoneAwaySeats",
 } as const satisfies Record<StadiumZoneCode, string>;
 
+export const MATCH_ZONE_PRICE_FIELDS = {
+  A: "zoneAPrice",
+  B: "zoneBPrice",
+  C: "zoneCPrice",
+  D: "zoneDPrice",
+  E: "zoneEPrice",
+  F: "zoneFPrice",
+  G: "zoneGPrice",
+  I: "zoneIPrice",
+  J: "zoneJPrice",
+  AWAY: "zoneAwayPrice",
+} as const satisfies Record<StadiumZoneCode, string>;
+
 export type MatchZoneCapacityField = (typeof MATCH_ZONE_CAPACITY_FIELDS)[StadiumZoneCode];
+export type MatchZonePriceField = (typeof MATCH_ZONE_PRICE_FIELDS)[StadiumZoneCode];
 export type ZonePriceGroup = 200 | 170 | 150 | 120 | 100;
 
 export type MatchCapacity = Record<MatchZoneCapacityField, number | null> & {
@@ -37,11 +51,23 @@ export type MatchCapacity = Record<MatchZoneCapacityField, number | null> & {
   zone100Seats: number | null;
 };
 
+export type MatchZonePrices = Record<MatchZonePriceField, number | null>;
+
+const LEGACY_ZONE_PRICE_GROUPS: Record<StadiumZoneCode, ZonePriceGroup> = {
+  A: 150,
+  B: 150,
+  C: 120,
+  D: 100,
+  E: 120,
+  F: 150,
+  G: 120,
+  I: 100,
+  J: 120,
+  AWAY: 200,
+};
+
 export function getZonePriceGroup(code: StadiumZoneCode): ZonePriceGroup | null {
-  const priceBaht = STADIUM_ZONES[code].priceSatang / 100;
-  return priceBaht === 200 || priceBaht === 170 || priceBaht === 150 || priceBaht === 120 || priceBaht === 100
-    ? priceBaht
-    : null;
+  return LEGACY_ZONE_PRICE_GROUPS[code] ?? null;
 }
 
 export function getZonesForPriceGroup(group: ZonePriceGroup): StadiumZoneCode[] {
@@ -63,6 +89,10 @@ export function getExactZoneCapacity(match: MatchCapacity, code: StadiumZoneCode
 
 export function getZoneCapacity(match: MatchCapacity, code: StadiumZoneCode) {
   return getExactZoneCapacity(match, code) ?? getLegacyZoneCapacity(match, code);
+}
+
+export function getZonePrice(match: MatchZonePrices, code: StadiumZoneCode) {
+  return match[MATCH_ZONE_PRICE_FIELDS[code]];
 }
 
 export function getZoneCapacityScope(match: MatchCapacity, code: StadiumZoneCode) {

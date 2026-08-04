@@ -6,7 +6,7 @@ import { readCustomerSession } from "@/lib/customer-session";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { getSeatAvailabilityForMatches } from "@/lib/seat-availability";
 import BookingForm from "./BookingForm";
-import { getStadiumZone, type StadiumZoneCode } from "@/lib/stadium-zones";
+import { getStadiumZone, getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
 
 // whitelist โซน — กัน XSS ผ่าน URL
 const ALLOWED_ZONES = [
@@ -34,12 +34,17 @@ export default async function MatchDetailPage(props: {
   const selectedAvailability = zone
     ? availabilityByMatch.get(match.id)?.[zone as StadiumZoneCode]
     : undefined;
+  const selectedPrice = zone
+    ? getZonePrice(match, zone as StadiumZoneCode)
+    : null;
   const capacity = selectedAvailability?.capacity ?? null;
   const remaining = selectedAvailability?.remaining ?? 0;
   const canBook =
     match.status === "ON_SALE" &&
     remaining > 0 &&
     selectedZone != null &&
+    selectedPrice != null &&
+    selectedPrice > 0 &&
     match.kickoffAt != null &&
     capacity != null;
 
@@ -84,8 +89,8 @@ export default async function MatchDetailPage(props: {
           <div className="flex gap-3">
             <dt className="w-24 shrink-0 text-slate-500">ราคา</dt>
             <dd>
-              {selectedZone ? (
-                `${formatBaht(selectedZone.priceSatang)} / ใบ`
+              {selectedPrice != null ? (
+                `${formatBaht(selectedPrice)} / ใบ`
               ) : (
                 <span className="text-slate-400">เลือกโซนเพื่อดูราคา</span>
               )}
@@ -116,7 +121,7 @@ export default async function MatchDetailPage(props: {
       ) : (
         <BookingForm
           matchId={match.id}
-          pricePerSeat={selectedZone!.priceSatang}
+          pricePerSeat={selectedPrice!}
           maxQuantity={Math.min(10, remaining)}
           customerEmail={session?.email ?? null}
           customerName={customer?.name ?? session?.name ?? ""}
