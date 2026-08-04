@@ -16,6 +16,35 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Beam webhook
+
+The Beam callback endpoint is `POST /api/payments/beam/webhook`. In Beam
+Lighthouse, configure the production URL as:
+
+```text
+https://pattanifc.co/api/payments/beam/webhook
+```
+
+Subscribe to `payment_link.paid` and `charge.succeeded`, then copy the generated
+base64 HMAC key into the server-only environment variable below. Never expose it
+through a `NEXT_PUBLIC_` variable.
+
+```dotenv
+BEAM_WEBHOOK_HMAC_KEY="..."
+```
+
+Payment links/charges must use one of these `referenceId` formats, and the Beam
+amount (the currency's smallest unit) must equal the pending order total:
+
+```text
+booking_<bookingCode>[_<uniqueSuffix>]
+season_<passCode>[_<uniqueSuffix>]
+```
+
+The handler verifies `X-Beam-Signature` against the exact raw request body before
+processing either event. Repeated events are safe: only a matching `PENDING`
+record can transition to `CONFIRMED`.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

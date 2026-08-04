@@ -1,0 +1,127 @@
+import { revalidatePath, revalidateTag } from "next/cache";
+import { parseBeamPaymentReference, verifyBeamSignature } from "@/lib/beam-webhook";
+import { prisma } from "@/lib/prisma";
+
+export const runtime = "nodejs";
+
+type BeamPayload = {
+  referenceId?: unknown;
+  status?: unknown;
+  amount?: unknown;
+  transactionTime?: unknown;
+  paymentMethod?: { paymentMethodType?: unknown } | null;
+  order?: { referenceId?: unknown; netAmount?: unknown } | null;
+};
+
+type PaymentDetails = {
+  referenceId: string;
+  amount: number;
+  paymentMethod: string;
+  paidAt: Date;
+};
+
+function paymentDetails(event: string, payload: BeamPayload): PaymentDetails | null {
+  if (event === "payment_link.paid") {
+    if (payload.status !== "PAID" || typeof payload.order?.referenceId !== "string" || !Number.isInteger(payload.order.netAmount)) {
+      return null;
+    }
+    return {
+      referenceId: payload.order.referenceId,
+      amount: payload.order.netAmount as number,
+      paymentMethod: "BEAM",
+      paidAt: new Date(),
+    };
+  }
+
+  if (event === "charge.succeeded") {
+    if (payload.status !== "SUCCEEDED" || typeof payload.referenceId !== "string" || !Number.isInteger(payload.amount)) {
+      return null;
+    }
+    const method = typeof payload.paymentMethod?.paymentMethodType === "string"
+      ? payload.paymentMethod.paymentMethodType.replace(/[^A-Z0-9_]/gi, "_").toUpperCase().slice(0, 40)
+      : "UNKNOWN";
+    const transactionTime = typeof payload.transactionTime === "string" ? new Date(payload.transactionTime) : new Date();
+    return {
+      referenceId: payload.referenceId,
+      amount: payload.amount as number,
+      paymentMethod: `BEAM_${method}`,
+      paidAt: Number.isNaN(transactionTime.getTime()) ? new Date() : transactionTime,
+    };
+  }
+
+  return null;
+}
+
+function revalidatePaymentViews(kind: "booking" | "season", code: string) {
+  if (kind === "booking") {
+    revalidatePath(`/tickets/${code}`);
+    revalidatePath(`/checkout/${code}`);
+  } else {
+    revalidatePath(`/tickets/season/${code}`);
+    revalidatePath(`/checkout/season/${code}`);
+  }
+  revalidatePath("/member/bookings");
+  revalidatePath("/");
+  revalidatePath("/tickets");
+  revalidatePath("/matches");
+  revalidatePath("/admin/matches");
+  revalidateTag("bookings", { expire: 0 });
+}
+
+export async function POST(request: Request) {
+  const encodedHmacKey = process.env.BEAM_WEBHOOK_HMAC_KEY;
+  if (!encodedHmacKey) {
+    console.error("Beam webhook is not configured: BEAM_WEBHOOK_HMAC_KEY is missing");
+    return new Response("Webhook is not configured", { status: 503 });
+  }
+
+  const rawBody = new Uint8Array(await request.arrayBuffer());
+  if (!verifyBeamSignature(rawBody, request.headers.get("x-beam-signature"), encodedHmacKey)) {
+    return new Response("Invalid Beam signature", { status: 401 });
+  }
+
+  let payload: BeamPayload;
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(rawBody).toString("utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return new Response("Invalid JSON payload", { status: 400 });
+    }
+    payload = parsed as BeamPayload;
+  } catch {
+    return new Response("Invalid JSON payload", { status: 400 });
+  }
+
+  const event = request.headers.get("x-beam-event") ?? "";
+  const payment = paymentDetails(event, payload);
+  if (!payment) return Response.json({ ok: true, processed: false });
+
+  const reference = parseBeamPaymentReference(payment.referenceId);
+  if (!reference) {
+    console.warn("Ignored Beam payment with an unsupported reference format", { event });
+    return Response.json({ ok: true, processed: false });
+  }
+
+  let updated = 0;
+  if (reference.kind === "booking") {
+    const result = await prisma.booking.updateMany({
+      where: { bookingCode: reference.code, status: "PENDING", totalAmount: payment.amount },
+      data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod, paidAt: payment.paidAt },
+    });
+    updated = result.count;
+  } else {
+    const order = await prisma.seasonPassOrder.findUnique({
+      where: { passCode: reference.code },
+      select: { id: true, priceBaht: true, shippingFeeBaht: true, status: true },
+    });
+    if (order?.status === "PENDING" && (order.priceBaht + order.shippingFeeBaht) * 100 === payment.amount) {
+      const result = await prisma.seasonPassOrder.updateMany({
+        where: { id: order.id, status: "PENDING" },
+        data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod },
+      });
+      updated = result.count;
+    }
+  }
+
+  if (updated > 0) revalidatePaymentViews(reference.kind, reference.code);
+  return Response.json({ ok: true, processed: updated > 0 });
+}
