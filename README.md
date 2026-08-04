@@ -16,7 +16,23 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Beam webhook
+## Beam PromptPay
+
+Match-ticket and season-pass checkout create QR PromptPay charges through Beam's
+server-side Charge API. Configure all three server-only values:
+
+```dotenv
+BEAM_MERCHANT_ID="..."
+BEAM_API_KEY="..."
+BEAM_WEBHOOK_HMAC_KEY="..."
+```
+
+The QR creation endpoint is `POST /api/payments/beam/create`; it uses a unique
+Beam idempotency key and stores the pending charge so refreshing the checkout
+does not create another QR. The checkout polls `/api/payments/beam/status`, while
+the signed webhook remains the authority that confirms an order.
+
+### Webhook
 
 The Beam callback endpoint is `POST /api/payments/beam/webhook`. In Beam
 Lighthouse, configure the production URL as:
@@ -28,10 +44,6 @@ https://pattanifc.co/api/payments/beam/webhook
 Subscribe to `payment_link.paid` and `charge.succeeded`, then copy the generated
 base64 HMAC key into the server-only environment variable below. Never expose it
 through a `NEXT_PUBLIC_` variable.
-
-```dotenv
-BEAM_WEBHOOK_HMAC_KEY="..."
-```
 
 Payment links/charges must use one of these `referenceId` formats, and the Beam
 amount (the currency's smallest unit) must equal the pending order total:

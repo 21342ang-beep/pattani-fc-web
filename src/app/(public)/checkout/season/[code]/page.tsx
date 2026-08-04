@@ -48,7 +48,7 @@ export default async function SeasonPassCheckoutPage({
         <div className="mb-6">
           <p className="text-base font-bold uppercase tracking-widest text-yellow-600 md:text-lg">Season Pass</p>
           <h1 className="mt-1 text-4xl font-black text-green-900 md:text-5xl">ชำระเงินบัตรรายปี</h1>
-          <p className="mt-3 text-lg text-slate-600 md:text-xl">ชำระผ่าน PromptPay และรับบัตรอิเล็กทรอนิกส์ทันทีเมื่อ Xendit ยืนยันรายการ</p>
+          <p className="mt-3 text-lg text-slate-600 md:text-xl">ชำระผ่าน Beam PromptPay QR และรับบัตรอิเล็กทรอนิกส์ทันทีเมื่อ Beam ยืนยันรายการ</p>
         </div>
         <div className="grid gap-6 md:grid-cols-[1.4fr_1fr]">
           <PaymentGateway seasonPassCode={order.passCode} amountBaht={total} />

@@ -1,10 +1,13 @@
 import { revalidatePath, revalidateTag } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { parseBeamPaymentReference, verifyBeamSignature } from "@/lib/beam-webhook";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 type BeamPayload = {
+  chargeId?: unknown;
+  merchantId?: unknown;
   referenceId?: unknown;
   status?: unknown;
   amount?: unknown;
@@ -14,6 +17,7 @@ type BeamPayload = {
 };
 
 type PaymentDetails = {
+  chargeId: string | null;
   referenceId: string;
   amount: number;
   paymentMethod: string;
@@ -26,6 +30,7 @@ function paymentDetails(event: string, payload: BeamPayload): PaymentDetails | n
       return null;
     }
     return {
+      chargeId: null,
       referenceId: payload.order.referenceId,
       amount: payload.order.netAmount as number,
       paymentMethod: "BEAM",
@@ -42,6 +47,7 @@ function paymentDetails(event: string, payload: BeamPayload): PaymentDetails | n
       : "UNKNOWN";
     const transactionTime = typeof payload.transactionTime === "string" ? new Date(payload.transactionTime) : new Date();
     return {
+      chargeId: typeof payload.chargeId === "string" ? payload.chargeId : null,
       referenceId: payload.referenceId,
       amount: payload.amount as number,
       paymentMethod: `BEAM_${method}`,
@@ -92,6 +98,19 @@ export async function POST(request: Request) {
   }
 
   const event = request.headers.get("x-beam-event") ?? "";
+  const merchantId = process.env.BEAM_MERCHANT_ID;
+  if (merchantId && typeof payload.merchantId === "string" && payload.merchantId !== merchantId) {
+    return new Response("Invalid Beam merchant", { status: 401 });
+  }
+
+  if (event === "charge.failed" && typeof payload.referenceId === "string") {
+    const result = await prisma.$executeRaw(Prisma.sql`UPDATE "BeamPayment"
+      SET "status" = 'FAILED', "chargeId" = COALESCE(${typeof payload.chargeId === "string" ? payload.chargeId : null}, "chargeId"),
+          "updatedAt" = NOW()
+      WHERE "referenceId" = ${payload.referenceId}`);
+    return Response.json({ ok: true, processed: result > 0 });
+  }
+
   const payment = paymentDetails(event, payload);
   if (!payment) return Response.json({ ok: true, processed: false });
 
@@ -102,6 +121,9 @@ export async function POST(request: Request) {
   }
 
   let updated = 0;
+  await prisma.$executeRaw(Prisma.sql`UPDATE "BeamPayment"
+    SET "status" = 'SUCCEEDED', "chargeId" = COALESCE(${payment.chargeId}, "chargeId"), "updatedAt" = NOW()
+    WHERE "referenceId" = ${payment.referenceId}`);
   if (reference.kind === "booking") {
     const result = await prisma.booking.updateMany({
       where: { bookingCode: reference.code, status: "PENDING", totalAmount: payment.amount },
