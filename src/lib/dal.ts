@@ -58,3 +58,13 @@ export async function verifyPermission(perm: Permission): Promise<AdminUser> {
   if (!hasPermission(user, perm)) redirect("/admin");
   return user;
 }
+
+export async function verifyAnyPermission(
+  permissions: readonly Permission[],
+): Promise<AdminUser> {
+  const user = await getAdminUser();
+  if (!permissions.some((permission) => hasPermission(user, permission))) {
+    redirect("/admin");
+  }
+  return user;
+}

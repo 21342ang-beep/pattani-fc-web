@@ -55,6 +55,12 @@ export default async function AdminMatchesPage(props: {
             description="กำหนดโควตารวม ที่นั่งสปอนเซอร์ และจำนวนเปิดขายแยกตามแพ็กเกจและโซน"
             className="border-blue-200 bg-blue-50 hover:border-blue-400"
           />
+          <MatchManagementCard
+            href="/admin/ticket-settings"
+            title="ตั้งค่าจำนวนตั๋วต่อรายการ"
+            description="กำหนดจำนวนสูงสุดต่อคำสั่งซื้อสำหรับตั๋วรายแมตช์และบัตรรายปี"
+            className="border-violet-200 bg-violet-50 hover:border-violet-400"
+          />
         </div>
       </div>
     );

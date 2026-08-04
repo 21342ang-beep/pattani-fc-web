@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { bookingCreateSchema } from "@/lib/validations";
 import { verifyPermission } from "@/lib/dal";
 import { readCustomerSession } from "@/lib/customer-session";
+import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import {
   getStadiumZone,
   getZoneCapacity,
@@ -40,6 +41,14 @@ export async function createBooking(
   });
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const settings = await getTicketPurchaseSettings();
+  if (parsed.data.quantity > settings.matchMaxQuantity) {
+    return {
+      fieldErrors: {
+        quantity: [`ซื้อได้สูงสุด ${settings.matchMaxQuantity} ใบต่อหนึ่งรายการ`],
+      },
+    };
   }
 
   let bookingCode: string;

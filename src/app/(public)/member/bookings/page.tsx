@@ -48,8 +48,11 @@ export default async function MyTicketsPage() {
           { customerEmail: { equals: customer.email, mode: "insensitive" } },
         ],
       },
+      include: {
+        purchase: { select: { purchaseCode: true } },
+      },
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: 100,
     }),
   ]);
 
@@ -126,11 +129,11 @@ export default async function MyTicketsPage() {
                       {(pass.status === "CONFIRMED" || pass.status === "PENDING") && (
                         <Link
                           href={pass.status === "PENDING"
-                            ? `/checkout/season/${encodeURIComponent(pass.passCode)}`
+                            ? `/checkout/season/${encodeURIComponent(pass.purchase?.purchaseCode ?? pass.passCode)}`
                             : `/tickets/season/${encodeURIComponent(pass.passCode)}`}
                           className="inline-flex items-center gap-1.5 rounded-full bg-green-800 px-4 py-2 text-sm font-bold text-yellow-300 transition hover:bg-green-900"
                         >
-                          เปิดบาร์โค้ด <ArrowRight className="size-4" />
+                          {pass.status === "PENDING" ? "ชำระเงิน" : "เปิดบาร์โค้ด"} <ArrowRight className="size-4" />
                         </Link>
                       )}
                     </div>

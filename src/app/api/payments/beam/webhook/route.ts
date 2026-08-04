@@ -131,6 +131,26 @@ export async function POST(request: Request) {
     });
     updated = result.count;
   } else {
+    const purchase = await prisma.seasonPassPurchase.findUnique({
+      where: { purchaseCode: reference.code },
+      select: { id: true, totalBaht: true, status: true },
+    });
+    if (purchase?.status === "PENDING" && purchase.totalBaht * 100 === payment.amount) {
+      const result = await prisma.$transaction(async (tx) => {
+        const updatedPurchase = await tx.seasonPassPurchase.updateMany({
+          where: { id: purchase.id, status: "PENDING" },
+          data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod },
+        });
+        if (updatedPurchase.count > 0) {
+          await tx.seasonPassOrder.updateMany({
+            where: { purchaseId: purchase.id, status: "PENDING" },
+            data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod },
+          });
+        }
+        return updatedPurchase;
+      });
+      updated = result.count;
+    } else if (!purchase) {
     const order = await prisma.seasonPassOrder.findUnique({
       where: { passCode: reference.code },
       select: { id: true, priceBaht: true, shippingFeeBaht: true, status: true },
@@ -141,6 +161,7 @@ export async function POST(request: Request) {
         data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod },
       });
       updated = result.count;
+    }
     }
   }
 

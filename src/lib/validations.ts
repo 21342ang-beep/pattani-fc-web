@@ -137,7 +137,7 @@ export const bookingCreateSchema = z.object({
   // optional — guest booking ไม่มีอีเมล, member ใช้ session email (ใส่จาก server)
   customerEmail: z.string().trim().toLowerCase().email().max(200).nullish(),
   customerPhone: z.string().trim().regex(/^[0-9+\-\s()]{6,20}$/, "เบอร์โทรไม่ถูกต้อง"),
-  quantity: z.number().int().positive().max(10), // จำกัด 10 ที่นั่ง/การจอง
+  quantity: z.number().int().positive(),
   notes: z.string().trim().max(500).optional(),
 });
 

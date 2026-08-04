@@ -60,6 +60,31 @@ async function createBookingPayment(bookingCode: string) {
 }
 
 async function createSeasonPassPayment(seasonPassCode: string) {
+  const purchase = await prisma.seasonPassPurchase.findUnique({
+    where: { purchaseCode: seasonPassCode },
+    select: { id: true, purchaseCode: true, totalBaht: true, status: true },
+  });
+  if (purchase) {
+    if (purchase.status !== "PENDING") {
+      return Response.json({ error: "รายการนี้ไม่สามารถชำระเงินได้" }, { status: 409 });
+    }
+    const existing = await pendingQr(Prisma.sql`WHERE "seasonPassPurchaseId" = ${purchase.id}`);
+    if (existing[0]?.qrString) {
+      return Response.json({ paymentRequestId: existing[0].paymentRequestId, qrSvg: await toQrSvg(existing[0].qrString) });
+    }
+    const amount = purchase.totalBaht * 100;
+    try {
+      const referenceId = `season_${purchase.purchaseCode}_${randomUUID().replace(/-/g, "")}`;
+      const created = await createPromptPayPaymentRequest({ referenceId, amountBaht: amount / 100, description: `Pattani FC season passes ${purchase.purchaseCode}` });
+      await prisma.$executeRaw(Prisma.sql`INSERT INTO "XenditPayment"
+        ("id", "seasonPassPurchaseId", "referenceId", "paymentRequestId", "amount", "status", "qrString", "updatedAt")
+        VALUES (${randomUUID()}, ${purchase.id}, ${referenceId}, ${created.paymentRequestId}, ${amount}, 'PENDING', ${created.qrString}, NOW())`);
+      return Response.json({ paymentRequestId: created.paymentRequestId, qrSvg: await toQrSvg(created.qrString) });
+    } catch (error) {
+      return handleCreateError(error, Prisma.sql`WHERE "seasonPassPurchaseId" = ${purchase.id}`);
+    }
+  }
+
   const order = await prisma.seasonPassOrder.findUnique({
     where: { passCode: seasonPassCode },
     select: { id: true, passCode: true, priceBaht: true, shippingFeeBaht: true, status: true },

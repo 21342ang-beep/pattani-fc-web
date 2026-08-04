@@ -1,15 +1,16 @@
 export const metadata = { title: "คำถามที่พบบ่อย — Ticket Online" };
 
 import { getT } from "@/lib/i18n/server";
+import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 
-const faqs = [
+const faqs = (maxQuantity: number) => [
   {
     q: "จองตั๋วยังไง?",
     a: "เลือกแมตช์จากหน้าตารางแข่งขัน กรอกชื่อ อีเมล เบอร์โทร และจำนวนตั๋ว เมื่อจองสำเร็จระบบจะแสดงรหัสการจองให้เก็บไว้",
   },
   {
     q: "จองได้สูงสุดกี่ใบต่อครั้ง?",
-    a: "สูงสุด 10 ใบต่อการจอง 1 ครั้ง เพื่อให้แฟนบอลคนอื่นได้มีโอกาสจองด้วย",
+    a: `สูงสุด ${maxQuantity} ใบต่อการจอง 1 ครั้ง เพื่อให้แฟนบอลคนอื่นได้มีโอกาสจองด้วย`,
   },
   {
     q: "ตรวจสอบสถานะการจองที่ไหน?",
@@ -29,17 +30,17 @@ const faqs = [
   },
 ];
 
-const faqsEn = [
+const faqsEn = (maxQuantity: number) => [
   { q: "How do I book tickets?", a: "Choose a match, select a seating zone, enter the required booking details, and complete payment. Your E-Ticket will be available after successful payment." },
-  { q: "How many tickets can I book at once?", a: "You can book up to 10 tickets in one transaction." },
+  { q: "How many tickets can I book at once?", a: `You can book up to ${maxQuantity} tickets in one transaction.` },
   { q: "Where can I check my booking?", a: "Open Check Booking, enter the phone number used for booking, and verify the OTP. The system will show all match tickets and season passes linked to that number." },
   { q: "Can I cancel a booking?", a: "Please contact the club directly regarding cancellation eligibility and applicable terms." },
   { q: "Is my personal information secure?", a: "The system stores only information required to provide the service and uses security controls including encrypted passwords and secure cookies." },
   { q: "What if I cannot find my booking?", a: "Search with the phone number used for the booking. If it still does not appear, contact the club for assistance." },
 ];
-const faqsMs = [
+const faqsMs = (maxQuantity: number) => [
   { q: "Bagaimanakah cara menempah tiket?", a: "Pilih perlawanan dan zon tempat duduk, masukkan maklumat yang diperlukan, kemudian lengkapkan pembayaran. E-Tiket tersedia selepas pembayaran berjaya." },
-  { q: "Berapa banyak tiket boleh ditempah sekali gus?", a: "Anda boleh menempah sehingga 10 tiket dalam satu transaksi." },
+  { q: "Berapa banyak tiket boleh ditempah sekali gus?", a: `Anda boleh menempah sehingga ${maxQuantity} tiket dalam satu transaksi.` },
   { q: "Di manakah saya boleh menyemak tempahan?", a: "Buka Semak Tempahan, masukkan nombor telefon yang digunakan dan sahkan OTP untuk melihat semua tiket serta pas musim." },
   { q: "Bolehkah tempahan dibatalkan?", a: "Sila hubungi kelab secara langsung untuk menyemak kelayakan pembatalan dan syarat yang berkaitan." },
   { q: "Adakah maklumat peribadi saya selamat?", a: "Sistem hanya menyimpan maklumat yang diperlukan dan menggunakan kawalan keselamatan termasuk kata laluan disulitkan serta kuki selamat." },
@@ -47,8 +48,12 @@ const faqsMs = [
 ];
 
 export default async function FAQPage() {
-  const { locale } = await getT();
-  const items = locale === "th" ? faqs : locale === "ms" ? faqsMs : faqsEn;
+  const [{ locale }, settings] = await Promise.all([getT(), getTicketPurchaseSettings()]);
+  const items = locale === "th"
+    ? faqs(settings.matchMaxQuantity)
+    : locale === "ms"
+      ? faqsMs(settings.matchMaxQuantity)
+      : faqsEn(settings.matchMaxQuantity);
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10 md:py-16">
       <header>

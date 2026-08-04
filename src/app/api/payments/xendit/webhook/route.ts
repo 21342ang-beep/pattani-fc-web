@@ -15,10 +15,12 @@ type Payment = {
   id: string;
   bookingId: string | null;
   seasonPassOrderId: string | null;
+  seasonPassPurchaseId: string | null;
   referenceId: string;
   amount: number;
   bookingCode: string | null;
   passCode: string | null;
+  purchaseCode: string | null;
 };
 
 export async function POST(request: Request) {
@@ -28,11 +30,12 @@ export async function POST(request: Request) {
   try { payload = await request.json(); } catch { return new Response("Invalid payload", { status: 400 }); }
   if (!payload.data?.payment_request_id) return Response.json({ ok: true });
 
-  const payments = await prisma.$queryRaw<Payment[]>(Prisma.sql`SELECT xp."id", xp."bookingId", xp."seasonPassOrderId", xp."referenceId", xp."amount",
-      b."bookingCode", s."passCode"
+  const payments = await prisma.$queryRaw<Payment[]>(Prisma.sql`SELECT xp."id", xp."bookingId", xp."seasonPassOrderId", xp."seasonPassPurchaseId", xp."referenceId", xp."amount",
+      b."bookingCode", s."passCode", sp."purchaseCode"
     FROM "XenditPayment" xp
     LEFT JOIN "Booking" b ON b."id" = xp."bookingId"
     LEFT JOIN "SeasonPassOrder" s ON s."id" = xp."seasonPassOrderId"
+    LEFT JOIN "SeasonPassPurchase" sp ON sp."id" = xp."seasonPassPurchaseId"
     WHERE xp."paymentRequestId" = ${payload.data.payment_request_id} LIMIT 1`);
   const payment = payments[0];
   if (!payment || payload.data.reference_id !== payment.referenceId) return Response.json({ ok: true });
@@ -54,6 +57,22 @@ export async function POST(request: Request) {
           data: { status: "CONFIRMED", paymentMethod: "XENDIT_PROMPTPAY" },
         });
       }
+      if (payment.seasonPassPurchaseId) {
+        const purchase = await tx.seasonPassPurchase.findUnique({
+          where: { id: payment.seasonPassPurchaseId },
+          select: { totalBaht: true, status: true },
+        });
+        if (purchase?.status === "PENDING" && purchase.totalBaht * 100 === payment.amount) {
+          await tx.seasonPassPurchase.update({
+            where: { id: payment.seasonPassPurchaseId },
+            data: { status: "CONFIRMED", paymentMethod: "XENDIT_PROMPTPAY" },
+          });
+          await tx.seasonPassOrder.updateMany({
+            where: { purchaseId: payment.seasonPassPurchaseId, status: "PENDING" },
+            data: { status: "CONFIRMED", paymentMethod: "XENDIT_PROMPTPAY" },
+          });
+        }
+      }
     });
     if (payment.bookingCode) {
       revalidatePath(`/tickets/${payment.bookingCode}`);
@@ -62,6 +81,9 @@ export async function POST(request: Request) {
     if (payment.passCode) {
       revalidatePath(`/tickets/season/${payment.passCode}`);
       revalidatePath(`/checkout/season/${payment.passCode}`);
+    }
+    if (payment.purchaseCode) {
+      revalidatePath(`/checkout/season/${payment.purchaseCode}`);
     }
     revalidatePath("/member/bookings");
     revalidatePath("/");

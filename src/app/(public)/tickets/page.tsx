@@ -9,6 +9,7 @@ import { getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
 import { getT } from "@/lib/i18n/server";
 import { intlLocale, localize } from "@/lib/i18n/text";
 import type { Locale } from "@/lib/i18n/dict";
+import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 
 export const metadata = { title: "จองตั๋วรายแมตช์ — Pattani FC" };
 
@@ -42,9 +43,9 @@ const STADIUM_ZONES: StadiumZone[] = [
 ];
 
 export default async function TicketsPage() {
-  const [onSaleMatches, { locale }] = await Promise.all([prisma.match.findMany({
+  const [onSaleMatches, { locale }, purchaseSettings] = await Promise.all([prisma.match.findMany({
     where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
-  }), getT()]);
+  }), getT(), getTicketPurchaseSettings()]);
   const t = (th: string, en: string) => localize(locale, th, en);
   const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
   const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
@@ -150,7 +151,7 @@ export default async function TicketsPage() {
           </h2>
           <ol className="mt-7 space-y-5 text-lg text-slate-700 md:text-xl lg:text-2xl">
             <Step n={1}>{t("เลือกแมตช์ที่ต้องการจากตารางโปรแกรมการแข่งขัน", "Choose a match from the fixtures")}</Step>
-            <Step n={2}>{t("กรอกข้อมูลผู้จองและจำนวนใบที่ต้องการ (สูงสุด 10 ใบ/รายการ)", "Enter your details and ticket quantity (up to 10 per booking)")}</Step>
+            <Step n={2}>{t(`กรอกข้อมูลผู้จองและจำนวนใบที่ต้องการ (สูงสุด ${purchaseSettings.matchMaxQuantity} ใบ/รายการ)`, `Enter your details and ticket quantity (up to ${purchaseSettings.matchMaxQuantity} per booking)`)}</Step>
             <Step n={3}>{t("ดำเนินการชำระเงินผ่าน PromptPay / Mobile Banking / Credit Card", "Pay via PromptPay, Mobile Banking, or Credit Card")}</Step>
             <Step n={4}>{t("รับ E-Ticket ทันที — แสดง QR ที่ประตูสนามในวันแข่ง", "Receive your E-Ticket and show its QR code at the stadium entrance")}</Step>
           </ol>

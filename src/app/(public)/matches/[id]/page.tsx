@@ -7,6 +7,7 @@ import { formatBaht, formatDateTime } from "@/lib/format";
 import { getSeatAvailabilityForMatches } from "@/lib/seat-availability";
 import BookingForm from "./BookingForm";
 import { getStadiumZone, getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
+import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 
 // whitelist โซน — กัน XSS ผ่าน URL
 const ALLOWED_ZONES = [
@@ -24,9 +25,10 @@ export default async function MatchDetailPage(props: {
     : undefined;
   const selectedZone = getStadiumZone(zone);
 
-  const [match, session] = await Promise.all([
+  const [match, session, purchaseSettings] = await Promise.all([
     getMatchById(id),
     readCustomerSession(),
+    getTicketPurchaseSettings(),
   ]);
   if (!match) notFound();
 
@@ -122,7 +124,7 @@ export default async function MatchDetailPage(props: {
         <BookingForm
           matchId={match.id}
           pricePerSeat={selectedPrice!}
-          maxQuantity={Math.min(10, remaining)}
+          maxQuantity={Math.min(purchaseSettings.matchMaxQuantity, remaining)}
           customerEmail={session?.email ?? null}
           customerName={customer?.name ?? session?.name ?? ""}
           customerPhone={customer?.phone ?? ""}

@@ -68,6 +68,12 @@ export default async function AdminSeasonPassesPage(props: {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
+            href="/admin/ticket-settings"
+            className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-base font-medium text-violet-900 hover:bg-violet-100 md:text-lg"
+          >
+            ⚙️ ตั้งค่าจำนวนสูงสุดต่อรายการ
+          </Link>
+          <Link
             href="/admin/season-passes/check"
             className="rounded-md border border-green-200 bg-white px-3 py-2 text-base font-medium text-green-900 hover:bg-green-50 md:text-lg"
           >

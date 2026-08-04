@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { readCustomerSession } from "@/lib/customer-session";
 import { SEASON_LABEL, getSeasonTier } from "@/lib/season-pass-tiers";
 import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
+import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import SeasonPassWizard, {
   type SeasonPassZoneOption,
   type ShippingProvince,
@@ -27,7 +28,7 @@ export default async function SeasonPassApplyPage(props: {
     // ต้องเป็นสมาชิกก่อนจอง — เข้าสู่ระบบ (หรือกดสมัครจากหน้า login) แล้วเด้งกลับมาต่อ
     redirect(`/member/login?returnTo=${encodeURIComponent(`/tickets/season/apply?tier=${tier.id}`)}`);
   }
-  const [customer, quotas, soldGroups] = await Promise.all([
+  const [customer, quotas, soldGroups, purchaseSettings] = await Promise.all([
     prisma.customer.findUnique({
       where: { id: session.customerId },
       select: {
@@ -52,6 +53,7 @@ export default async function SeasonPassApplyPage(props: {
       },
       _count: { _all: true },
     }),
+    getTicketPurchaseSettings(),
   ]);
   const ranges = calculateSeasonPassZoneRanges(tier.allowedSeatZones, quotas);
   const zoneOptions: SeasonPassZoneOption[] = tier.allowedSeatZones.map((seatZone) => {
@@ -104,6 +106,7 @@ export default async function SeasonPassApplyPage(props: {
         defaultPostalCode={customer?.postalCode ?? ""}
         shippingProvinces={shippingProvinces}
         zoneOptions={zoneOptions}
+        maxQuantity={purchaseSettings.seasonPassMaxQuantity}
       />
     </div>
   );

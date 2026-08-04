@@ -70,6 +70,7 @@ interface CustomerData {
   phone: string;
   email: string;
   seatZone: SeasonPassSeatZone | "";
+  quantity: number;
   deliveryMethod: DeliveryMethod;
   shipAddress: string;
   shipCity: string;
@@ -98,6 +99,7 @@ export default function SeasonPassWizard({
   defaultPostalCode,
   shippingProvinces,
   zoneOptions,
+  maxQuantity,
 }: {
   tier: SeasonTier;
   memberEmail: string | null;
@@ -109,6 +111,7 @@ export default function SeasonPassWizard({
   defaultPostalCode: string;
   shippingProvinces: ShippingProvince[];
   zoneOptions: SeasonPassZoneOption[];
+  maxQuantity: number;
 }) {
   const [step, setStep] = useState<Step>("form");
   const [customer, setCustomer] = useState<CustomerData>({
@@ -116,6 +119,7 @@ export default function SeasonPassWizard({
     phone: defaultPhone,
     email: memberEmail ?? "",
     seatZone: "",
+    quantity: 1,
     deliveryMethod: "PICKUP",
     shipAddress: defaultAddress,
     shipCity: defaultDistrict,
@@ -130,7 +134,7 @@ export default function SeasonPassWizard({
 
   const shippingFee =
     customer.deliveryMethod === "SHIPPING" ? SEASON_PASS_SHIPPING_FEE_BAHT : 0;
-  const totalBaht = tier.priceBaht + shippingFee;
+  const totalBaht = tier.priceBaht * customer.quantity + shippingFee;
 
   const isMember = !!memberEmail;
 
@@ -147,6 +151,7 @@ export default function SeasonPassWizard({
       phone: data.phone,
       email: data.email || "",
       seatZone: data.seatZone,
+      quantity: data.quantity,
       paymentMethod: "promptpay",
       deliveryMethod: data.deliveryMethod,
       shipAddress: data.shipAddress,
@@ -161,7 +166,7 @@ export default function SeasonPassWizard({
       setSaveError(res.error);
       return;
     }
-    window.location.assign(`/checkout/season/${encodeURIComponent(res.passCode)}`);
+    window.location.assign(`/checkout/season/${encodeURIComponent(res.checkoutCode)}`);
   }
 
   // เรียก server action → บันทึกออเดอร์ลง DB → คืน passCode ที่แท้จริง
@@ -178,6 +183,7 @@ export default function SeasonPassWizard({
       phone: customer.phone,
       email: customer.email || "",
       seatZone: customer.seatZone,
+      quantity: customer.quantity,
       paymentMethod,
       deliveryMethod: customer.deliveryMethod,
       shipAddress: customer.shipAddress,
@@ -193,7 +199,7 @@ export default function SeasonPassWizard({
       return false;
     }
     // The order remains pending until Xendit sends a verified payment callback.
-    window.location.assign(`/checkout/season/${encodeURIComponent(res.passCode)}`);
+    window.location.assign(`/checkout/season/${encodeURIComponent(res.checkoutCode)}`);
     return true;
   }
 
@@ -215,9 +221,13 @@ export default function SeasonPassWizard({
               memberEmail={memberEmail}
               shippingProvinces={shippingProvinces}
               zoneOptions={zoneOptions}
+              maxQuantity={maxQuantity}
               onSubmit={handleFormSubmit}
               onDeliveryMethodChange={(m) =>
                 setCustomer((c) => ({ ...c, deliveryMethod: m }))
+              }
+              onQuantityChange={(quantity) =>
+                setCustomer((current) => ({ ...current, quantity }))
               }
             />
           )}
@@ -241,6 +251,7 @@ export default function SeasonPassWizard({
           isMember={isMember}
           shippingFee={shippingFee}
           totalBaht={totalBaht}
+          quantity={customer.quantity}
         />
       </div>
     </div>
@@ -303,21 +314,26 @@ function FormStep({
   memberEmail,
   shippingProvinces,
   zoneOptions,
+  maxQuantity,
   onSubmit,
   onDeliveryMethodChange,
+  onQuantityChange,
 }: {
   tier: SeasonTier;
   initial: CustomerData;
   memberEmail: string | null;
   shippingProvinces: ShippingProvince[];
   zoneOptions: SeasonPassZoneOption[];
+  maxQuantity: number;
   onSubmit: (data: CustomerData) => void;
   onDeliveryMethodChange: (method: DeliveryMethod) => void;
+  onQuantityChange: (quantity: number) => void;
 }) {
   const [name, setName] = useState(initial.name);
   const [phone, setPhone] = useState(initial.phone);
   const [email, setEmail] = useState(initial.email);
   const [seatZone, setSeatZone] = useState(initial.seatZone);
+  const [quantity, setQuantity] = useState(initial.quantity);
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(
     initial.deliveryMethod,
   );
@@ -335,6 +351,11 @@ function FormStep({
   );
   const selectedDistrict = selectedProvince?.districts.find(
     (district) => district.name === shipCity,
+  );
+  const selectedZone = zoneOptions.find((option) => option.seatZone === seatZone);
+  const effectiveMaxQuantity = Math.max(
+    1,
+    Math.min(maxQuantity, selectedZone?.remaining ?? maxQuantity),
   );
   function handleProvinceChange(province: string) {
     setShipProvince(province);
@@ -358,6 +379,9 @@ function FormStep({
       nextErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
     }
     if (!seatZone) nextErrors.seatZone = "กรุณาเลือกโซนที่นั่ง";
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > effectiveMaxQuantity) {
+      nextErrors.quantity = `เลือกได้สูงสุด ${effectiveMaxQuantity} ใบ`;
+    }
     if (!shirtSize) nextErrors.shirtSize = "กรุณาเลือกไซส์เสื้อ";
     if (deliveryMethod === "SHIPPING") {
       if (!shipAddress.trim()) nextErrors.shipAddress = "กรุณากรอกที่อยู่";
@@ -378,6 +402,7 @@ function FormStep({
       phone: phone.trim(),
       email: email.trim(),
       seatZone,
+      quantity,
       deliveryMethod,
       shipAddress: shipAddress.trim(),
       shipCity: shipCity.trim(),
@@ -410,6 +435,30 @@ function FormStep({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="เช่น สมชาย ใจดี"
+          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-base outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
+        />
+      </Field>
+
+      <Field
+        label={`จำนวนบัตร (สูงสุด ${effectiveMaxQuantity} ใบ)`}
+        htmlFor="sp-quantity"
+        error={errors.quantity}
+        hint="แต่ละใบจะได้รับหมายเลขบาร์โค้ดแยกกัน"
+      >
+        <input
+          id="sp-quantity"
+          type="number"
+          min={1}
+          max={effectiveMaxQuantity}
+          value={quantity}
+          onChange={(event) => {
+            const nextQuantity = Number(event.target.value);
+            setQuantity(nextQuantity);
+            if (Number.isInteger(nextQuantity) && nextQuantity > 0) {
+              onQuantityChange(nextQuantity);
+            }
+          }}
+          required
           className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-base outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
         />
       </Field>
@@ -1322,11 +1371,13 @@ function TierSummary({
   isMember,
   shippingFee,
   totalBaht,
+  quantity,
 }: {
   tier: SeasonTier;
   isMember: boolean;
   shippingFee: number;
   totalBaht: number;
+  quantity: number;
 }) {
   return (
     <aside className="h-fit space-y-5 rounded-2xl border border-green-100 bg-white p-4 shadow-sm sm:p-6">
@@ -1343,9 +1394,9 @@ function TierSummary({
 
       <div className="border-y border-slate-200 py-4">
         <div className="flex items-baseline justify-between text-sm">
-          <span className="text-slate-500">ราคาบัตร</span>
+          <span className="text-slate-500">ราคาบัตร × {quantity}</span>
           <span className="font-semibold text-slate-800">
-            ฿{tier.priceBaht.toLocaleString("th-TH")}
+            ฿{(tier.priceBaht * quantity).toLocaleString("th-TH")}
           </span>
         </div>
         <div className="mt-1 flex items-baseline justify-between text-sm">

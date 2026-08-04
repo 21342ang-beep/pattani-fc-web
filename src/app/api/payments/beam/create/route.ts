@@ -23,13 +23,20 @@ type PaymentRow = {
 async function preparePayment(input: {
   bookingId?: string;
   seasonPassOrderId?: string;
+  seasonPassPurchaseId?: string;
   referencePrefix: string;
   amount: number;
 }) {
-  const lockKey = input.bookingId ? `booking:${input.bookingId}` : `season:${input.seasonPassOrderId}`;
+  const lockKey = input.bookingId
+    ? `booking:${input.bookingId}`
+    : input.seasonPassPurchaseId
+      ? `season-purchase:${input.seasonPassPurchaseId}`
+      : `season:${input.seasonPassOrderId}`;
   const target = input.bookingId
     ? Prisma.sql`"bookingId" = ${input.bookingId}`
-    : Prisma.sql`"seasonPassOrderId" = ${input.seasonPassOrderId}`;
+    : input.seasonPassPurchaseId
+      ? Prisma.sql`"seasonPassPurchaseId" = ${input.seasonPassPurchaseId}`
+      : Prisma.sql`"seasonPassOrderId" = ${input.seasonPassOrderId}`;
 
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
@@ -50,8 +57,8 @@ async function preparePayment(input: {
     const referenceId = `${input.referencePrefix}_${randomUUID().replace(/-/g, "")}`;
     const idempotencyKey = randomUUID();
     await tx.$executeRaw(Prisma.sql`INSERT INTO "BeamPayment"
-      ("id", "bookingId", "seasonPassOrderId", "referenceId", "idempotencyKey", "amount", "status", "updatedAt")
-      VALUES (${id}, ${input.bookingId ?? null}, ${input.seasonPassOrderId ?? null}, ${referenceId}, ${idempotencyKey}, ${input.amount}, 'INITIATED', NOW())`);
+      ("id", "bookingId", "seasonPassOrderId", "seasonPassPurchaseId", "referenceId", "idempotencyKey", "amount", "status", "updatedAt")
+      VALUES (${id}, ${input.bookingId ?? null}, ${input.seasonPassOrderId ?? null}, ${input.seasonPassPurchaseId ?? null}, ${referenceId}, ${idempotencyKey}, ${input.amount}, 'INITIATED', NOW())`);
     return { id, referenceId, idempotencyKey, chargeId: null, qrImageBase64: null, expiresAt: null };
   });
 }
@@ -90,6 +97,24 @@ async function createBookingPayment(request: Request, bookingCode: string) {
 }
 
 async function createSeasonPassPayment(request: Request, seasonPassCode: string) {
+  const purchase = await prisma.seasonPassPurchase.findUnique({
+    where: { purchaseCode: seasonPassCode },
+    select: { id: true, purchaseCode: true, totalBaht: true, quantity: true, status: true },
+  });
+  if (purchase) {
+    if (purchase.status !== "PENDING") {
+      return Response.json({ error: "รายการนี้ไม่สามารถชำระเงินได้" }, { status: 409 });
+    }
+    const amount = purchase.totalBaht * 100;
+    const payment = await preparePayment({
+      seasonPassPurchaseId: purchase.id,
+      referencePrefix: `season_${purchase.purchaseCode}`,
+      amount,
+    });
+    const successPath = purchase.quantity > 1 ? "/member/bookings" : `/checkout/season/${encodeURIComponent(purchase.purchaseCode)}`;
+    return finishCharge(request, payment, amount, successPath);
+  }
+
   const order = await prisma.seasonPassOrder.findUnique({
     where: { passCode: seasonPassCode },
     select: { id: true, passCode: true, priceBaht: true, shippingFeeBaht: true, status: true },

@@ -219,43 +219,49 @@ model Booking {
 // Payment request ที่สร้างกับ Xendit แยกออกจาก Booking เพื่อเก็บ reference
 // สำหรับตรวจสอบ callback และกันการยืนยันการชำระเงินจากฝั่ง browser
 model XenditPayment {
-  id                String           @id @default(cuid())
-  bookingId         String?
-  booking           Booking?         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  seasonPassOrderId String?
-  seasonPassOrder   SeasonPassOrder? @relation(fields: [seasonPassOrderId], references: [id], onDelete: Cascade)
-  referenceId       String           @unique
-  paymentRequestId  String           @unique
-  paymentId         String?          @unique
-  amount            Int // สตางค์
-  status            String           @default("PENDING")
-  qrString          String?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id                   String              @id @default(cuid())
+  bookingId            String?
+  booking              Booking?            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seasonPassOrderId    String?
+  seasonPassOrder      SeasonPassOrder?    @relation(fields: [seasonPassOrderId], references: [id], onDelete: Cascade)
+  seasonPassPurchaseId String?
+  seasonPassPurchase   SeasonPassPurchase? @relation(fields: [seasonPassPurchaseId], references: [id], onDelete: Cascade)
+  referenceId          String              @unique
+  paymentRequestId     String              @unique
+  paymentId            String?             @unique
+  amount               Int // สตางค์
+  status               String              @default("PENDING")
+  qrString             String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
   @@index([bookingId, status])
   @@index([seasonPassOrderId, status])
+  @@index([seasonPassPurchaseId, status])
 }
 
 // QR PromptPay charges created through Beam Charge API.
 model BeamPayment {
-  id                String           @id @default(cuid())
-  bookingId         String?
-  booking           Booking?         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  seasonPassOrderId String?
-  seasonPassOrder   SeasonPassOrder? @relation(fields: [seasonPassOrderId], references: [id], onDelete: Cascade)
-  referenceId       String           @unique
-  chargeId          String?          @unique
-  idempotencyKey    String           @unique
-  amount            Int
-  status            String           @default("INITIATED")
-  qrImageBase64     String?
-  expiresAt         DateTime?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id                   String              @id @default(cuid())
+  bookingId            String?
+  booking              Booking?            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seasonPassOrderId    String?
+  seasonPassOrder      SeasonPassOrder?    @relation(fields: [seasonPassOrderId], references: [id], onDelete: Cascade)
+  seasonPassPurchaseId String?
+  seasonPassPurchase   SeasonPassPurchase? @relation(fields: [seasonPassPurchaseId], references: [id], onDelete: Cascade)
+  referenceId          String              @unique
+  chargeId             String?             @unique
+  idempotencyKey       String              @unique
+  amount               Int
+  status               String              @default("INITIATED")
+  qrImageBase64        String?
+  expiresAt            DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
   @@index([bookingId, status])
   @@index([seasonPassOrderId, status])
+  @@index([seasonPassPurchaseId, status])
   @@index([expiresAt])
 }
 
@@ -378,6 +384,28 @@ enum ShopPaymentMethod {
 // tier + priceBaht + shippingFeeBaht เป็น snapshot ตอนซื้อ — กันราคาเปลี่ยนแล้วกระทบออเดอร์เก่า
 // customerId nullable = รองรับ guest checkout (member จะ link ผ่าน customerId)
 // deliveryMethod = SHIPPING → ต้องมี shipAddress; PICKUP → ต้องมี pickupLocation
+model SeasonPassPurchase {
+  id              String                @id @default(cuid())
+  purchaseCode    String                @unique
+  customerId      String?
+  customerEmail   String?
+  quantity        Int
+  subtotalBaht    Int
+  shippingFeeBaht Int                   @default(0)
+  totalBaht       Int
+  paymentMethod   String
+  status          SeasonPassOrderStatus @default(PENDING)
+  orders          SeasonPassOrder[]
+  xenditPayments  XenditPayment[]
+  beamPayments    BeamPayment[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([customerId])
+  @@index([customerEmail])
+  @@index([status])
+}
+
 model SeasonPassOrder {
   id              String                   @id @default(cuid())
   passCode        String                   @unique
@@ -404,6 +432,8 @@ model SeasonPassOrder {
   paymentMethod   String // "card" | "promptpay" | "banking"
   status          SeasonPassOrderStatus    @default(CONFIRMED)
   notes           String?
+  purchaseId      String?
+  purchase        SeasonPassPurchase?      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   barcode         SeasonPassBarcode?
   xenditPayments  XenditPayment[]
   beamPayments    BeamPayment[]
@@ -414,6 +444,16 @@ model SeasonPassOrder {
   @@index([customerPhone])
   @@index([customerEmail])
   @@index([customerId])
+  @@index([purchaseId])
+}
+
+// ค่าจำนวนสูงสุดต่อหนึ่งคำสั่งซื้อ กำหนดผ่านหลังบ้าน
+model TicketPurchaseSetting {
+  id                    Int      @id
+  matchMaxQuantity      Int
+  seasonPassMaxQuantity Int
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 // โควตาบัตรรายปีแยกตามฤดูกาล แพ็กเกจ และโซน

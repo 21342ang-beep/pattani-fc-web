@@ -15,10 +15,12 @@ export default function PaymentGateway({
   bookingCode,
   seasonPassCode,
   amountBaht,
+  successUrl: successUrlOverride,
 }: {
   bookingCode?: string;
   seasonPassCode?: string;
   amountBaht: number;
+  successUrl?: string;
 }) {
   const router = useRouter();
   const [state, setState] = useState<PaymentState>({ status: "idle" });
@@ -26,9 +28,9 @@ export default function PaymentGateway({
     ? `seasonPassCode=${encodeURIComponent(seasonPassCode)}`
     : `bookingCode=${encodeURIComponent(bookingCode ?? "")}`;
   const paymentBody = seasonPassCode ? { seasonPassCode } : { bookingCode };
-  const successUrl = seasonPassCode
+  const successUrl = successUrlOverride ?? (seasonPassCode
     ? `/tickets/season/${encodeURIComponent(seasonPassCode)}`
-    : `/tickets/${encodeURIComponent(bookingCode ?? "")}`;
+    : `/tickets/${encodeURIComponent(bookingCode ?? "")}`);
 
   useEffect(() => {
     if (state.status !== "ready") return;
