@@ -32,7 +32,7 @@ async function preparePayment(input: {
     : Prisma.sql`"seasonPassOrderId" = ${input.seasonPassOrderId}`;
 
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
     await tx.$executeRaw(Prisma.sql`UPDATE "BeamPayment" SET "status" = 'EXPIRED', "updatedAt" = NOW()
       WHERE ${target} AND "status" = 'PENDING' AND "expiresAt" <= NOW()`);
 
