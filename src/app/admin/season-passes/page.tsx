@@ -80,6 +80,12 @@ export default async function AdminSeasonPassesPage(props: {
           >
             🎫 สแกนและประวัติการใช้งานบัตรรายปี
           </Link>
+          <a
+            href={`/admin/season-passes/export?tier=${selectedTier}`}
+            className="rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-base font-medium text-white hover:bg-emerald-800 md:text-lg"
+          >
+            📥 ดาวน์โหลด Excel ({tierById.get(selectedTier)?.priceBaht.toLocaleString("th-TH")} บาท)
+          </a>
           <DeleteAllSeasonPassOrdersButton count={orders.length} />
         </div>
       </div>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 import {
   Crown,
@@ -10,7 +9,7 @@ import {
   CalendarRange,
 } from "lucide-react";
 import PageHero from "../../_components/PageHero";
-import { readCustomerSession } from "@/lib/customer-session";
+import SeasonPassAnnouncementModal from "../../_components/SeasonPassAnnouncementModal";
 import {
   SEASON_MATCHES,
   SEASON_TIERS,
@@ -38,10 +37,12 @@ const TIER_MOCKUPS: Partial<Record<SeasonTierId, string>> = {
 };
 
 export default async function SeasonTicketsPage() {
-  const [session, { locale }] = await Promise.all([readCustomerSession(), getT()]);
+  const { locale } = await getT();
   const t = (th: string, en: string) => localize(locale, th, en);
   return (
     <>
+      <SeasonPassAnnouncementModal initiallyOpen />
+
       <PageHero
         title={t("ตั๋วรายปี", "Season Tickets")}
         subtitle={t("บัตรสมาชิกรายปี — ซื้อครั้งเดียว ดูทุกแมตช์เหย้าตลอดฤดูกาล พร้อมสิทธิพิเศษเฉพาะสมาชิก", "One season pass for every home match, with exclusive member benefits")}
@@ -80,7 +81,7 @@ export default async function SeasonTicketsPage() {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {SEASON_TIERS.filter((t) => t.id !== "vvip-elite").map((t) => (
-            <TierCard key={t.id} tier={t} isMember={!!session} locale={locale} />
+            <TierCard key={t.id} tier={t} locale={locale} />
           ))}
         </div>
 
@@ -92,7 +93,7 @@ export default async function SeasonTicketsPage() {
   );
 }
 
-function TierCard({ tier, isMember, locale }: { tier: SeasonTier; isMember: boolean; locale: Locale }) {
+function TierCard({ tier, locale }: { tier: SeasonTier; locale: Locale }) {
   const t = (th: string, en: string) => localize(locale, th, en);
   const highlighted = tier.highlight;
   const priceLabel = tier.priceBaht.toLocaleString(intlLocale(locale));
@@ -213,8 +214,7 @@ function TierCard({ tier, isMember, locale }: { tier: SeasonTier; isMember: bool
         ))}
       </ul>
 
-      <Link
-        href={isMember ? `/tickets/season/apply?tier=${tier.id}` : `/member/login?returnTo=${encodeURIComponent(`/tickets/season/apply?tier=${tier.id}`)}`}
+      <SeasonPassAnnouncementModal
         className={`mt-8 inline-flex w-full items-center justify-center rounded-full px-6 py-3.5 text-lg font-bold transition md:py-4 md:text-xl ${
           highlighted
             ? "bg-yellow-400 text-green-950 hover:bg-yellow-300"
@@ -222,7 +222,7 @@ function TierCard({ tier, isMember, locale }: { tier: SeasonTier; isMember: bool
         }`}
       >
         {t("ซื้อบัตรสมาชิกรายปี", "Buy Season Membership")}
-      </Link>
+      </SeasonPassAnnouncementModal>
     </div>
   );
 }
