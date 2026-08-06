@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Loader2, Lock, QrCode, ShieldCheck } from "lucide-react";
+import { Download, Loader2, Lock, QrCode, ShieldCheck } from "lucide-react";
 
 type PaymentState =
   | { status: "idle" }
@@ -31,6 +31,8 @@ export default function PaymentGateway({
   const successUrl = successUrlOverride ?? (seasonPassCode
     ? `/tickets/season/${encodeURIComponent(seasonPassCode)}`
     : `/tickets/${encodeURIComponent(bookingCode ?? "")}`);
+  const qrFilename = `pattani-fc-promptpay-${(seasonPassCode ?? bookingCode ?? "payment")
+    .replace(/[^a-z0-9-]/gi, "-")}.png`;
 
   useEffect(() => {
     if (state.status !== "ready") return;
@@ -79,6 +81,35 @@ export default function PaymentGateway({
     } catch (error) {
       setState({ status: "error", message: error instanceof Error ? error.message : "เกิดข้อผิดพลาด" });
     }
+  }
+
+  async function saveQrCode() {
+    if (state.status !== "ready") return;
+
+    const binary = window.atob(state.qrImageBase64);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const file = new File([bytes], qrFilename, { type: "image/png" });
+
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: "Pattani FC PromptPay QR Code",
+        });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
+    const url = URL.createObjectURL(file);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = qrFilename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   return (
@@ -143,6 +174,19 @@ export default function PaymentGateway({
                 unoptimized
                 className="size-72 max-w-full md:size-80"
               />
+            </div>
+            <div className="mx-auto max-w-md space-y-2">
+              <button
+                type="button"
+                onClick={saveQrCode}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-5 py-3.5 text-lg font-bold text-yellow-300 shadow-sm transition hover:bg-green-900"
+              >
+                <Download className="size-5" />
+                บันทึก QR Code ลงเครื่อง
+              </button>
+              <p className="text-sm leading-relaxed text-slate-500 md:text-base">
+                หากจองผ่านมือถือเครื่องเดียว ให้บันทึกรูปนี้แล้วเลือกจากคลังรูปในแอปธนาคาร
+              </p>
             </div>
             <div className="flex items-center justify-center gap-2 text-base text-slate-500 md:text-lg">
               <Loader2 className="size-4 animate-spin text-green-800" /> กำลังรอผลการชำระเงินจาก Beam
