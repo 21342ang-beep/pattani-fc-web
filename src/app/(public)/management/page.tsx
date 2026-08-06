@@ -159,17 +159,19 @@ function PersonCard({ person, locale }: { person: Person; locale: Locale }) {
       ? "/management-sukree-hayeeyasaemae.png"
       : person.name.includes("ซัยนูรดีน นิมา")
         ? "/management-sainurdeen-nima.jpg"
-        : person.name.includes("นินี สุไลมาน")
-          ? "/management-ninee-sulaiman.png"
-          : person.name.includes("มูฮัมหมัดฟาห์มี ตาเละ")
-            ? "/management-muhammad-fahmi-taleh.png"
-            : person.name.includes("เจะอับดุลลาเตะ ซีเดะ")
-              ? "/management-jeabdullateh-sideh.png"
-              : person.name.includes("มูฮัมหมัดดือราโอ๊ะ")
-                ? "/management-muhammad-due-raoh.png"
-                : person.name.includes("หาญณรงค์ ชุณหะคุณากร")
-                  ? "/management-harnnarong-chunahakunakorn.png"
-                  : null;
+        : person.name.includes("อิลเลียส เจ๊ะเลาะ")
+          ? "/management-ilyas-jehloh.jpg"
+          : person.name.includes("นินี สุไลมาน")
+            ? "/management-ninee-sulaiman.png"
+            : person.name.includes("มูฮัมหมัดฟาห์มี ตาเละ")
+              ? "/management-muhammad-fahmi-taleh.png"
+              : person.name.includes("เจะอับดุลลาเตะ ซีเดะ")
+                ? "/management-jeabdullateh-sideh.png"
+                : person.name.includes("มูฮัมหมัดดือราโอ๊ะ")
+                  ? "/management-muhammad-due-raoh.png"
+                  : person.name.includes("หาญณรงค์ ชุณหะคุณากร")
+                    ? "/management-harnnarong-chunahakunakorn.png"
+                    : null;
   return (
     <Card className="h-full overflow-hidden">
       <div className="flex items-center gap-4 p-5">
