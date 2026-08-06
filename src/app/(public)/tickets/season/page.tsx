@@ -55,7 +55,7 @@ export default async function SeasonTicketsPage() {
             <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">{t("แผนผังสนาม", "Stadium Map")}</h2>
             <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">{t("ตรวจสอบโซนที่นั่งก่อนเลือกแพ็กเกจสมาชิก", "Review seating zones before choosing your membership package")}</p>
           </div>
-          <div className="relative aspect-[1463/1058] w-full">
+          <div className="relative aspect-[1553/1058] w-full">
               <Image
                 src="/stadium-zones-season-2026-27-v4.png"
                 alt={t("แผนผังโซนที่นั่ง Rainbow Stadium — Pattani FC", "Rainbow Stadium seating plan — Pattani FC")}
