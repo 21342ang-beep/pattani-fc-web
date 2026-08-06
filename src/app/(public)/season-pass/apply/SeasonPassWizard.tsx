@@ -430,6 +430,7 @@ function FormStep({
       <Field label="ชื่อ-นามสกุล" htmlFor="sp-name" icon={<User className="size-4" />} error={errors.name}>
         <input
           id="sp-name"
+          aria-describedby="sp-name-owner-note"
           autoComplete="name"
           required
           value={name}
@@ -437,6 +438,9 @@ function FormStep({
           placeholder="เช่น สมชาย ใจดี"
           className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-base outline-none transition focus:border-green-800 focus:ring-2 focus:ring-green-800/20"
         />
+        <p id="sp-name-owner-note" className="mt-1.5 text-sm font-medium text-amber-700">
+          (กรณีซื้อบัตรให้ผู้อื่น กรุณาระบุชื่อเจ้าของบัตรให้ถูกต้อง)
+        </p>
       </Field>
 
       <Field
