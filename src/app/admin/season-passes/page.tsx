@@ -7,6 +7,7 @@ import {
   type SeasonTierId,
 } from "@/lib/season-pass-tiers";
 import { formatDateTime } from "@/lib/format";
+import { getStadiumZone } from "@/lib/stadium-zones";
 import Link from "next/link";
 import SeasonPassStatusSelect from "./SeasonPassStatusSelect";
 import DeleteSeasonPassButton from "./DeleteSeasonPassButton";
@@ -115,6 +116,12 @@ export default async function AdminSeasonPassesPage(props: {
             const tierOrders = ordersByTier.get(tier.id) ?? [];
             const confirmed = tierOrders.filter((order) => order.status === "CONFIRMED");
             const revenue = confirmed.reduce((sum, order) => sum + order.priceBaht + order.shippingFeeBaht, 0);
+            const orderCountByZone = new Map(
+              tier.allowedSeatZones.map((seatZone) => [
+                seatZone,
+                tierOrders.filter((order) => order.seatZone === seatZone).length,
+              ]),
+            );
             return (
               <Link
                 key={tier.id}
@@ -127,6 +134,16 @@ export default async function AdminSeasonPassesPage(props: {
                 <p className="mt-1 text-base font-bold text-green-900 md:text-lg">{tier.badge}</p>
                 <p className="mt-3 text-3xl font-black text-green-900 md:text-4xl">{tierOrders.length.toLocaleString("th-TH")} <span className="text-base font-medium md:text-lg">รายการ</span></p>
                 <p className="mt-1 text-sm text-slate-600 md:text-base">ยืนยันแล้ว {confirmed.length} รายการ · ฿{revenue.toLocaleString("th-TH")}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5" aria-label={`รายละเอียดโซนแพ็กเกจ ${tier.badge}`}>
+                  {tier.allowedSeatZones.map((seatZone) => (
+                    <span
+                      key={seatZone}
+                      className="rounded-full border border-green-200 bg-white px-2.5 py-1 text-sm font-semibold text-green-900"
+                    >
+                      {seatZone} · {(orderCountByZone.get(seatZone) ?? 0).toLocaleString("th-TH")}
+                    </span>
+                  ))}
+                </div>
               </Link>
             );
           })}
@@ -135,11 +152,13 @@ export default async function AdminSeasonPassesPage(props: {
 
       {/* ตารางบัตร */}
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm" role="tabpanel">
-        <table className="w-full min-w-[1100px] text-base md:text-lg">
+        <table className="w-full min-w-[1300px] text-base md:text-lg">
           <thead className="border-b bg-slate-50 text-sm uppercase md:text-base">
             <tr>
               <th className="px-3 py-2 text-left">รหัสบัตร</th>
               <th className="px-3 py-2 text-left">Tier</th>
+              <th className="px-3 py-2 text-left">โซนที่เลือก</th>
+              <th className="px-3 py-2 text-left">ไซส์เสื้อ</th>
               <th className="px-3 py-2 text-left">ลูกค้า</th>
               <th className="px-3 py-2 text-left">การจัดส่ง</th>
               <th className="px-3 py-2 text-right">ยอดรวม</th>
@@ -151,7 +170,7 @@ export default async function AdminSeasonPassesPage(props: {
           <tbody>
             {displayedOrders.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-slate-500">
+                <td colSpan={10} className="p-8 text-center text-slate-500">
                   ยังไม่มีคนซื้อบัตรรายปี — เมื่อลูกค้าสมัครที่{" "}
                   <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm">
                     /season-pass/apply
@@ -173,6 +192,25 @@ export default async function AdminSeasonPassesPage(props: {
                       <span className="rounded bg-yellow-100 px-2 py-0.5 text-sm font-bold text-yellow-900">
                         {tier?.badge ?? o.tierId}
                       </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="inline-flex rounded-md border border-green-200 bg-green-50 px-2.5 py-1 font-bold text-green-900">
+                        {o.seatZone}
+                      </div>
+                      {getSeasonPassZoneDetail(o.seatZone) && (
+                        <div className="mt-1 text-sm text-slate-600 md:text-base">
+                          {getSeasonPassZoneDetail(o.seatZone)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {o.shirtSize ? (
+                        <span className="inline-flex min-w-10 justify-center rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 font-bold uppercase text-violet-900">
+                          {o.shirtSize}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{o.customerName}</div>
@@ -270,6 +308,11 @@ export default async function AdminSeasonPassesPage(props: {
 
     </div>
   );
+}
+
+function getSeasonPassZoneDetail(seatZone: string) {
+  const stadiumZoneCode = seatZone.split("-").pop();
+  return getStadiumZone(stadiumZoneCode)?.label ?? null;
 }
 
 function StatCard({
