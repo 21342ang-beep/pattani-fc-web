@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Download, Loader2, Lock, QrCode, ShieldCheck } from "lucide-react";
+import { Download, Loader2, Lock, QrCode, ShieldCheck, X } from "lucide-react";
 
 type PaymentState =
   | { status: "idle" }
@@ -24,6 +24,9 @@ export default function PaymentGateway({
 }) {
   const router = useRouter();
   const [state, setState] = useState<PaymentState>({ status: "idle" });
+  const [isSavingQr, setIsSavingQr] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [showScreenshotHelp, setShowScreenshotHelp] = useState(false);
   const paymentParams = seasonPassCode
     ? `seasonPassCode=${encodeURIComponent(seasonPassCode)}`
     : `bookingCode=${encodeURIComponent(bookingCode ?? "")}`;
@@ -56,6 +59,8 @@ export default function PaymentGateway({
   }, [state]);
 
   async function createPayment() {
+    setShowScreenshotHelp(false);
+    setSaveMessage("");
     setState({ status: "loading" });
     try {
       const response = await fetch("/api/payments/beam/create", {
@@ -85,31 +90,47 @@ export default function PaymentGateway({
 
   async function saveQrCode() {
     if (state.status !== "ready") return;
+    setIsSavingQr(true);
+    setSaveMessage("");
+    setShowScreenshotHelp(true);
 
-    const binary = window.atob(state.qrImageBase64);
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    const file = new File([bytes], qrFilename, { type: "image/png" });
+    try {
+      const binary = window.atob(state.qrImageBase64);
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "image/png" });
+      const file = new File([blob], qrFilename, { type: "image/png" });
 
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      try {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({
           files: [file],
           title: "Pattani FC PromptPay QR Code",
         });
+        setSaveMessage("เลือก “บันทึกรูปภาพ” เพื่อเก็บ QR Code ลงในคลังรูป");
         return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
       }
-    }
 
-    const url = URL.createObjectURL(file);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = qrFilename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = qrFilename;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+
+      setSaveMessage("ระบบส่งไฟล์ QR ให้แล้ว หากไม่พบไฟล์ ให้แคปหน้าจอจากภาพขนาดใหญ่");
+      setShowScreenshotHelp(true);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setSaveMessage("สามารถกดค้างที่ QR ขนาดใหญ่เพื่อบันทึก หรือแคปหน้าจอได้");
+        return;
+      }
+      setSaveMessage("อุปกรณ์นี้ไม่รองรับการบันทึกโดยตรง กรุณาแคปหน้าจอจากภาพขนาดใหญ่");
+      setShowScreenshotHelp(true);
+    } finally {
+      setIsSavingQr(false);
+    }
   }
 
   return (
@@ -179,14 +200,20 @@ export default function PaymentGateway({
               <button
                 type="button"
                 onClick={saveQrCode}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-5 py-3.5 text-lg font-bold text-yellow-300 shadow-sm transition hover:bg-green-900"
+                disabled={isSavingQr}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-5 py-3.5 text-lg font-bold text-yellow-300 shadow-sm transition hover:bg-green-900 disabled:cursor-wait disabled:opacity-60"
               >
-                <Download className="size-5" />
-                บันทึก QR Code ลงเครื่อง
+                {isSavingQr ? <Loader2 className="size-5 animate-spin" /> : <Download className="size-5" />}
+                {isSavingQr ? "กำลังเตรียมภาพ..." : "บันทึกหรือแคปหน้าจอ"}
               </button>
               <p className="text-sm leading-relaxed text-slate-500 md:text-base">
-                หากจองผ่านมือถือเครื่องเดียว ให้บันทึกรูปนี้แล้วเลือกจากคลังรูปในแอปธนาคาร
+                หากบันทึกไฟล์ไม่ได้ ระบบจะแสดง QR ขนาดใหญ่สำหรับกดค้างบันทึกหรือแคปหน้าจอ
               </p>
+              {saveMessage && (
+                <p role="status" className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800">
+                  {saveMessage}
+                </p>
+              )}
             </div>
             <div className="flex items-center justify-center gap-2 text-base text-slate-500 md:text-lg">
               <Loader2 className="size-4 animate-spin text-green-800" /> กำลังรอผลการชำระเงินจาก Beam
@@ -202,6 +229,57 @@ export default function PaymentGateway({
       <footer className="border-t border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-500 md:text-base">
         <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-4 text-green-700" /> ระบบจะไม่ยืนยันการจองจากการกดปุ่มหน้าเว็บไซต์</span>
       </footer>
+
+      {state.status === "ready" && showScreenshotHelp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="qr-screenshot-title"
+        >
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 text-center shadow-2xl">
+            <div className="flex items-start justify-between gap-3 text-left">
+              <div>
+                <h2 id="qr-screenshot-title" className="text-xl font-black text-green-950">
+                  แคปหน้าจอ QR ชำระเงิน
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  กดค้างที่ภาพเพื่อบันทึก หรือแคปหน้าจอนี้แล้วเลือกภาพในแอปธนาคาร
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScreenshotHelp(false)}
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
+                aria-label="ปิดหน้าต่าง QR Code"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="mx-auto mt-4 w-fit rounded-xl border-2 border-green-800 bg-white p-3">
+              <Image
+                src={`data:image/png;base64,${state.qrImageBase64}`}
+                alt="PromptPay QR Code สำหรับแคปหน้าจอ"
+                width={360}
+                height={360}
+                unoptimized
+                className="size-[min(76vw,360px)]"
+              />
+            </div>
+            <p className="mt-3 text-2xl font-black text-green-900">
+              {amountBaht.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowScreenshotHelp(false)}
+              className="mt-4 w-full rounded-full bg-green-800 px-5 py-3 font-bold text-yellow-300 hover:bg-green-900"
+            >
+              ปิดหน้าต่าง
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
