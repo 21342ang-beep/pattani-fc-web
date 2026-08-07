@@ -149,14 +149,16 @@ export default function RegisterForm({
           label="รหัสผ่าน"
           name="password"
           autoComplete="new-password"
+          minLength={8}
           required
-          hint="อย่างน้อย 8 ตัวอักษร + ต้องมีตัวอักษรและตัวเลข"
+          hint="อย่างน้อย 8 ตัวอักษร สามารถใช้ตัวเลขอย่างเดียวได้"
           error={fe.password}
         />
         <PasswordField
           label="ยืนยันรหัสผ่าน"
           name="confirmPassword"
           autoComplete="new-password"
+          minLength={8}
           required
           error={fe.confirmPassword}
         />

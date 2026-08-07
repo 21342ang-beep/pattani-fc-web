@@ -45,8 +45,7 @@ const registerSchema = z.object({
     .string()
     .min(8, "รหัสผ่านต้องอย่างน้อย 8 ตัวอักษร")
     .max(200, "รหัสผ่านยาวเกินไป")
-    .regex(/[A-Za-z]/, "ต้องมีตัวอักษร")
-    .regex(/[0-9]/, "ต้องมีตัวเลข"),
+    .regex(/\S/, "รหัสผ่านต้องไม่เป็นช่องว่างทั้งหมด"),
   confirmPassword: z.string(),
   pdpaConsent: z.literal("on", {
     message: "กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนสมัคร",
