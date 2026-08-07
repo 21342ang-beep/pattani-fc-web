@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
+import { getThaiProvinceCoordinate } from "@/lib/thai-province-coordinates";
 import {
   SEASON_LABEL,
   SEASON_TIERS,
@@ -400,33 +401,165 @@ export function ProvinceDashboard({
         />
       </div>
 
-      {stats.length === 0 ? (
-        <p className="mt-5 rounded-xl bg-slate-50 p-6 text-center text-slate-500">
-          ยังไม่มีข้อมูลสมาชิก
-        </p>
-      ) : (
-        <div className="mt-5 grid max-h-[32rem] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
-          {stats.map((stat) => (
-            <div key={stat.province} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <p className="font-bold text-slate-800">{stat.province}</p>
-                <p className="shrink-0 text-sm font-semibold text-green-900">
-                  {stat.count.toLocaleString("th-TH")} คน · {formatPercentage(stat.percentage)}
-                </p>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-green-100">
-                <div
-                  className="h-full rounded-full bg-green-700"
-                  style={{
-                    width: `${Math.min(100, Math.max(stat.percentage, stat.count > 0 ? 2 : 0))}%`,
-                  }}
-                />
-              </div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(22rem,0.8fr)_minmax(30rem,1.2fr)]">
+        <ThailandMemberMap stats={specifiedStats} />
+
+        <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 md:p-5">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h3 className="text-lg font-black text-green-950 md:text-xl">
+                กราฟจำนวนสมาชิกและเปอร์เซ็นต์
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                เรียงจากจังหวัดที่มีสมาชิกมากที่สุด
+              </p>
             </div>
-          ))}
+            <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-green-800 shadow-sm">
+              รวม {totalMembers.toLocaleString("th-TH")} คน
+            </span>
+          </div>
+
+          {stats.length === 0 ? (
+            <p className="mt-5 rounded-xl bg-white p-6 text-center text-slate-500">
+              ยังไม่มีข้อมูลสมาชิก
+            </p>
+          ) : (
+            <div className="mt-5 grid max-h-[34rem] gap-3 overflow-y-auto pr-1">
+              {stats.map((stat) => (
+                <div
+                  key={stat.province}
+                  data-province-percentage={stat.percentage.toFixed(1)}
+                  className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-bold text-slate-800">{stat.province}</p>
+                      <p className="mt-0.5 text-sm text-slate-500">
+                        {stat.count.toLocaleString("th-TH")} คน
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-xl font-black text-green-800">
+                      {formatPercentage(stat.percentage)}
+                    </p>
+                  </div>
+                  <div className="mt-3 h-3 overflow-hidden rounded-full bg-green-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-green-700 to-emerald-500"
+                      style={{
+                        width: `${Math.min(100, Math.max(stat.percentage, stat.count > 0 ? 2 : 0))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </section>
+  );
+}
+
+function ThailandMemberMap({ stats }: { stats: ProvinceStat[] }) {
+  const locatedStats = stats.flatMap((stat) => {
+    const coordinate = getThaiProvinceCoordinate(stat.province);
+    return coordinate ? [{ stat, coordinate }] : [];
+  });
+  const unmatchedStats = stats.filter(
+    (stat) => !getThaiProvinceCoordinate(stat.province),
+  );
+  const maxCount = Math.max(1, ...locatedStats.map(({ stat }) => stat.count));
+
+  const project = (latitude: number, longitude: number) => ({
+    x: 25 + ((longitude - 97.2) / (105.7 - 97.2)) * 990,
+    y: 25 + ((20.6 - latitude) / (20.6 - 5.5)) * 1790,
+  });
+
+  return (
+    <div className="rounded-2xl border border-green-100 bg-gradient-to-b from-green-50 to-emerald-100/70 p-4 md:p-5">
+      <div>
+        <h3 className="text-lg font-black text-green-950 md:text-xl">
+          แผนที่สมาชิกทั่วประเทศไทย
+        </h3>
+        <p className="mt-1 text-sm text-slate-600">
+          ขนาดหมุดสัมพันธ์กับจำนวนสมาชิกในจังหวัด
+        </p>
+      </div>
+
+      <div className="relative mx-auto mt-4 max-w-[25rem] overflow-hidden rounded-2xl border border-white/70 bg-white/60 p-2 shadow-inner">
+        <svg
+          viewBox="0 0 1051.164 1849.133"
+          role="img"
+          aria-labelledby="thailand-member-map-title thailand-member-map-desc"
+          className="h-auto w-full"
+        >
+          <title id="thailand-member-map-title">แผนที่ประเทศไทยแสดงสมาชิกแยกตามจังหวัด</title>
+          <desc id="thailand-member-map-desc">
+            หมุดแต่ละจุดแสดงจังหวัด จำนวนสมาชิก และเปอร์เซ็นต์ของสมาชิกทั้งหมด
+          </desc>
+          <defs>
+            <filter id="member-marker-shadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="6" stdDeviation="6" floodOpacity="0.28" />
+            </filter>
+          </defs>
+          <image
+            href="/thailand-provinces-map.webp"
+            width="1051.164"
+            height="1849.133"
+            aria-hidden="true"
+            style={{ filter: "drop-shadow(0 18px 16px rgb(15 23 42 / 0.22))" }}
+          />
+
+          {locatedStats.map(({ stat, coordinate }) => {
+            const point = project(coordinate.latitude, coordinate.longitude);
+            const radius = 24 + Math.sqrt(stat.count / maxCount) * 20;
+            return (
+              <g
+                key={stat.province}
+                data-province-marker={stat.province}
+                transform={`translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`}
+                filter="url(#member-marker-shadow)"
+              >
+                <title>
+                  {stat.province}: {stat.count.toLocaleString("th-TH")} คน ({stat.percentage.toFixed(1)}%)
+                </title>
+                <circle r={radius + 11} fill="#facc15" opacity="0.35" />
+                <circle r={radius} fill="#166534" stroke="#facc15" strokeWidth="7" />
+                <text
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="white"
+                  fontSize={stat.count > 99 ? 24 : 29}
+                  fontWeight="800"
+                >
+                  {stat.count > 999 ? "999+" : stat.count}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+
+        {locatedStats.length === 0 && (
+          <p className="absolute inset-x-4 top-1/2 -translate-y-1/2 rounded-xl bg-white/95 p-4 text-center text-sm font-semibold text-slate-600 shadow">
+            ยังไม่มีข้อมูลจังหวัดสำหรับแสดงหมุดบนแผนที่
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-600">
+        <span className="inline-flex items-center gap-2">
+          <span className="size-3 rounded-full border-2 border-yellow-400 bg-green-800" />
+          จังหวัดที่มีสมาชิก
+        </span>
+        <span>หมุดใหญ่ = สมาชิกมาก</span>
+      </div>
+
+      {unmatchedStats.length > 0 && (
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          ไม่พบตำแหน่งบนแผนที่: {unmatchedStats.map((stat) => stat.province).join(", ")}
+        </p>
+      )}
+    </div>
   );
 }
 

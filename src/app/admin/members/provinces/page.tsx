@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
+import { normalizeThaiProvinceName } from "@/lib/thai-province-coordinates";
 import {
   ProvinceDashboard,
   type ProvinceStat,
@@ -25,7 +26,9 @@ export default async function MemberProvinceDashboardPage() {
 
   const provinceCountByName = new Map<string, number>();
   for (const group of provinceGroups) {
-    const province = group.province?.trim() || "ไม่ระบุจังหวัด";
+    const province = group.province?.trim()
+      ? normalizeThaiProvinceName(group.province)
+      : "ไม่ระบุจังหวัด";
     provinceCountByName.set(
       province,
       (provinceCountByName.get(province) ?? 0) + group._count._all,
