@@ -1,7 +1,7 @@
 "use client";
 
 import { toPng } from "html-to-image";
-import { Printer, Download, Shield, Zap } from "lucide-react";
+import { Printer, Download, Shield, X, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 
 type Props = {
@@ -74,6 +74,8 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
   const ticketRef = useRef<HTMLElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [ticketPreview, setTicketPreview] = useState("");
+  const [showScreenshotHelp, setShowScreenshotHelp] = useState(false);
   const { date, time } = formatKickoffParts(booking.match.kickoffAt);
   const home = resolveLogo(booking.match.homeTeamLogo, booking.match.homeTeam);
   const away = resolveLogo(booking.match.awayTeamLogo, booking.match.awayTeam);
@@ -85,6 +87,8 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
     if (!ticketRef.current || isSaving) return;
     setIsSaving(true);
     setSaveMessage("");
+    setTicketPreview("");
+    setShowScreenshotHelp(false);
     try {
       const ticketImages = Array.from(ticketRef.current.querySelectorAll("img"));
       await Promise.all(ticketImages.map(waitForImage));
@@ -100,54 +104,40 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
       const imageBlob = await fetch(dataUrl).then((response) => response.blob());
       const filename = `pattanifc-eticket-${booking.bookingCode}.png`;
       const imageFile = new File([imageBlob], filename, { type: "image/png" });
-      const canShareImage = navigator.canShare?.({ files: [imageFile] });
+      setTicketPreview(dataUrl);
+      setShowScreenshotHelp(true);
 
-      if (canShareImage) {
-        await navigator.share({
-          title: "Pattani FC E-ticket",
-          text: "บันทึก E-ticket ของคุณ",
-          files: [imageFile],
-        });
-        setSaveMessage("เลือก “บันทึกรูปภาพ” เพื่อเก็บ E-ticket ลงใน Gallery");
-        return;
+      if (navigator.share && navigator.canShare?.({ files: [imageFile] })) {
+        try {
+          await navigator.share({
+            title: "Pattani FC E-ticket",
+            text: "บันทึก E-ticket ของคุณ",
+            files: [imageFile],
+          });
+          setSaveMessage("เลือก “บันทึกรูปภาพ” เพื่อเก็บ E-ticket ลงในคลังรูป");
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            setSaveMessage("สามารถกดค้างที่ภาพ E-Ticket หรือแคปหน้าจอได้");
+            return;
+          }
+        }
       }
 
+      const imageUrl = URL.createObjectURL(imageBlob);
       const link = document.createElement("a");
-      link.href = dataUrl;
+      link.href = imageUrl;
       link.download = filename;
+      link.rel = "noopener";
+      document.body.appendChild(link);
       link.click();
-      setSaveMessage("บันทึก E-ticket แล้ว");
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        setSaveMessage("ไม่สามารถบันทึก E-ticket ได้ กรุณาลองใหม่");
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function downloadTicket() {
-    if (!ticketRef.current || isSaving) return;
-    setIsSaving(true);
-    setSaveMessage("");
-    try {
-      const ticketImages = Array.from(ticketRef.current.querySelectorAll("img"));
-      await Promise.all(ticketImages.map(waitForImage));
-      await document.fonts?.ready;
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      );
-      const dataUrl = await toPng(ticketRef.current, {
-        backgroundColor: "#0a1e15",
-        pixelRatio: 2,
-      });
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `pattanifc-eticket-${booking.bookingCode}.png`;
-      link.click();
-      setSaveMessage("ดาวน์โหลด E-ticket แล้ว");
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(imageUrl), 60_000);
+      setSaveMessage("ระบบส่งไฟล์ E-Ticket ให้แล้ว หากไม่พบไฟล์ ให้แคปหน้าจอจากภาพขนาดใหญ่");
     } catch {
-      setSaveMessage("ไม่สามารถดาวน์โหลด E-ticket ได้ กรุณาลองใหม่");
+      setShowScreenshotHelp(true);
+      setSaveMessage("อุปกรณ์นี้ไม่สามารถสร้างไฟล์ภาพได้ กรุณาแคปหน้าจอ E-Ticket ที่แสดงอยู่");
+      ticketRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } finally {
       setIsSaving(false);
     }
@@ -171,17 +161,9 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
               type="button"
               onClick={saveTicket}
               disabled={isSaving}
-              className="inline-flex items-center gap-1.5 rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-green-950 transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70 sm:hidden"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-green-950 transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70"
             >
-              <Download className="size-3.5" /> {isSaving ? "กำลังบันทึก..." : <><span className="sm:hidden">บันทึก E-ticket</span><span className="hidden sm:inline">บันทึกตั๋ว</span></>}
-            </button>
-            <button
-              type="button"
-              onClick={downloadTicket}
-              disabled={isSaving}
-              className="hidden items-center gap-1.5 rounded-full bg-yellow-400 px-4 py-2 text-xs font-semibold text-green-950 transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70 sm:inline-flex"
-            >
-              <Download className="size-3.5" /> {isSaving ? "กำลังดาวน์โหลด..." : "ดาวน์โหลดตั๋ว"}
+              <Download className="size-3.5" /> {isSaving ? "กำลังเตรียมภาพ..." : "บันทึกหรือแคปหน้าจอ"}
             </button>
             <button
               onClick={() => window.print()}
@@ -343,6 +325,59 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
           ตั๋วใบนี้ใช้ได้ครั้งเดียว · ห้ามจำหน่ายต่อ · เก็บรักษาบาร์โค้ดให้ปลอดภัย
         </p>
       </div>
+
+      {showScreenshotHelp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 p-3 print:hidden sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="eticket-screenshot-title"
+        >
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-4 text-center shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-5">
+            <div className="flex items-start justify-between gap-3 text-left">
+              <div>
+                <h2 id="eticket-screenshot-title" className="text-xl font-black text-green-950">
+                  บันทึกหรือแคปหน้าจอ E-Ticket
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  กดค้างที่ภาพเพื่อบันทึก หรือแคปหน้าจอนี้เก็บไว้แสดงที่ประตูสนาม
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScreenshotHelp(false)}
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
+                aria-label="ปิดหน้าต่าง E-Ticket"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {ticketPreview ? (
+              <div className="mt-4 flex justify-center overflow-hidden rounded-xl bg-slate-900 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={ticketPreview}
+                  alt="E-Ticket สำหรับบันทึกหรือแคปหน้าจอ"
+                  className="max-h-[calc(100dvh-13rem)] w-auto max-w-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl bg-amber-50 p-5 text-sm font-medium text-amber-900">
+                ไม่สามารถสร้างไฟล์ภาพบนอุปกรณ์นี้ได้ กรุณาปิดหน้าต่างแล้วแคปหน้าจอตั๋วที่แสดงอยู่
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowScreenshotHelp(false)}
+              className="mt-4 w-full rounded-full bg-green-800 px-5 py-3 font-bold text-yellow-300 hover:bg-green-900"
+            >
+              ปิดหน้าต่าง
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
