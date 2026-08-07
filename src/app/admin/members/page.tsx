@@ -15,6 +15,12 @@ export const metadata = { title: "ข้อมูลผู้ใช้งาน 
 
 type TierFilter = "all" | "none" | SeasonTierId;
 
+type ProvinceStat = {
+  province: string;
+  count: number;
+  percentage: number;
+};
+
 const statusStyle: Record<string, { label: string; className: string }> = {
   CONFIRMED: {
     label: "ชำระแล้ว",
@@ -66,7 +72,7 @@ export default async function MembersPage(props: {
     ? (rawTier as TierFilter)
     : "all";
 
-  const [seasonOrders, totalMembers] = await Promise.all([
+  const [seasonOrders, totalMembers, provinceGroups] = await Promise.all([
     prisma.seasonPassOrder.findMany({
       where: {
         seasonLabel: SEASON_LABEL,
@@ -85,7 +91,27 @@ export default async function MembersPage(props: {
       orderBy: { createdAt: "desc" },
     }),
     prisma.customer.count(),
+    prisma.customer.groupBy({
+      by: ["province"],
+      _count: { _all: true },
+    }),
   ]);
+
+  const provinceCountByName = new Map<string, number>();
+  for (const group of provinceGroups) {
+    const province = group.province?.trim() || "ไม่ระบุจังหวัด";
+    provinceCountByName.set(
+      province,
+      (provinceCountByName.get(province) ?? 0) + group._count._all,
+    );
+  }
+  const provinceStats: ProvinceStat[] = [...provinceCountByName.entries()]
+    .map(([province, count]) => ({
+      province,
+      count,
+      percentage: totalMembers > 0 ? (count / totalMembers) * 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count || a.province.localeCompare(b.province, "th"));
 
   const activeMemberIds = new Set(
     seasonOrders.flatMap((order) => order.customerId ? [order.customerId] : []),
@@ -204,6 +230,8 @@ export default async function MembersPage(props: {
           })}
         </div>
       </section>
+
+      <ProvinceDashboard stats={provinceStats} totalMembers={totalMembers} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <form className="flex flex-1 flex-wrap items-center gap-2">
@@ -332,6 +360,104 @@ export default async function MembersPage(props: {
       <p className="text-sm text-slate-500">
         แสดงสูงสุด 100 บัญชีล่าสุดจากทั้งหมด {filteredMemberCount.toLocaleString("th-TH")} บัญชีตามตัวกรอง
       </p>
+    </div>
+  );
+}
+
+function ProvinceDashboard({
+  stats,
+  totalMembers,
+}: {
+  stats: ProvinceStat[];
+  totalMembers: number;
+}) {
+  const specifiedStats = stats.filter((stat) => stat.province !== "ไม่ระบุจังหวัด");
+  const topProvince = specifiedStats[0];
+  const unspecified = stats.find((stat) => stat.province === "ไม่ระบุจังหวัด");
+  const percentageFormatter = new Intl.NumberFormat("th-TH", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+  const formatPercentage = (value: number) => `${percentageFormatter.format(value)}%`;
+
+  return (
+    <section
+      aria-labelledby="province-dashboard-title"
+      className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm md:p-6"
+    >
+      <div>
+        <h2 id="province-dashboard-title" className="text-xl font-black text-green-950 md:text-2xl">
+          สมาชิกแยกตามจังหวัด
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">
+          สัดส่วนจากสมาชิกทั้งหมด {totalMembers.toLocaleString("th-TH")} คน
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <ProvinceSummaryCard
+          label="จังหวัดที่มีสมาชิก"
+          value={`${specifiedStats.length.toLocaleString("th-TH")} จังหวัด`}
+          detail="ไม่นับสมาชิกที่ยังไม่ระบุจังหวัด"
+        />
+        <ProvinceSummaryCard
+          label="จังหวัดที่มีสมาชิกสูงสุด"
+          value={topProvince?.province ?? "—"}
+          detail={topProvince
+            ? `${topProvince.count.toLocaleString("th-TH")} คน · ${formatPercentage(topProvince.percentage)}`
+            : "ยังไม่มีข้อมูลจังหวัด"}
+        />
+        <ProvinceSummaryCard
+          label="ไม่ระบุจังหวัด"
+          value={`${(unspecified?.count ?? 0).toLocaleString("th-TH")} คน`}
+          detail={formatPercentage(unspecified?.percentage ?? 0)}
+        />
+      </div>
+
+      {stats.length === 0 ? (
+        <p className="mt-5 rounded-xl bg-slate-50 p-6 text-center text-slate-500">
+          ยังไม่มีข้อมูลสมาชิก
+        </p>
+      ) : (
+        <div className="mt-5 grid max-h-[32rem] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+          {stats.map((stat) => (
+            <div key={stat.province} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <p className="font-bold text-slate-800">{stat.province}</p>
+                <p className="shrink-0 text-sm font-semibold text-green-900">
+                  {stat.count.toLocaleString("th-TH")} คน · {formatPercentage(stat.percentage)}
+                </p>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-green-100">
+                <div
+                  className="h-full rounded-full bg-green-700"
+                  style={{
+                    width: `${Math.min(100, Math.max(stat.percentage, stat.count > 0 ? 2 : 0))}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProvinceSummaryCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-xl border border-green-100 bg-green-50 p-4">
+      <p className="text-sm font-bold text-green-800">{label}</p>
+      <p className="mt-2 text-2xl font-black text-green-950">{value}</p>
+      <p className="mt-1 text-sm text-slate-600">{detail}</p>
     </div>
   );
 }
