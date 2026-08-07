@@ -2,9 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { Gift, Sparkles, Calendar, ArrowRight, ChevronDown } from "lucide-react";
 import { verifyCustomer } from "@/lib/customer-dal";
-import { prisma } from "@/lib/prisma";
 import { payload } from "@/lib/payload";
 import { formatDateTime } from "@/lib/format";
+import { getMemberTicketIds } from "@/lib/member-tickets";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "สมาชิก — Pattani FC" };
@@ -54,7 +54,7 @@ export default async function MemberPage(props: {
   const noticeMessage = notice ? NOTICE_MESSAGES[notice] : undefined;
 
   const cms = await payload();
-  const [{ docs }, bookingCount, seasonPassCount] = await Promise.all([
+  const [{ docs }, ticketIds] = await Promise.all([
     cms.find({
       collection: "promotions",
       where: { active: { equals: true } },
@@ -63,18 +63,10 @@ export default async function MemberPage(props: {
       depth: 1,
       overrideAccess: true,
     }),
-    prisma.booking.count({
-      where: { customerEmail: { equals: customer.email, mode: "insensitive" } },
-    }),
-    prisma.seasonPassOrder.count({
-      where: {
-        OR: [
-          { customerId: customer.id },
-          { customerEmail: { equals: customer.email, mode: "insensitive" } },
-        ],
-      },
-    }),
+    getMemberTicketIds(customer),
   ]);
+  const bookingCount = ticketIds.bookingIds.length;
+  const seasonPassCount = ticketIds.seasonPassOrderIds.length;
   const promotions = docs as unknown as PromotionDoc[];
 
   return (

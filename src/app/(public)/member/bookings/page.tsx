@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyCustomer } from "@/lib/customer-dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { getSeasonTier } from "@/lib/season-pass-tiers";
+import { getMemberTicketIds } from "@/lib/member-tickets";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "ตั๋วของฉัน — Pattani FC" };
@@ -21,11 +22,12 @@ function statusOf(status: string) {
 
 export default async function MyTicketsPage() {
   const customer = await verifyCustomer();
+  const ticketIds = await getMemberTicketIds(customer);
 
   const [bookings, seasonPasses] = await Promise.all([
     prisma.booking.findMany({
       where: {
-        customerEmail: { equals: customer.email, mode: "insensitive" },
+        id: { in: ticketIds.bookingIds },
       },
       include: {
         match: {
@@ -40,13 +42,9 @@ export default async function MyTicketsPage() {
       orderBy: { createdAt: "desc" },
       take: 100,
     }),
-    // บัตรรายปีผูกได้ 2 ทาง: customerId (สมัครตอนล็อกอิน) หรืออีเมลที่กรอกตอนสมัคร
     prisma.seasonPassOrder.findMany({
       where: {
-        OR: [
-          { customerId: customer.id },
-          { customerEmail: { equals: customer.email, mode: "insensitive" } },
-        ],
+        id: { in: ticketIds.seasonPassOrderIds },
       },
       include: {
         purchase: { select: { purchaseCode: true } },
