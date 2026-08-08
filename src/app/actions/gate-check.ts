@@ -209,19 +209,96 @@ const seasonPassScanSchema = z.object({
   barcode: z.string().trim().regex(/^(PFC26-(4000|2500|2000|1500)-\d{4}|SP-[A-Z]+-[A-Z0-9]{8})$/i),
 });
 
+type SeasonPassScanError = "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "INVALID" | "LEAGUE_ONLY";
+
+export type LookupSeasonPassResult =
+  | {
+      ok: true;
+      barcode: string;
+      passCode: string;
+      customerName: string;
+      customerPhoneLast4: string;
+      seatZone: string;
+      tierId: string;
+      usesRemaining: number;
+    }
+  | { ok: false; error: SeasonPassScanError };
+
 export type ScanSeasonPassResult =
   | {
       ok: true;
       passCode: string;
       customerName: string;
-      customerPhone: string;
+      customerPhoneLast4: string;
       customerEmail: string | null;
       seatZone: string;
       tierId: string;
       usesRemaining: number;
       scanId: string;
     }
-  | { ok: false; error: "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "INVALID" | "LEAGUE_ONLY" };
+  | { ok: false; error: SeasonPassScanError };
+
+function phoneLast4(phone: string | null | undefined) {
+  const digits = phone?.replace(/\D/g, "") ?? "";
+  return digits.length >= 4 ? digits.slice(-4) : "—";
+}
+
+// Read-only preview for gate staff. No usage is consumed until scanSeasonPass
+// is called from the explicit confirmation step.
+export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPassResult> {
+  await verifyPermission("GATE_CHECK");
+  const parsed = seasonPassScanSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "INVALID" };
+
+  const barcode = parsed.data.barcode.toUpperCase();
+  const match = await prisma.match.findUnique({
+    where: { id: parsed.data.matchId },
+    select: { competitionType: true, homeTeam: true },
+  });
+  if (!match || match.competitionType !== "LEAGUE" || !isPattaniHomeTeam(match.homeTeam)) {
+    return { ok: false, error: "LEAGUE_ONLY" };
+  }
+
+  const pass = await prisma.seasonPassBarcode.findUnique({
+    where: { barcode },
+    include: {
+      order: {
+        select: {
+          status: true,
+          passCode: true,
+          customerName: true,
+          customerPhone: true,
+          seatZone: true,
+        },
+      },
+      scans: {
+        where: { matchId: parsed.data.matchId },
+        select: { id: true },
+        take: 1,
+      },
+    },
+  });
+  if (!pass) return { ok: false, error: "NOT_FOUND" };
+
+  const order = pass.order;
+  const isInternalVvip = pass.tierId === "vvip-elite" && pass.isGenerated;
+  if (!isInternalVvip && (!order || order.status !== "CONFIRMED")) {
+    return { ok: false, error: "INACTIVE" };
+  }
+  if (pass.scans.length > 0) return { ok: false, error: "DUPLICATE" };
+  if (pass.usesRemaining <= 0) return { ok: false, error: "EXHAUSTED" };
+
+  return {
+    ok: true,
+    barcode,
+    passCode: order?.passCode ?? pass.barcode,
+    customerName: order?.customerName ?? "VVIP 4,000 · ใช้งานภายใน",
+    customerPhoneLast4: phoneLast4(order?.customerPhone),
+    seatZone: order?.seatZone ?? "VVIP",
+    tierId: pass.tierId,
+    usesRemaining: pass.usesRemaining,
+  };
+}
 
 // Season passes require an online, transactional check: this is what makes a
 // duplicate scan fail immediately even when two gates scan at the same time.
@@ -278,7 +355,7 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
       ok: true,
       passCode: order?.passCode ?? pass.barcode,
       customerName: order?.customerName ?? "VVIP 4,000 · ใช้งานภายใน",
-      customerPhone: order?.customerPhone ?? "—",
+      customerPhoneLast4: phoneLast4(order?.customerPhone),
       customerEmail: order?.customerEmail ?? null,
       seatZone: order?.seatZone ?? "VVIP",
       tierId: pass.tierId,

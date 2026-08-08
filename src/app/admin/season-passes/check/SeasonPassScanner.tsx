@@ -2,8 +2,13 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronDown, Loader2, ScanLine } from "lucide-react";
-import { scanSeasonPass, type ScanSeasonPassResult } from "@/app/actions/gate-check";
+import { CheckCircle2, ChevronDown, Loader2, ScanLine, ShieldCheck, X } from "lucide-react";
+import {
+  lookupSeasonPass,
+  scanSeasonPass,
+  type LookupSeasonPassResult,
+  type ScanSeasonPassResult,
+} from "@/app/actions/gate-check";
 import DeleteAllSeasonPassScansButton from "./DeleteAllSeasonPassScansButton";
 import DeleteSeasonPassScanButton from "./DeleteSeasonPassScanButton";
 
@@ -18,6 +23,19 @@ type ScanHistoryItem = {
   matchLabel: string;
 };
 type ScanRecord = Extract<ScanSeasonPassResult, { ok: true }> & { id: string; at: string; matchLabel: string };
+type PreviewRecord = Extract<LookupSeasonPassResult, { ok: true }> & { matchLabel: string };
+type ScanError = Extract<LookupSeasonPassResult, { ok: false }>["error"];
+
+function scanErrorMessage(error: ScanError) {
+  return {
+    NOT_FOUND: "ไม่พบบัตรรายปีนี้",
+    DUPLICATE: "บัตรนี้ใช้สิทธิ์สำหรับแมตช์นี้ไปแล้ว",
+    EXHAUSTED: "บัตรนี้ใช้สิทธิ์ครบตามจำนวนแมตช์แล้ว",
+    INACTIVE: "บัตรรายปีนี้ยังไม่พร้อมใช้งาน",
+    INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
+    LEAGUE_ONLY: "บัตรรายปีใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC",
+  }[error];
+}
 
 export default function SeasonPassScanner({
   matches,
@@ -33,6 +51,7 @@ export default function SeasonPassScanner({
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [history, setHistory] = useState(scanHistory);
   const [barcode, setBarcode] = useState("");
+  const [preview, setPreview] = useState<PreviewRecord | null>(null);
   const [latest, setLatest] = useState<ScanRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -54,29 +73,50 @@ export default function SeasonPassScanner({
     setError(null);
 
     startTransition(async () => {
-      const result = await scanSeasonPass({ matchId, barcode: code });
+      const result = await lookupSeasonPass({ matchId, barcode: code });
       if (!result.ok) {
-        const message = {
-          NOT_FOUND: "ไม่พบบัตรรายปีนี้",
-          DUPLICATE: "บัตรนี้ใช้สิทธิ์สำหรับแมตช์นี้ไปแล้ว",
-          EXHAUSTED: "บัตรนี้ใช้สิทธิ์ครบตามจำนวนแมตช์แล้ว",
-          INACTIVE: "บัตรรายปีนี้ยังไม่พร้อมใช้งาน",
-          INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
-          LEAGUE_ONLY: "บัตรรายปีใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC",
-        }[result.error];
-        setError(message);
+        setPreview(null);
+        setError(scanErrorMessage(result.error));
       } else {
-        setLatest({
+        setLatest(null);
+        setPreview({
           ...result,
-          id: `${result.passCode}-${Date.now()}`,
-          at: new Date().toISOString(),
           matchLabel: matches.find((match) => match.id === matchId)?.label ?? "",
         });
-        router.refresh();
       }
       setBarcode("");
+    });
+  }
+
+  function confirmEntry() {
+    if (!preview) return;
+    setError(null);
+
+    startTransition(async () => {
+      const result = await scanSeasonPass({ matchId, barcode: preview.barcode });
+      if (!result.ok) {
+        setError(scanErrorMessage(result.error));
+        setPreview(null);
+        window.setTimeout(() => inputRef.current?.focus(), 0);
+        return;
+      }
+
+      setLatest({
+        ...result,
+        id: `${result.passCode}-${Date.now()}`,
+        at: new Date().toISOString(),
+        matchLabel: preview.matchLabel,
+      });
+      setPreview(null);
+      router.refresh();
       window.setTimeout(() => inputRef.current?.focus(), 0);
     });
+  }
+
+  function cancelPreview() {
+    setPreview(null);
+    setError(null);
+    window.setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   return (
@@ -132,6 +172,8 @@ export default function SeasonPassScanner({
                       onClick={() => {
                         setMatchId(match.id);
                         setMatchMenuOpen(false);
+                        setPreview(null);
+                        setError(null);
                       }}
                       className={`block w-full px-3 py-3 text-left text-base hover:bg-green-50 md:text-lg ${match.id === matchId ? "bg-green-100 font-semibold text-green-900" : "text-slate-700"}`}
                     >
@@ -148,6 +190,7 @@ export default function SeasonPassScanner({
               ref={inputRef}
               value={barcode}
               onChange={(event) => setBarcode(event.target.value)}
+              disabled={pending || preview !== null}
               autoComplete="off"
               spellCheck={false}
               placeholder="เช่น PFC26-2500-0001 หรือ SP-..."
@@ -157,21 +200,61 @@ export default function SeasonPassScanner({
         </div>
         <button
           type="submit"
-          disabled={pending || !matchId || !barcode.trim()}
+          disabled={pending || preview !== null || !matchId || !barcode.trim()}
           className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-green-800 px-5 py-3.5 text-lg font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto md:text-xl"
         >
           {pending ? <Loader2 className="size-5 animate-spin" /> : <ScanLine className="size-5" />}
-          สแกน / ตรวจสอบบัตร
+          ตรวจสอบข้อมูลบัตร
         </button>
-        {pending && <p className="mt-3 flex items-center gap-2 text-base text-slate-600 md:text-lg"><Loader2 className="size-4 animate-spin" /> กำลังบันทึกการใช้งาน...</p>}
+        {pending && !preview && <p className="mt-3 flex items-center gap-2 text-base text-slate-600 md:text-lg"><Loader2 className="size-4 animate-spin" /> กำลังตรวจสอบข้อมูล...</p>}
         {error && !pending && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-base font-medium text-red-700 md:text-lg">{error}</p>}
       </form>
+
+      {preview && (
+        <section className="rounded-xl border-2 border-amber-400 bg-amber-50 p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-amber-900">
+            <ShieldCheck className="size-7" />
+            <h2 className="text-2xl font-bold md:text-3xl">ตรวจสอบเจ้าของบัตรก่อนยืนยัน</h2>
+          </div>
+          <p className="mt-2 text-base font-medium text-amber-900 md:text-lg">
+            กรุณาสอบถามชื่อและเบอร์โทร 4 ตัวท้ายจากผู้ถือบัตร แล้วเปรียบเทียบกับข้อมูลด้านล่าง
+          </p>
+          <dl className="mt-4 grid gap-3 text-base sm:grid-cols-2 md:text-lg">
+            <Info label="ชื่อเจ้าของบัตร"><span className="font-bold">{preview.customerName}</span></Info>
+            <Info label="เบอร์โทร 4 ตัวท้าย"><span className="font-mono text-xl font-black">•••• {preview.customerPhoneLast4}</span></Info>
+            <Info label="แพ็กเกจ">{summaries.find((tier) => tier.id === preview.tierId)?.badge ?? preview.tierId}</Info>
+            <Info label="โซนที่นั่ง">{preview.seatZone}</Info>
+            <Info label="รหัสบัตร"><span className="font-mono">{preview.passCode}</span></Info>
+            <Info label="แมตช์">{preview.matchLabel}</Info>
+            <Info label="สิทธิ์คงเหลือ"><span className="font-bold">{preview.usesRemaining} แมตช์</span></Info>
+          </dl>
+          <div className="mt-5 flex flex-col gap-3 border-t border-amber-200 pt-4 sm:flex-row">
+            <button
+              type="button"
+              onClick={confirmEntry}
+              disabled={pending}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-800 px-6 py-3.5 text-lg font-bold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300 md:text-xl"
+            >
+              {pending ? <Loader2 className="size-5 animate-spin" /> : <CheckCircle2 className="size-5" />}
+              ยืนยันให้เข้าสนาม
+            </button>
+            <button
+              type="button"
+              onClick={cancelPreview}
+              disabled={pending}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-lg font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 md:text-xl"
+            >
+              <X className="size-5" /> ข้อมูลไม่ตรง / ยกเลิก
+            </button>
+          </div>
+        </section>
+      )}
 
       {latest && (
         <section className="rounded-xl border border-emerald-300 bg-emerald-50 p-5 shadow-sm">
           <div className="flex items-center gap-2 text-emerald-800"><CheckCircle2 className="size-6" /><h2 className="text-2xl font-bold md:text-3xl">บันทึกการใช้งานบัตรรายปีแล้ว</h2></div>
           <dl className="mt-4 grid gap-3 text-base md:text-lg sm:grid-cols-2">
-            <Info label="ผู้ซื้อ">{latest.customerName}</Info><Info label="โทรศัพท์">{latest.customerPhone}</Info>
+            <Info label="ผู้ซื้อ">{latest.customerName}</Info><Info label="เบอร์โทร 4 ตัวท้าย"><span className="font-mono">•••• {latest.customerPhoneLast4}</span></Info>
             <Info label="แพ็กเกจ">{summaries.find((tier) => tier.id === latest.tierId)?.badge ?? latest.tierId}</Info><Info label="โซนที่นั่ง">{latest.seatZone}</Info>
             <Info label="รหัสบัตร"><span className="font-mono">{latest.passCode}</span></Info><Info label="แมตช์">{latest.matchLabel}</Info>
             <Info label="สิทธิ์คงเหลือ"><span className="font-bold">{latest.usesRemaining} แมตช์</span></Info>
