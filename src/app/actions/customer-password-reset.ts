@@ -63,7 +63,14 @@ export async function resetCustomerPassword(_prev: PasswordResetState, formData:
     const response = await fetch("https://otp.thaibulksms.com/v2/otp/verify", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ key: auth.key, secret: auth.secret, token: record.providerToken, pin }), cache: "no-store", signal: AbortSignal.timeout(10_000) });
     const data = await response.json().catch(() => null) as { status?: string } | null;
     if (!response.ok || data?.status !== "success") return { error: "OTP ไม่ถูกต้องหรือหมดอายุ" };
-    await prisma.customer.update({ where: { id: record.customerId }, data: { passwordHash: await bcrypt.hash(password, 12) } });
+    await prisma.customer.update({
+      where: { id: record.customerId },
+      data: {
+        passwordHash: await bcrypt.hash(password, 12),
+        // การรีเซ็ตสำเร็จได้เพราะผ่าน SMS OTP ของเบอร์สมาชิกแล้ว
+        phoneVerifiedAt: new Date(),
+      },
+    });
     await prisma.$executeRaw`DELETE FROM "CustomerPasswordResetOtp" WHERE "id" = ${id}`;
     (await cookies()).delete(COOKIE);
     return { reset: true };

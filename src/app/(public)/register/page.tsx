@@ -5,6 +5,7 @@ import { Shield } from "lucide-react";
 import { getAllProvinces } from "geothai";
 import { readCustomerSession } from "@/lib/customer-session";
 import { getSafeReturnTo } from "@/lib/oauth";
+import { getTurnstileSiteKey } from "@/lib/turnstile";
 import RegisterForm, { type ShippingProvince } from "./RegisterForm";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export default async function RegisterPage(props: {
   const session = await readCustomerSession();
   if (session) redirect(returnTo ?? "/member");
   const errorMessage = sp.error ? ERROR_MESSAGES[sp.error] : undefined;
+  const turnstileSiteKey = getTurnstileSiteKey();
   const shippingProvinces: ShippingProvince[] = getAllProvinces()
     .map((province) => ({
       name: province.name_th,
@@ -63,7 +65,12 @@ export default async function RegisterPage(props: {
           </p>
         </div>
 
-        <RegisterForm errorMessage={errorMessage} shippingProvinces={shippingProvinces} returnTo={returnTo ?? undefined} />
+        <RegisterForm
+          errorMessage={errorMessage}
+          shippingProvinces={shippingProvinces}
+          returnTo={returnTo ?? undefined}
+          turnstileSiteKey={turnstileSiteKey ?? undefined}
+        />
 
         <p className="mt-6 text-center text-base text-slate-600 md:text-lg">
           มีบัญชีอยู่แล้ว?{" "}

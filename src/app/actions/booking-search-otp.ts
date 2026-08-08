@@ -1,9 +1,11 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
+import { readCustomerSession } from "@/lib/customer-session";
 import {
   BOOKING_SEARCH_OTP_COOKIE,
   bookingSearchPhoneVariants,
@@ -149,6 +151,28 @@ async function findSeasonPasses(phone: string): Promise<SeasonPassSearchResult[]
   }));
 }
 
+async function markCurrentCustomerPhoneVerified(phone: string): Promise<void> {
+  const session = await readCustomerSession();
+  if (!session) return;
+  const customer = await prisma.customer.findUnique({
+    where: { id: session.customerId },
+    select: { id: true, phone: true, phoneVerifiedAt: true },
+  });
+  if (
+    !customer?.phone ||
+    normalizeBookingSearchPhone(customer.phone) !== normalizeBookingSearchPhone(phone)
+  ) {
+    return;
+  }
+  if (!customer.phoneVerifiedAt) {
+    await prisma.customer.update({
+      where: { id: customer.id },
+      data: { phoneVerifiedAt: new Date() },
+    });
+    revalidatePath("/member/profile");
+  }
+}
+
 export async function requestBookingSearchOtp(
   _prev: RequestBookingSearchOtpState,
   formData: FormData,
@@ -282,6 +306,13 @@ export async function verifyBookingSearchOtp(
       SET "verifiedAt" = NOW()
       WHERE "id" = ${request.id}
     `;
+    // ไม่ส่ง OTP เพิ่ม: ถ้าผู้ใช้ล็อกอินอยู่และเบอร์ตรงกับโปรไฟล์
+    // ให้ OTP ที่เพิ่งผ่านนี้ยืนยันเบอร์สมาชิกไปพร้อมกัน
+    await markCurrentCustomerPhoneVerified(request.phone).catch((error) => {
+      console.error("Failed to mark customer phone as verified", {
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    });
     const [bookings, seasonPasses] = await Promise.all([
       findBookings(request.phone),
       findSeasonPasses(request.phone),

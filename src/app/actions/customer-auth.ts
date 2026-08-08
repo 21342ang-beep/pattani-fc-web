@@ -12,6 +12,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { createOAuthState, getSafeReturnTo } from "@/lib/oauth";
 import { buildGoogleAuthUrl, isGoogleConfigured } from "@/lib/oauth-google";
 import { buildLineAuthUrl, isLineConfigured } from "@/lib/oauth-line";
+import { verifyRegistrationTurnstile } from "@/lib/turnstile";
 
 const registerSchema = z.object({
   name: z.string().trim().min(2, "กรอกชื่อ-นามสกุลให้ครบ").max(100),
@@ -107,6 +108,15 @@ export async function registerCustomer(
       if (typeof k === "string" && !fieldErrors[k]) fieldErrors[k] = issue.message;
     }
     return { error: "กรุณาตรวจสอบข้อมูล", fieldErrors };
+  }
+
+  const humanVerified = await verifyRegistrationTurnstile(
+    formData.get("turnstileToken"),
+  );
+  if (!humanVerified) {
+    return {
+      error: "ไม่ผ่านการตรวจสอบความปลอดภัย กรุณาลองใหม่อีกครั้ง",
+    };
   }
 
   const { name, email, phone, gender, birthDate, address, province, district, postalCode, password } = parsed.data;

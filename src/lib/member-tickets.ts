@@ -28,11 +28,13 @@ export async function getMemberTicketIds(
     prisma.booking.findMany({
       where: {
         customerEmail: { equals: customer.email, mode: "insensitive" },
+        status: "CONFIRMED",
       },
       select: { id: true },
     }),
     prisma.seasonPassOrder.findMany({
       where: {
+        status: "CONFIRMED",
         OR: [
           { customerId: customer.id },
           { customerEmail: { equals: customer.email, mode: "insensitive" } },
@@ -58,6 +60,7 @@ export async function getMemberTicketIds(
     prisma.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "Booking"
       WHERE coalesce(trim("customerEmail"), '') = ''
+        AND "status" = 'CONFIRMED'
         AND (
           regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
           OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}
@@ -67,6 +70,7 @@ export async function getMemberTicketIds(
       SELECT "id" FROM "SeasonPassOrder"
       WHERE "customerId" IS NULL
         AND coalesce(trim("customerEmail"), '') = ''
+        AND "status" = 'CONFIRMED'
         AND (
           regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
           OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}

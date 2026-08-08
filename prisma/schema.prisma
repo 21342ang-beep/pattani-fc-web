@@ -55,6 +55,7 @@ model Customer {
   passwordHash      String?
   name              String
   phone             String?
+  phoneVerifiedAt   DateTime?
   gender            String?
   birthDate         DateTime?
   address           String?

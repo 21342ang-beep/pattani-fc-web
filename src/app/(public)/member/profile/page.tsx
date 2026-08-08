@@ -2,6 +2,7 @@ import { verifyCustomer } from "@/lib/customer-dal";
 import { formatDateTime } from "@/lib/format";
 import ProfileForm from "./ProfileForm";
 import DangerZone from "./DangerZone";
+import PhoneVerificationCard from "./PhoneVerificationCard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "โปรไฟล์ — Pattani FC" };
@@ -28,6 +29,13 @@ export default async function ProfilePage() {
           }}
         />
       </section>
+
+      <PhoneVerificationCard
+        phone={customer.phone}
+        verifiedAtLabel={
+          customer.phoneVerifiedAt ? formatDateTime(customer.phoneVerifiedAt) : null
+        }
+      />
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2">
         <InfoBox label="สมัครสมาชิกเมื่อ" value={formatDateTime(customer.createdAt)} />

@@ -8,6 +8,7 @@ import {
   type CustomerAuthState,
 } from "@/app/actions/customer-auth";
 import PasswordInput from "@/components/PasswordInput";
+import TurnstileWidget from "./TurnstileWidget";
 
 export type ShippingProvince = {
   name: string;
@@ -19,15 +20,19 @@ export default function RegisterForm({
   errorMessage,
   shippingProvinces,
   returnTo,
+  turnstileSiteKey,
 }: {
   errorMessage?: string;
   shippingProvinces: ShippingProvince[];
   returnTo?: string;
+  turnstileSiteKey?: string;
 }) {
   const [pdpaChecked, setPdpaChecked] = useState(false);
   const [province, setProvince] = useState("");
   const [district, setDistrict] = useState("");
   const [postalCode, setPostalCode] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const router = useRouter();
   const [state, formAction, pending] = useActionState<CustomerAuthState, FormData>(
     registerCustomer,
@@ -40,6 +45,12 @@ export default function RegisterForm({
   useEffect(() => {
     if (state?.redirectTo) router.replace(state.redirectTo);
   }, [router, state?.redirectTo]);
+
+  useEffect(() => {
+    if (!state) return;
+    setTurnstileToken("");
+    setTurnstileResetKey((value) => value + 1);
+  }, [state]);
 
   function handleProvinceChange(value: string) {
     setProvince(value);
@@ -67,6 +78,7 @@ export default function RegisterForm({
           name="pdpaConsent"
           value={pdpaChecked ? "on" : ""}
         />
+        <input type="hidden" name="turnstileToken" value={turnstileToken} />
         {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
 
         {/* ─── ข้อมูลลูกค้า ─── */}
@@ -190,11 +202,18 @@ export default function RegisterForm({
         </div>
 
         {/* ─── สมัครด้วยรหัสผ่าน ─── */}
+        {turnstileSiteKey && (
+          <TurnstileWidget
+            siteKey={turnstileSiteKey}
+            resetKey={turnstileResetKey}
+            onTokenChange={setTurnstileToken}
+          />
+        )}
         <button
           type="submit"
           name="mode"
           value="password"
-          disabled={pending || !pdpaChecked}
+          disabled={pending || !pdpaChecked || (!!turnstileSiteKey && !turnstileToken)}
           suppressHydrationWarning
           className="w-full rounded-md bg-green-800 px-4 py-3 text-base font-bold text-yellow-300 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-white md:text-lg"
         >

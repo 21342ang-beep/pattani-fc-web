@@ -19,6 +19,7 @@ export const verifyCustomer = cache(async () => {
       email: true,
       name: true,
       phone: true,
+      phoneVerifiedAt: true,
       lastLoginAt: true,
       createdAt: true,
     },

@@ -84,6 +84,7 @@ export async function GET(request: Request) {
       province: true,
       postalCode: true,
       emailVerifiedAt: true,
+      phoneVerifiedAt: true,
       createdAt: true,
       lastLoginAt: true,
       accounts: { select: { provider: true } },
@@ -113,6 +114,7 @@ export async function GET(request: Request) {
         ? member.accounts.map((account) => account.provider).join(", ")
         : "อีเมล / รหัสผ่าน",
       member.emailVerifiedAt ? "ยืนยันแล้ว" : "ยังไม่ยืนยัน",
+      member.phoneVerifiedAt ? "ยืนยันแล้ว" : "ยังไม่ยืนยัน",
       member.createdAt,
       member.lastLoginAt,
     ];
@@ -134,12 +136,13 @@ export async function GET(request: Request) {
       "แพ็กเกจบัตรรายปี",
       "ช่องทางสมัคร",
       "สถานะยืนยันอีเมล",
+      "สถานะยืนยันเบอร์โทร",
       "วันที่สมัคร",
       "เข้าใช้ล่าสุด",
     ],
     rows,
-    columnWidths: [8, 24, 30, 16, 38, 20, 20, 16, 48, 20, 18, 22, 22],
-    dateColumns: [12, 13],
+    columnWidths: [8, 24, 30, 16, 38, 20, 20, 16, 48, 20, 18, 18, 22, 22],
+    dateColumns: [13, 14],
     textColumns: [3, 4, 8],
     dateTimeOffsetMinutes: 7 * 60,
   });

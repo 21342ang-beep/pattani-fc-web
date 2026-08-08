@@ -11,6 +11,7 @@ import {
   deleteCustomerSession,
 } from "@/lib/customer-session";
 import { rateLimit } from "@/lib/rate-limit";
+import { normalizeBookingSearchPhone } from "@/lib/booking-search-otp";
 
 export type ProfileState =
   | { error?: string; success?: string; fieldErrors?: Record<string, string> }
@@ -46,9 +47,18 @@ export async function updateProfile(
   }
 
   const { name, phone } = parsed.data;
+  const nextPhone = phone || null;
+  const phoneChanged =
+    normalizeBookingSearchPhone(customer.phone ?? "") !==
+    normalizeBookingSearchPhone(nextPhone ?? "");
   const updated = await prisma.customer.update({
     where: { id: customer.id },
-    data: { name, phone: phone || null },
+    data: {
+      name,
+      phone: nextPhone,
+      // การยืนยันผูกกับหมายเลขเดิมเท่านั้น เปลี่ยนเบอร์แล้วต้องยืนยันใหม่
+      ...(phoneChanged ? { phoneVerifiedAt: null } : {}),
+    },
   });
 
   // ชื่อเปลี่ยน → refresh session token ให้ avatar/nav แสดงชื่อใหม่

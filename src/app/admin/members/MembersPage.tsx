@@ -138,6 +138,7 @@ export default async function MembersPage(props: {
         createdAt: true,
         lastLoginAt: true,
         emailVerifiedAt: true,
+        phoneVerifiedAt: true,
         accounts: { select: { provider: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -290,6 +291,11 @@ export default async function MembersPage(props: {
                   <td className="px-4 py-3 text-sm text-slate-600">
                     <div>{member.email}</div>
                     <div className="mt-1">{member.phone ?? "—"}</div>
+                    {member.phone ? (
+                      <div className={`mt-1 text-xs font-medium ${member.phoneVerifiedAt ? "text-emerald-700" : "text-amber-700"}`}>
+                        {member.phoneVerifiedAt ? "ยืนยันเบอร์แล้ว" : "ยังไม่ยืนยันเบอร์"}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="max-w-72 px-4 py-3 text-sm leading-relaxed text-slate-600">
                     {addressLines.length > 0
