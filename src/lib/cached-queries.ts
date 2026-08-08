@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { activeBookingStatusWhere, expirePendingBookings } from "@/lib/booking-expiry";
 
 // Cache key แยกตาม filter — matches list เปลี่ยนไม่บ่อย (ข้อมูล match)
 // invalidate ผ่าน revalidateTag("matches") จาก admin action ตอนแก้ match/booking
@@ -33,8 +34,9 @@ export const getMatchById = unstable_cache(
 // ต้อง revalidateTag(`match-sold-${matchId}`) ใน booking action ตอนจองสำเร็จ
 export const getSoldSeats = unstable_cache(
   async (matchId: string) => {
+    await expirePendingBookings({ matchIds: [matchId] });
     const res = await prisma.booking.aggregate({
-      where: { matchId, status: { in: ["PENDING", "CONFIRMED"] } },
+      where: { matchId, ...activeBookingStatusWhere() },
       _sum: { quantity: true },
     });
     return res._sum.quantity ?? 0;

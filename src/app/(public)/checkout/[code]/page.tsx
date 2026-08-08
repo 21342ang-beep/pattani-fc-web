@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { expirePendingBookings } from "@/lib/booking-expiry";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import PaymentGateway from "./PaymentGateway";
 
@@ -13,6 +14,8 @@ export default async function CheckoutPage({
   const { code } = await params;
 
   if (!code || !/^[a-z0-9]+$/i.test(code)) notFound();
+
+  await expirePendingBookings({ bookingCode: code });
 
   const booking = await prisma.booking.findUnique({
     where: { bookingCode: code },

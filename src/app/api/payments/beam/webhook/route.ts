@@ -108,6 +108,18 @@ export async function POST(request: Request) {
       SET "status" = 'FAILED', "chargeId" = COALESCE(${typeof payload.chargeId === "string" ? payload.chargeId : null}, "chargeId"),
           "updatedAt" = NOW()
       WHERE "referenceId" = ${payload.referenceId}`);
+    const reference = parseBeamPaymentReference(payload.referenceId);
+    if (reference?.kind === "booking") {
+      const cancelled = await prisma.booking.updateMany({
+        where: {
+          bookingCode: reference.code,
+          status: "PENDING",
+          paymentExpiresAt: { lte: new Date() },
+        },
+        data: { status: "CANCELLED" },
+      });
+      if (cancelled.count > 0) revalidatePaymentViews("booking", reference.code);
+    }
     return Response.json({ ok: true, processed: result > 0 });
   }
 
@@ -125,9 +137,24 @@ export async function POST(request: Request) {
     SET "status" = 'SUCCEEDED', "chargeId" = COALESCE(${payment.chargeId}, "chargeId"), "updatedAt" = NOW()
     WHERE "referenceId" = ${payment.referenceId}`);
   if (reference.kind === "booking") {
-    const result = await prisma.booking.updateMany({
-      where: { bookingCode: reference.code, status: "PENDING", totalAmount: payment.amount },
-      data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod, paidAt: payment.paidAt },
+    const result = await prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { bookingCode: reference.code },
+        select: { id: true, matchId: true },
+      });
+      if (!booking) return { count: 0 };
+      await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${booking.matchId}`}))`);
+      return tx.booking.updateMany({
+        where: {
+          id: booking.id,
+          status: "PENDING",
+          totalAmount: payment.amount,
+          // Accept a delayed webhook only when Beam says payment happened
+          // before the exact QR deadline stored on the booking.
+          paymentExpiresAt: { gte: payment.paidAt },
+        },
+        data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod, paidAt: payment.paidAt },
+      });
     });
     updated = result.count;
   } else {

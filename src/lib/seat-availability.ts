@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Match } from "@prisma/client";
+import { activeBookingStatusWhere, expirePendingBookings } from "@/lib/booking-expiry";
 import { prisma } from "@/lib/prisma";
 import {
   getZoneCapacity,
@@ -78,11 +79,14 @@ export async function getSeatAvailabilityForMatches(matches: MatchForAvailabilit
     return new Map<string, Record<StadiumZoneCode, ZoneAvailability>>();
   }
 
+  const matchIds = matches.map((match) => match.id);
+  await expirePendingBookings({ matchIds });
+
   const bookingGroups = await prisma.booking.groupBy({
     by: ["matchId", "zone"],
     where: {
-      matchId: { in: matches.map((match) => match.id) },
-      status: { in: ["PENDING", "CONFIRMED"] },
+      matchId: { in: matchIds },
+      ...activeBookingStatusWhere(),
     },
     _sum: { quantity: true },
   });

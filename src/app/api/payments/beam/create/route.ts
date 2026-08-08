@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { BeamApiError, createBeamPromptPayCharge } from "@/lib/beam";
+import { expirePendingBookings } from "@/lib/booking-expiry";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
 }
 
 async function createBookingPayment(request: Request, bookingCode: string) {
+  await expirePendingBookings({ bookingCode });
   const booking = await prisma.booking.findUnique({
     where: { bookingCode },
     select: { id: true, bookingCode: true, totalAmount: true, status: true },
@@ -93,7 +95,7 @@ async function createBookingPayment(request: Request, bookingCode: string) {
     referencePrefix: `booking_${booking.bookingCode}`,
     amount: booking.totalAmount,
   });
-  return finishCharge(request, payment, booking.totalAmount, `/tickets/${booking.bookingCode}`);
+  return finishCharge(request, payment, booking.totalAmount, `/tickets/${booking.bookingCode}`, booking.id);
 }
 
 async function createSeasonPassPayment(request: Request, seasonPassCode: string) {
@@ -131,7 +133,13 @@ async function createSeasonPassPayment(request: Request, seasonPassCode: string)
   return finishCharge(request, payment, amount, `/tickets/season/${encodeURIComponent(order.passCode)}`);
 }
 
-async function finishCharge(request: Request, payment: PaymentRow, amount: number, successPath: string) {
+async function finishCharge(
+  request: Request,
+  payment: PaymentRow,
+  amount: number,
+  successPath: string,
+  bookingId?: string,
+) {
   const ready = readyResponse(payment);
   if (ready) return ready;
 
@@ -147,10 +155,29 @@ async function finishCharge(request: Request, payment: PaymentRow, amount: numbe
     });
     if (charge.qrImageBase64.length > 2_000_000) throw new BeamApiError("QR Code จาก Beam มีขนาดใหญ่เกินไป", false);
 
-    await prisma.$executeRaw(Prisma.sql`UPDATE "BeamPayment"
-      SET "chargeId" = ${charge.chargeId}, "qrImageBase64" = ${charge.qrImageBase64},
-          "expiresAt" = ${charge.expiresAt}, "status" = 'PENDING', "updatedAt" = NOW()
-      WHERE "id" = ${payment.id}`);
+    const bookingActivated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`UPDATE "BeamPayment"
+        SET "chargeId" = ${charge.chargeId}, "qrImageBase64" = ${charge.qrImageBase64},
+            "expiresAt" = ${charge.expiresAt}, "status" = 'PENDING', "updatedAt" = NOW()
+        WHERE "id" = ${payment.id}`);
+      if (!bookingId) return true;
+      const result = await tx.booking.updateMany({
+        where: {
+          id: bookingId,
+          status: "PENDING",
+          paymentExpiresAt: { gt: new Date() },
+        },
+        data: { paymentExpiresAt: charge.expiresAt },
+      });
+      if (result.count === 0) {
+        await tx.$executeRaw(Prisma.sql`UPDATE "BeamPayment" SET "status" = 'EXPIRED', "updatedAt" = NOW()
+          WHERE "id" = ${payment.id}`);
+      }
+      return result.count > 0;
+    });
+    if (!bookingActivated) {
+      return Response.json({ error: "หมดเวลาชำระเงินแล้ว ที่นั่งถูกคืนเข้าสู่ระบบ กรุณาทำรายการจองใหม่" }, { status: 409 });
+    }
     return Response.json({
       chargeId: charge.chargeId,
       qrImageBase64: charge.qrImageBase64,

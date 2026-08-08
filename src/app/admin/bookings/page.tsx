@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { expirePendingBookings } from "@/lib/booking-expiry";
 import { verifyPermission } from "@/lib/dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -20,6 +21,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
   const { price: rawPrice, name: rawName } = await props.searchParams;
   const selectedPrice = rawPrice && /^\d+$/.test(rawPrice) ? Number(rawPrice) : null;
   const customerName = rawName?.trim().slice(0, 100) ?? "";
+  await expirePendingBookings();
   const allBookings = await prisma.booking.findMany({
     where: customerName ? { customerName: { contains: customerName, mode: "insensitive" } } : undefined,
     orderBy: { createdAt: "desc" },

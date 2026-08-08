@@ -9,6 +9,7 @@ type PaymentState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "ready"; qrImageBase64: string; chargeId: string; expiresAt: string }
+  | { status: "expired" }
   | { status: "error"; message: string };
 
 export default function PaymentGateway({
@@ -43,8 +44,9 @@ export default function PaymentGateway({
       const response = await fetch(`/api/payments/beam/status?${paymentParams}`, {
         cache: "no-store",
       });
-      const result = (await response.json().catch(() => null)) as { confirmed?: boolean } | null;
+      const result = (await response.json().catch(() => null)) as { confirmed?: boolean; expired?: boolean } | null;
       if (result?.confirmed) router.replace(successUrl);
+      if (result?.expired) setState({ status: "expired" });
     }, 3000);
     return () => window.clearInterval(timer);
   }, [paymentParams, router, state.status, successUrl]);
@@ -52,11 +54,12 @@ export default function PaymentGateway({
   useEffect(() => {
     if (state.status !== "ready") return;
     const remaining = new Date(state.expiresAt).getTime() - Date.now();
-    const timer = window.setTimeout(() => {
-      setState({ status: "error", message: "QR Code หมดอายุแล้ว กรุณาสร้าง QR ใหม่" });
+    const timer = window.setTimeout(async () => {
+      await fetch(`/api/payments/beam/status?${paymentParams}`, { cache: "no-store" }).catch(() => null);
+      setState({ status: "expired" });
     }, Math.max(0, remaining));
     return () => window.clearTimeout(timer);
-  }, [state]);
+  }, [paymentParams, state]);
 
   async function createPayment() {
     setShowScreenshotHelp(false);
@@ -152,7 +155,14 @@ export default function PaymentGateway({
           </p>
         )}
 
-        {state.status !== "ready" ? (
+        {state.status === "expired" ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+            <p className="text-xl font-black text-red-800">หมดเวลาชำระเงินแล้ว</p>
+            <p className="mt-2 text-base leading-relaxed text-red-700">
+              ระบบยกเลิกสิทธิการจองและคืนที่นั่งเข้าสู่จำนวนคงเหลือแล้ว กรุณากลับไปทำรายการจองใหม่
+            </p>
+          </div>
+        ) : state.status !== "ready" ? (
           <div className="space-y-5">
             <div className="rounded-xl border border-green-100 bg-green-50/60 p-5">
               <div className="flex items-center gap-3">

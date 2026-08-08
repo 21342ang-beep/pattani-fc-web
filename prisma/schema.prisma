@@ -183,34 +183,36 @@ enum MatchStatus {
 // customerEmail = nullable เพื่อรองรับ guest checkout (ไม่ต้องสมัครสมาชิก)
 // member จะมี email จาก session, guest จะเป็น null
 model Booking {
-  id             String            @id @default(cuid())
-  bookingCode    String            @unique @default(cuid())
-  matchId        String
-  match          Match             @relation(fields: [matchId], references: [id], onDelete: Restrict)
-  customerName   String
-  customerEmail  String? // guest = null, member = session email
-  customerPhone  String
-  quantity       Int
-  zone           String?
-  totalAmount    Int // ราคารวม (สตางค์)
-  status         BookingStatus     @default(PENDING)
-  paymentMethod  String? // "PROMPTPAY" | "MOBILE_BANKING" | "CREDIT_CARD"
-  paidAt         DateTime?
-  seatNumbers    String[] // ที่นั่งที่ออกให้ เช่น ["A-101","A-102"]
-  notes          String?
+  id               String            @id @default(cuid())
+  bookingCode      String            @unique @default(cuid())
+  matchId          String
+  match            Match             @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  customerName     String
+  customerEmail    String? // guest = null, member = session email
+  customerPhone    String
+  quantity         Int
+  zone             String?
+  totalAmount      Int // ราคารวม (สตางค์)
+  status           BookingStatus     @default(PENDING)
+  paymentMethod    String? // "PROMPTPAY" | "MOBILE_BANKING" | "CREDIT_CARD"
+  paidAt           DateTime?
+  paymentExpiresAt DateTime? // deadline for holding seats while payment is pending
+  seatNumbers      String[] // ที่นั่งที่ออกให้ เช่น ["A-101","A-102"]
+  notes            String?
   // เวลา scan ครั้งแรก (คงไว้รองรับระบบ gate-check แบบเดิม)
   // รายการ scan รายใบอยู่ใน gateScans เพื่อรองรับ booking ที่มีหลายใบ
-  scannedAt      DateTime?
-  scannedBy      String? // userId ของ admin ที่กด scan (เก็บไว้ audit)
-  gateScans      BookingGateScan[]
-  xenditPayments XenditPayment[]
-  beamPayments   BeamPayment[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  scannedAt        DateTime?
+  scannedBy        String? // userId ของ admin ที่กด scan (เก็บไว้ audit)
+  gateScans        BookingGateScan[]
+  xenditPayments   XenditPayment[]
+  beamPayments     BeamPayment[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([matchId])
   @@index([matchId, zone])
   @@index([status])
+  @@index([status, paymentExpiresAt])
   @@index([customerEmail])
   @@index([customerPhone])
   @@index([scannedAt])

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { expirePendingBookings } from "@/lib/booking-expiry";
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -11,9 +12,13 @@ export async function GET(request: Request) {
 
   if (bookingCode) {
     if (!/^[a-z0-9]{8,50}$/i.test(bookingCode)) return Response.json({ error: "ข้อมูลการจองไม่ถูกต้อง" }, { status: 400 });
+    await expirePendingBookings({ bookingCode });
     const booking = await prisma.booking.findUnique({ where: { bookingCode }, select: { status: true } });
     if (!booking) return Response.json({ error: "ไม่พบรายการจอง" }, { status: 404 });
-    return Response.json({ confirmed: booking.status === "CONFIRMED" });
+    return Response.json({
+      confirmed: booking.status === "CONFIRMED",
+      expired: booking.status === "CANCELLED",
+    });
   }
 
   if (!seasonPassCode || !/^[a-z0-9-]{8,100}$/i.test(seasonPassCode)) {

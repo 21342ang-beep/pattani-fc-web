@@ -2,7 +2,9 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { activeBookingStatusWhere, newBookingPaymentDeadline } from "@/lib/booking-expiry";
 import { bookingCreateSchema } from "@/lib/validations";
 import { verifyPermission } from "@/lib/dal";
 import { readCustomerSession } from "@/lib/customer-session";
@@ -75,11 +77,23 @@ export async function createBooking(
         }
 
         const capacityScope = getZoneCapacityScope(match, parsed.data.zone);
+        // Serialize capacity checks for this match so two simultaneous requests
+        // cannot both claim the same final seats.
+        await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${match.id}`}))`);
+        const now = new Date();
+        await tx.booking.updateMany({
+          where: {
+            matchId: match.id,
+            status: "PENDING",
+            paymentExpiresAt: { lte: now },
+          },
+          data: { status: "CANCELLED" },
+        });
         const sold = await tx.booking.aggregate({
           where: {
             matchId: match.id,
             zone: { in: capacityScope },
-            status: { in: ["PENDING", "CONFIRMED"] },
+            ...activeBookingStatusWhere(now),
           },
           _sum: { quantity: true },
         });
@@ -99,6 +113,7 @@ export async function createBooking(
             quantity: parsed.data.quantity,
             zone: parsed.data.zone,
             totalAmount: price * parsed.data.quantity,
+            paymentExpiresAt: newBookingPaymentDeadline(now),
             notes: parsed.data.notes,
           },
         });
