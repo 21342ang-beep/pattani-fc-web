@@ -18,10 +18,10 @@ export default async function SeasonPassCheckPage() {
       orderBy: { kickoffAt: "asc" },
       select: { id: true, homeTeam: true, awayTeam: true, kickoffAt: true },
     }),
-    prisma.seasonPassOrder.findMany({ select: { tierId: true } }),
+    prisma.seasonPassOrder.findMany({ select: { tierId: true, status: true } }),
     prisma.seasonPassBarcode.findMany({
       where: { isGenerated: true },
-      select: { tierId: true },
+      select: { tierId: true, orderId: true },
     }),
     prisma.seasonPassScan.findMany({
       orderBy: { scannedAt: "desc" },
@@ -40,8 +40,11 @@ export default async function SeasonPassCheckPage() {
     id: tier.id,
     badge: tier.badge,
     orders: tier.id === "vvip-elite"
-      ? activeBarcodes.filter((barcode) => barcode.tierId === tier.id).length
+      ? orders.filter((order) => order.tierId === tier.id && order.status === "CONFIRMED").length
       : orders.filter((order) => order.tierId === tier.id).length,
+    unregistered: tier.id === "vvip-elite"
+      ? activeBarcodes.filter((barcode) => barcode.tierId === tier.id && barcode.orderId === null).length
+      : undefined,
     scans: scans.filter((scan) => scan.barcode.tierId === tier.id).length,
   }));
 
@@ -55,6 +58,12 @@ export default async function SeasonPassCheckPage() {
         <p className="text-base text-slate-600 md:text-lg">
           ใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC {SEASON_MATCHES} แมตช์เท่านั้น · บอลถ้วยและเกมเยือนไม่รวมสิทธิ์บัตรรายปี
         </p>
+        <Link
+          href="/admin/season-passes/offline"
+          className="mt-4 inline-flex rounded-lg bg-green-800 px-4 py-2.5 text-base font-bold text-yellow-300 hover:bg-green-900"
+        >
+          + ลงทะเบียน VVIP 4,000 แบบขายออฟไลน์
+        </Link>
       </header>
 
       <SeasonPassScanner

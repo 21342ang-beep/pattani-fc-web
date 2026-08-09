@@ -209,7 +209,7 @@ const seasonPassScanSchema = z.object({
   barcode: z.string().trim().regex(/^(PFC26-(4000|2500|2000|1500)-\d{4}|SP-[A-Z]+-[A-Z0-9]{8})$/i),
 });
 
-type SeasonPassScanError = "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "INVALID" | "LEAGUE_ONLY";
+type SeasonPassScanError = "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "UNREGISTERED" | "INVALID" | "LEAGUE_ONLY";
 
 export type LookupSeasonPassResult =
   | {
@@ -281,8 +281,10 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
   if (!pass) return { ok: false, error: "NOT_FOUND" };
 
   const order = pass.order;
-  const isInternalVvip = pass.tierId === "vvip-elite" && pass.isGenerated;
-  if (!isInternalVvip && (!order || order.status !== "CONFIRMED")) {
+  if (pass.tierId === "vvip-elite" && pass.isGenerated && !order) {
+    return { ok: false, error: "UNREGISTERED" };
+  }
+  if (!order || order.status !== "CONFIRMED") {
     return { ok: false, error: "INACTIVE" };
   }
   if (pass.scans.length > 0) return { ok: false, error: "DUPLICATE" };
@@ -291,10 +293,10 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
   return {
     ok: true,
     barcode,
-    passCode: order?.passCode ?? pass.barcode,
-    customerName: order?.customerName ?? "VVIP 4,000 · ใช้งานภายใน",
-    customerPhoneLast4: phoneLast4(order?.customerPhone),
-    seatZone: order?.seatZone ?? "VVIP",
+    passCode: order.passCode,
+    customerName: order.customerName,
+    customerPhoneLast4: phoneLast4(order.customerPhone),
+    seatZone: order.seatZone,
     tierId: pass.tierId,
     usesRemaining: pass.usesRemaining,
   };
@@ -332,8 +334,10 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
   });
   if (!pass) return { ok: false, error: "NOT_FOUND" };
   const order = pass.order;
-  const isInternalVvip = pass.tierId === "vvip-elite" && pass.isGenerated;
-  if (!isInternalVvip && (!order || order.status !== "CONFIRMED")) {
+  if (pass.tierId === "vvip-elite" && pass.isGenerated && !order) {
+    return { ok: false, error: "UNREGISTERED" };
+  }
+  if (!order || order.status !== "CONFIRMED") {
     return { ok: false, error: "INACTIVE" };
   }
   if (pass.usesRemaining <= 0) return { ok: false, error: "EXHAUSTED" };
@@ -353,11 +357,11 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
     });
     return {
       ok: true,
-      passCode: order?.passCode ?? pass.barcode,
-      customerName: order?.customerName ?? "VVIP 4,000 · ใช้งานภายใน",
-      customerPhoneLast4: phoneLast4(order?.customerPhone),
-      customerEmail: order?.customerEmail ?? null,
-      seatZone: order?.seatZone ?? "VVIP",
+      passCode: order.passCode,
+      customerName: order.customerName,
+      customerPhoneLast4: phoneLast4(order.customerPhone),
+      customerEmail: order.customerEmail,
+      seatZone: order.seatZone,
       tierId: pass.tierId,
       usesRemaining: result.usesRemaining,
       scanId: result.scanId,

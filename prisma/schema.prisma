@@ -410,44 +410,51 @@ model SeasonPassPurchase {
 }
 
 model SeasonPassOrder {
-  id              String                   @id @default(cuid())
-  passCode        String                   @unique
-  tierId          String // "vvip-elite" | "vip-advanced" | "premium" | "gold"
-  seatZone        String
-  seasonLabel     String // "2026/27"
-  priceBaht       Int // สแนปช็อตราคาบัตร ณ วันซื้อ
-  shippingFeeBaht Int                      @default(0)
+  id               String                   @id @default(cuid())
+  passCode         String                   @unique
+  tierId           String // "vvip-elite" | "vip-advanced" | "premium" | "gold"
+  seatZone         String
+  seasonLabel      String // "2026/27"
+  priceBaht        Int // สแนปช็อตราคาบัตร ณ วันซื้อ
+  shippingFeeBaht  Int                      @default(0)
   // customer
-  customerId      String?
-  customerName    String
-  customerPhone   String
-  customerEmail   String?
+  customerId       String?
+  customerName     String
+  customerPhone    String
+  customerEmail    String?
   // delivery
-  deliveryMethod  SeasonPassDeliveryMethod @default(PICKUP)
-  shipAddress     String?
-  shipCity        String?
-  shipProvince    String?
-  shipPostalCode  String?
-  shirtSize       String?
-  shipNote        String?
-  pickupLocation  String?
+  deliveryMethod   SeasonPassDeliveryMethod @default(PICKUP)
+  shipAddress      String?
+  shipCity         String?
+  shipProvince     String?
+  shipPostalCode   String?
+  shirtSize        String?
+  shipNote         String?
+  pickupLocation   String?
   // payment / status
-  paymentMethod   String // "card" | "promptpay" | "banking"
-  status          SeasonPassOrderStatus    @default(CONFIRMED)
-  notes           String?
-  purchaseId      String?
-  purchase        SeasonPassPurchase?      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  barcode         SeasonPassBarcode?
-  xenditPayments  XenditPayment[]
-  beamPayments    BeamPayment[]
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  paymentMethod    String // "card" | "promptpay" | "banking"
+  status           SeasonPassOrderStatus    @default(CONFIRMED)
+  salesChannel     SeasonPassSalesChannel   @default(ONLINE)
+  seatNumber       String?
+  offlineReceiptNo String?
+  soldAt           DateTime?
+  soldById         String?
+  notes            String?
+  purchaseId       String?
+  purchase         SeasonPassPurchase?      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  barcode          SeasonPassBarcode?
+  xenditPayments   XenditPayment[]
+  beamPayments     BeamPayment[]
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
+  @@unique([seasonLabel, seatZone, seatNumber])
   @@index([status])
   @@index([customerPhone])
   @@index([customerEmail])
   @@index([customerId])
   @@index([purchaseId])
+  @@index([salesChannel])
 }
 
 // ค่าจำนวนสูงสุดต่อหนึ่งคำสั่งซื้อ กำหนดผ่านหลังบ้าน
@@ -510,6 +517,12 @@ enum SeasonPassOrderStatus {
   CONFIRMED
   CANCELLED
   REFUNDED
+}
+
+enum SeasonPassSalesChannel {
+  ONLINE
+  OFFLINE
+  INTERNAL
 }
 
 enum SeasonPassDeliveryMethod {

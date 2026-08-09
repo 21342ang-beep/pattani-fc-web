@@ -13,7 +13,7 @@ import DeleteAllSeasonPassScansButton from "./DeleteAllSeasonPassScansButton";
 import DeleteSeasonPassScanButton from "./DeleteSeasonPassScanButton";
 
 type MatchOption = { id: string; label: string };
-type TierSummary = { id: string; badge: string; orders: number; scans: number };
+type TierSummary = { id: string; badge: string; orders: number; scans: number; unregistered?: number };
 type ScanHistoryItem = {
   id: string;
   scannedAt: string;
@@ -32,6 +32,7 @@ function scanErrorMessage(error: ScanError) {
     DUPLICATE: "บัตรนี้ใช้สิทธิ์สำหรับแมตช์นี้ไปแล้ว",
     EXHAUSTED: "บัตรนี้ใช้สิทธิ์ครบตามจำนวนแมตช์แล้ว",
     INACTIVE: "บัตรรายปีนี้ยังไม่พร้อมใช้งาน",
+    UNREGISTERED: "บัตร VVIP 4,000 นี้ยังไม่ได้ลงทะเบียนการขายออฟไลน์ กรุณาติดต่อผู้ดูแล",
     INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
     LEAGUE_ONLY: "บัตรรายปีใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC",
   }[error];
@@ -142,6 +143,11 @@ export default function SeasonPassScanner({
               <p className="text-sm font-bold tracking-wider text-yellow-700 md:text-base">{summary.badge}</p>
               <p className="mt-2 text-2xl font-black text-green-900 md:text-3xl">{summary.orders.toLocaleString("th-TH")} บัตร</p>
               <p className="text-base text-slate-600 md:text-lg">ใช้งานแล้ว {scanCount.toLocaleString("th-TH")} ครั้ง</p>
+              {typeof summary.unregistered === "number" && summary.unregistered > 0 && (
+                <p className="mt-1 text-sm font-semibold text-amber-700 md:text-base">
+                  ยังไม่ลงทะเบียน {summary.unregistered.toLocaleString("th-TH")} ใบ
+                </p>
+              )}
               <p className="mt-2 text-sm font-semibold text-green-800 md:text-base">ดูประวัติแพ็กเกจนี้</p>
             </button>
           );

@@ -166,6 +166,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
             DUPLICATE: "บัตรนี้ใช้สิทธิ์สำหรับแมตช์นี้ไปแล้ว",
             EXHAUSTED: "บัตรนี้ใช้สิทธิ์ครบ 15 ครั้งแล้ว",
             INACTIVE: "บัตรรายปีนี้ยังไม่พร้อมใช้งาน",
+            UNREGISTERED: "บัตร VVIP 4,000 นี้ยังไม่ได้ลงทะเบียนการขายออฟไลน์",
             INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
             LEAGUE_ONLY: "บัตรรายปีใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC",
           };

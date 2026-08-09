@@ -69,6 +69,12 @@ export default async function AdminSeasonPassesPage(props: {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
+            href="/admin/season-passes/offline"
+            className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-base font-medium text-amber-900 hover:bg-amber-100 md:text-lg"
+          >
+            + ลงทะเบียน VVIP 4,000 ออฟไลน์
+          </Link>
+          <Link
             href="/admin/ticket-settings"
             className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-base font-medium text-violet-900 hover:bg-violet-100 md:text-lg"
           >
