@@ -59,7 +59,7 @@ const GROUPS: Group[] = [
     label: "ที่ปรึกษาฝ่ายเทคนิค",
     icon: <Cpu className="size-5" />,
     columns: 1,
-    people: [{ name: "ดร.มูฮัมหมัดอัสมี อาบูบากา" }],
+    people: [{ name: "ดร.มูฮัมมาดอัสมี อาบูบากา" }],
   },
   {
     key: "executive",
