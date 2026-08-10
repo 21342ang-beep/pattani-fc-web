@@ -73,10 +73,12 @@ export default function TopNav({
   customer,
   locale,
   dict,
+  showLocalVisuals,
 }: {
   customer: CustomerInfo;
   locale: Locale;
   dict: Dict;
+  showLocalVisuals: boolean;
 }) {
   const path = usePathname();
   const searchParams = useSearchParams();
@@ -254,7 +256,9 @@ export default function TopNav({
         transition={{ duration: 0.25, ease: "easeInOut" }}
         className="relative isolate hidden overflow-hidden bg-gradient-to-r from-yellow-400 via-yellow-300 to-green-700 xl:block"
       >
-        <BatikLayer className="opacity-[0.28] mix-blend-multiply" />
+        {showLocalVisuals && (
+          <BatikLayer className="opacity-[0.28] mix-blend-multiply" />
+        )}
         <div className="relative z-10 mx-auto flex max-w-7xl items-center justify-end gap-6 px-4 py-2.5 text-xl font-bold text-green-950 2xl:text-2xl">
           <Link href="/faq" className="hover:underline">
             {dict.util.faq}
@@ -306,7 +310,7 @@ export default function TopNav({
           </Link>
         </motion.div>
         <div className="relative isolate overflow-hidden">
-          <BatikLayer className="opacity-[0.76]" />
+          {showLocalVisuals && <BatikLayer className="opacity-[0.76]" />}
           <motion.div
             animate={{ paddingTop: scrolled ? 8 : 12, paddingBottom: scrolled ? 8 : 12 }}
             transition={{ duration: 0.25 }}
@@ -401,7 +405,7 @@ export default function TopNav({
         </div>
 
         <nav className="relative isolate hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
-          <BatikLayer className="opacity-[0.22]" />
+          {showLocalVisuals && <BatikLayer className="opacity-[0.22]" />}
           <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-[repeat(4,minmax(0,1fr))_8rem_repeat(4,minmax(0,1fr))] items-center px-2 py-2.5">
             {items.slice(0, 4).map((item) => (
               <div key={"children" in item ? item.label : item.href} className="flex justify-center">

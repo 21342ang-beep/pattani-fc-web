@@ -42,6 +42,7 @@ export default async function PublicLayout({
           <TopNav
             locale={locale}
             dict={dict}
+            showLocalVisuals={process.env.NODE_ENV === "development"}
             customer={
               customer ? { name: customer.name, email: customer.email } : null
             }
