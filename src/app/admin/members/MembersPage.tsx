@@ -181,12 +181,20 @@ export default async function MembersPage(props: {
             จำแนกสมาชิกตามแพ็กเกจบัตรรายปี ฤดูกาล {SEASON_LABEL}
           </p>
         </div>
-        <Link
-          href="/admin/members/provinces"
-          className="rounded-lg bg-green-800 px-5 py-2.5 text-base font-semibold text-yellow-300 shadow-sm hover:bg-green-900"
-        >
-          แดชบอร์ดสมาชิกแยกจังหวัด
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/members/draw"
+            className="rounded-lg border border-yellow-400 bg-yellow-300 px-5 py-2.5 text-base font-bold text-green-950 shadow-sm hover:bg-yellow-200"
+          >
+            🎁 สุ่มรายชื่อแจกรางวัล
+          </Link>
+          <Link
+            href="/admin/members/provinces"
+            className="rounded-lg bg-green-800 px-5 py-2.5 text-base font-semibold text-yellow-300 shadow-sm hover:bg-green-900"
+          >
+            แดชบอร์ดสมาชิกแยกจังหวัด
+          </Link>
+        </div>
       </div>
 
       <section aria-label="สรุปสมาชิกตามแพ็กเกจ">
