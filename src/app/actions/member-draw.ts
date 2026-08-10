@@ -18,8 +18,18 @@ export type MemberDrawWinner = {
   registeredAt: string;
 };
 
+export type MemberDrawCandidate = {
+  id: string;
+  name: string;
+};
+
 export type MemberDrawResult =
-  | { ok: true; winners: MemberDrawWinner[]; remainingEligible: number }
+  | {
+      ok: true;
+      winners: MemberDrawWinner[];
+      animationCandidates: MemberDrawCandidate[];
+      remainingEligible: number;
+    }
   | { ok: false; error: string };
 
 function phoneLast4(phone: string | null) {
@@ -55,6 +65,28 @@ export async function drawMemberWinners(input: unknown): Promise<MemberDrawResul
   }
 
   const winner = members[randomInt(0, members.length)];
+  const animationPool = members.filter((member) => member.id !== winner.id);
+  for (let index = animationPool.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomInt(0, index + 1);
+    [animationPool[index], animationPool[swapIndex]] = [
+      animationPool[swapIndex],
+      animationPool[index],
+    ];
+  }
+  const animationCandidates: MemberDrawCandidate[] = [
+    { id: winner.id, name: winner.name },
+    ...animationPool.slice(0, 7).map((member) => ({
+      id: member.id,
+      name: member.name,
+    })),
+  ];
+  for (let index = animationCandidates.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomInt(0, index + 1);
+    [animationCandidates[index], animationCandidates[swapIndex]] = [
+      animationCandidates[swapIndex],
+      animationCandidates[index],
+    ];
+  }
 
   return {
     ok: true,
@@ -66,6 +98,7 @@ export async function drawMemberWinners(input: unknown): Promise<MemberDrawResul
       province: winner.province,
       registeredAt: winner.createdAt.toISOString(),
     }],
+    animationCandidates,
     remainingEligible: members.length - 1,
   };
 }
