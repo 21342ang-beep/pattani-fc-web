@@ -92,8 +92,8 @@ function createSheetXml(options: WorkbookOptions) {
   <sheetFormatPr defaultRowHeight="20"/>
   <cols>${widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join("")}</cols>
   <sheetData>${rows.join("")}</sheetData>
-  ${merges}
   <autoFilter ref="A${headerRowNumber}:${lastColumn}${lastRow}"/>
+  ${merges}
 </worksheet>`;
 }
 
