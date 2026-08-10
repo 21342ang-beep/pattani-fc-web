@@ -54,6 +54,21 @@ type NavItem =
 
 type CustomerInfo = { name: string; email: string } | null;
 
+function BatikLayer({ className }: { className: string }) {
+  return (
+    <div
+      aria-hidden
+      className={`pointer-events-none absolute inset-0 ${className}`}
+      style={{
+        backgroundImage: "url('/pattani-batik-pattern.jpg')",
+        backgroundPosition: "center",
+        backgroundRepeat: "repeat",
+        backgroundSize: "560px 560px",
+      }}
+    />
+  );
+}
+
 export default function TopNav({
   customer,
   locale,
@@ -237,9 +252,10 @@ export default function TopNav({
           opacity: scrolled ? 0 : 1,
         }}
         transition={{ duration: 0.25, ease: "easeInOut" }}
-        className="hidden overflow-hidden bg-gradient-to-r from-yellow-400 via-yellow-300 to-green-700 xl:block"
+        className="relative isolate hidden overflow-hidden bg-gradient-to-r from-yellow-400 via-yellow-300 to-green-700 xl:block"
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-end gap-6 px-4 py-2.5 text-xl font-bold text-green-950 2xl:text-2xl">
+        <BatikLayer className="opacity-[0.28] mix-blend-multiply" />
+        <div className="relative z-10 mx-auto flex max-w-7xl items-center justify-end gap-6 px-4 py-2.5 text-xl font-bold text-green-950 2xl:text-2xl">
           <Link href="/faq" className="hover:underline">
             {dict.util.faq}
           </Link>
@@ -289,11 +305,13 @@ export default function TopNav({
             />
           </Link>
         </motion.div>
-        <motion.div
-          animate={{ paddingTop: scrolled ? 8 : 12, paddingBottom: scrolled ? 8 : 12 }}
-          transition={{ duration: 0.25 }}
-          className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4"
-        >
+        <div className="relative isolate overflow-hidden">
+          <BatikLayer className="opacity-[0.76]" />
+          <motion.div
+            animate={{ paddingTop: scrolled ? 8 : 12, paddingBottom: scrolled ? 8 : 12 }}
+            transition={{ duration: 0.25 }}
+            className="relative z-10 mx-auto flex max-w-7xl items-center justify-between gap-4 px-4"
+          >
           <Link href="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
             {/* โลโก้ซ้าย — เฉพาะจอเล็ก; จอใหญ่ใช้โลโก้กลางแทน */}
             <motion.div
@@ -380,8 +398,11 @@ export default function TopNav({
         </motion.div>
 
         {/* Desktop nav — hidden below md */}
-        <nav className="hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
-          <div className="mx-auto grid max-w-7xl grid-cols-[repeat(4,minmax(0,1fr))_8rem_repeat(4,minmax(0,1fr))] items-center px-2 py-2.5">
+        </div>
+
+        <nav className="relative isolate hidden border-t border-yellow-300/10 bg-green-900/60 backdrop-blur-sm xl:block">
+          <BatikLayer className="opacity-[0.22]" />
+          <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-[repeat(4,minmax(0,1fr))_8rem_repeat(4,minmax(0,1fr))] items-center px-2 py-2.5">
             {items.slice(0, 4).map((item) => (
               <div key={"children" in item ? item.label : item.href} className="flex justify-center">
                 {renderDesktopItem(item)}

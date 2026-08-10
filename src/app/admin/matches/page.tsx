@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Shield } from "lucide-react";
+import { CalendarDays, MapPin, Shield } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
@@ -20,6 +20,13 @@ const statusLabel: Record<string, string> = {
 const competitionLabel: Record<string, string> = {
   LEAGUE: "บอลลีก",
   CUP: "บอลถ้วย",
+};
+const statusClassName: Record<string, string> = {
+  SCHEDULED: "border-slate-200 bg-slate-100 text-slate-700",
+  ON_SALE: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  SOLD_OUT: "border-amber-200 bg-amber-50 text-amber-700",
+  CANCELLED: "border-red-200 bg-red-50 text-red-700",
+  FINISHED: "border-blue-200 bg-blue-50 text-blue-700",
 };
 
 export default async function AdminMatchesPage(props: {
@@ -99,65 +106,66 @@ export default async function AdminMatchesPage(props: {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
-        <table className="w-full text-sm md:text-base">
-          <thead className="border-b bg-slate-50 text-sm uppercase md:text-base">
-            <tr>
-              <th className="px-3 py-2 text-left">แมตช์</th>
-              <th className="px-3 py-2 text-left">ประเภท</th>
-              <th className="px-3 py-2 text-left">เวลา</th>
-              <th className="px-3 py-2 text-left">สถานะ</th>
-              <th className="min-w-[720px] px-3 py-3 text-left">คงเหลือรายโซน / ความจุ</th>
-              <th className="px-3 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {matches.map((m) => (
-              <tr key={m.id} className="border-b last:border-0">
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <TeamBadge logo={m.homeTeamLogo} name={m.homeTeam} />
-                    <span className="text-xs text-slate-400">vs</span>
-                    <TeamBadge logo={m.awayTeamLogo} name={m.awayTeam} />
-                  </div>
-                  <div className="mt-1 text-sm text-slate-500 md:text-base">{m.venue ?? "— ยังไม่กำหนดสนาม"}</div>
-                </td>
-                <td className="px-3 py-2">
-                  <span className="rounded bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+      <div className="space-y-4">
+        {matches.map((m) => (
+          <article key={m.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)_auto] lg:items-center">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+                  <TeamBadge logo={m.homeTeamLogo} name={m.homeTeam} />
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-bold uppercase text-slate-500">vs</span>
+                  <TeamBadge logo={m.awayTeamLogo} name={m.awayTeam} />
+                </div>
+                <p className="mt-3 flex items-center gap-2 text-sm text-slate-500 md:text-base">
+                  <MapPin className="size-4 shrink-0 text-slate-400" />
+                  <span>{m.venue ?? "ยังไม่กำหนดสนาม"}</span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+                <MatchDetail label="ประเภท">
+                  <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">
                     {competitionLabel[m.competitionType] ?? m.competitionType}
                   </span>
-                </td>
-                <td className="px-3 py-2 text-sm md:text-base">
-                  {m.kickoffAt ? formatDateTime(m.kickoffAt) : <span className="text-slate-400">— ยังไม่กำหนด</span>}
-                </td>
-                <td className="px-3 py-2">
-                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs">
+                </MatchDetail>
+                <MatchDetail label="วันและเวลา" className="col-span-2 sm:col-span-1 lg:col-span-2 xl:col-span-1">
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800">
+                    <CalendarDays className="size-4 shrink-0 text-slate-400" />
+                    {m.kickoffAt ? formatDateTime(m.kickoffAt) : "ยังไม่กำหนด"}
+                  </span>
+                </MatchDetail>
+                <MatchDetail label="สถานะ">
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusClassName[m.status] ?? statusClassName.SCHEDULED}`}>
                     {statusLabel[m.status] ?? m.status}
                   </span>
-                </td>
-                <ZoneAvailabilityCell availability={availabilityByMatch.get(m.id)} />
-                <td className="px-3 py-2 text-right">
-                  <div className="flex justify-end gap-2">
-                    <Link
-                      href={`/admin/matches/${m.id}`}
-                      className="rounded border px-2 py-1 text-xs hover:bg-slate-100"
-                    >
-                      แก้ไข
-                    </Link>
-                    <DeleteMatchButton matchId={m.id} />
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {matches.length === 0 && (
-              <tr>
-                <td colSpan={6} className="p-6 text-center text-slate-500">
-                  ยังไม่มีแมตช์ — เริ่มเพิ่มได้เลย
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                </MatchDetail>
+              </div>
+
+              <div className="flex items-center gap-2 lg:justify-end">
+                <Link
+                  href={`/admin/matches/${m.id}`}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  แก้ไข
+                </Link>
+                <DeleteMatchButton matchId={m.id} />
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4">
+              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="font-bold text-slate-800">จำนวนคงเหลือรายโซน</h2>
+                <p className="text-xs text-slate-500">จำนวนคงเหลือ / ความจุทั้งหมด</p>
+              </div>
+              <ZoneAvailabilityGrid availability={availabilityByMatch.get(m.id)} />
+            </div>
+          </article>
+        ))}
+        {matches.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
+            ยังไม่มีแมตช์ — เริ่มเพิ่มได้เลย
+          </div>
+        )}
       </div>
     </div>
   );
@@ -183,57 +191,72 @@ function MatchManagementCard({
   );
 }
 
-function ZoneAvailabilityCell({
+function MatchDetail({
+  label,
+  className = "",
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`min-w-0 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 ${className}`}>
+      <p className="mb-1 text-xs font-medium text-slate-500">{label}</p>
+      <div className="text-sm">{children}</div>
+    </div>
+  );
+}
+
+function ZoneAvailabilityGrid({
   availability,
 }: {
   availability?: Record<StadiumZoneCode, ZoneAvailability>;
 }) {
   return (
-    <td className="px-3 py-2">
-      <div className="grid grid-cols-5 gap-2">
-        {STADIUM_ZONE_CODES.map((code) => {
-          const zone = availability?.[code];
-          return (
-            <div
-              key={code}
-              title={zone
-                ? `จองรายแมตช์ ${zone.matchBooked}${zone.sharedCapacity ? " · ใช้โควตาร่วมเดิม" : ""}`
-                : undefined}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2.5 text-center text-sm"
-            >
-              <p className="font-bold text-slate-700">โซน {code}</p>
-              <p className="mt-0.5 text-base font-bold text-emerald-700">
-                {zone?.capacity == null
-                  ? "—"
-                  : `${zone.remaining.toLocaleString("th-TH")} / ${zone.capacity.toLocaleString("th-TH")}`}
-              </p>
-              {zone?.sharedCapacity && <p className="text-xs text-slate-500">โควตาร่วม</p>}
-            </div>
-          );
-        })}
-      </div>
-    </td>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10">
+      {STADIUM_ZONE_CODES.map((code) => {
+        const zone = availability?.[code];
+        return (
+          <div
+            key={code}
+            title={zone
+              ? `จองรายแมตช์ ${zone.matchBooked}${zone.sharedCapacity ? " · ใช้โควตาร่วมเดิม" : ""}`
+              : undefined}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-center text-sm shadow-sm"
+          >
+            <p className="text-xs font-bold text-slate-500">โซน {code}</p>
+            <p className="mt-0.5 text-base font-black text-emerald-700">
+              {zone?.capacity == null
+                ? "—"
+                : `${zone.remaining.toLocaleString("th-TH")} / ${zone.capacity.toLocaleString("th-TH")}`}
+            </p>
+            {zone?.sharedCapacity && <p className="text-[11px] text-slate-500">โควตาร่วม</p>}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
 function TeamBadge({ logo, name }: { logo: string | null; name: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="flex size-6 items-center justify-center overflow-hidden rounded bg-slate-100">
+    <span className="inline-flex min-w-0 items-center gap-2.5">
+      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
         {logo ? (
           <Image
             src={logo}
             alt={name}
-            width={24}
-            height={24}
+            width={40}
+            height={40}
             unoptimized
-            className="size-full object-contain"
+            className="size-full p-1 object-contain"
           />
         ) : (
-          <Shield className="size-3.5 text-slate-400" />
+          <Shield className="size-5 text-slate-400" />
         )}
       </span>
-      <span className="font-medium">{name}</span>
+      <span className="font-bold text-slate-900">{name}</span>
     </span>
   );
 }

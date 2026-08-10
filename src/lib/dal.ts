@@ -14,14 +14,6 @@ export const verifySession = cache(async () => {
   return session;
 });
 
-export const verifyAdmin = cache(async () => {
-  const session = await verifySession();
-  if (session.role !== "ADMIN" && session.role !== "SUPER_ADMIN") {
-    redirect("/login");
-  }
-  return session;
-});
-
 export type AdminUser = {
   id: string;
   email: string;
@@ -33,7 +25,10 @@ export type AdminUser = {
 // โหลด user จริงจาก DB — permissions เปลี่ยนแปลงตอนไหนก็มีผลทันที
 // (ไม่แคชใน JWT เพื่อให้ SUPER_ADMIN ปรับสิทธิ์ได้ทันเวลา)
 export const getAdminUser = cache(async (): Promise<AdminUser> => {
-  const session = await verifyAdmin();
+  const session = await verifySession();
+  if (session.role !== "ADMIN" && session.role !== "SUPER_ADMIN") {
+    redirect("/login?reauth=1");
+  }
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     select: {
@@ -42,11 +37,38 @@ export const getAdminUser = cache(async (): Promise<AdminUser> => {
       name: true,
       role: true,
       permissions: true,
+      updatedAt: true,
     },
   });
-  if (!user) redirect("/login");
-  return user;
+  if (!user) redirect("/login?reauth=1");
+
+  // JWT เป็นเพียงหลักฐานการเข้าสู่ระบบ ณ เวลาหนึ่ง ส่วน role/permission
+  // ต้องเชื่อฐานข้อมูลปัจจุบันเสมอ และเพิกถอน session เดิมเมื่อบัญชี
+  // ถูกแก้ไข (เช่น เปลี่ยนรหัสผ่าน ลด role หรือปรับ permissions)
+  const issuedAtMs = typeof session.iat === "number" ? session.iat * 1000 : 0;
+  if (issuedAtMs + 1000 < user.updatedAt.getTime()) {
+    redirect("/login?reauth=1");
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    permissions: user.permissions,
+  };
 });
+
+export const verifyAdmin = cache(async () => {
+  const [session, user] = await Promise.all([verifySession(), getAdminUser()]);
+  return { ...session, role: user.role };
+});
+
+export async function verifySuperAdmin(): Promise<AdminUser> {
+  const user = await getAdminUser();
+  if (user.role !== "SUPER_ADMIN") redirect("/admin");
+  return user;
+}
 
 export function hasPermission(user: AdminUser, perm: Permission): boolean {
   return user.role === "SUPER_ADMIN" || user.permissions.includes(perm);

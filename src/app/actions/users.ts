@@ -2,20 +2,17 @@
 
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { Permission } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyAdmin } from "@/lib/dal";
+import { verifySuperAdmin } from "@/lib/dal";
 import { ALL_PERMISSIONS } from "@/lib/admin-permissions";
 
 // Server actions สำหรับหน้า /admin/users
 // ทุก action ต้องเป็น SUPER_ADMIN เท่านั้น
 
 async function requireSuperAdmin() {
-  const session = await verifyAdmin();
-  if (session.role !== "SUPER_ADMIN") redirect("/admin");
-  return session;
+  return verifySuperAdmin();
 }
 
 const permissionEnum = z.enum(
@@ -121,7 +118,7 @@ export async function updateAdmin(
   if (!target) return { error: "ไม่พบผู้ดูแลรายนี้" };
 
   // ห้ามลด role ของตัวเองจาก SUPER_ADMIN — กันตัวเองล็อกออก
-  if (target.id === session.userId && parsed.data.role !== "SUPER_ADMIN") {
+  if (target.id === session.id && parsed.data.role !== "SUPER_ADMIN") {
     return {
       error: "ห้ามลด role ของตัวเอง — ให้ SUPER_ADMIN คนอื่นทำแทน",
     };
@@ -186,7 +183,7 @@ export async function deleteAdmin(
 ): Promise<{ ok: true } | { error: string }> {
   const session = await requireSuperAdmin();
 
-  if (userId === session.userId) {
+  if (userId === session.id) {
     return { error: "ห้ามลบตัวเอง" };
   }
 

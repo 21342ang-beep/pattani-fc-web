@@ -10,27 +10,44 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboard() {
   const user = await getAdminUser();
 
-  const [matchCount, onSaleCount, bookingCount, revenue, customerCount] =
+  const canViewMatches = hasPermission(user, "MATCHES");
+  const canViewBookings = hasPermission(user, "BOOKINGS");
+  const canViewRevenue =
+    hasPermission(user, "REPORTS") || hasPermission(user, "FINANCE");
+  const canViewCustomers =
+    hasPermission(user, "CUSTOMERS") || hasPermission(user, "MEMBER_DATA");
+
+  // อย่าดึงหรือแสดงสถิติที่อยู่นอก permission ของผู้ดูแล แม้จะเป็น dashboard
+  const [matchSummary, bookingCount, revenue, customerCount] =
     await Promise.all([
-      prisma.match.count(),
-      prisma.match.count({ where: { status: "ON_SALE" } }),
-      prisma.booking.count({
-        where: { status: { in: ["PENDING", "CONFIRMED"] } },
-      }),
-      prisma.booking.aggregate({
-        where: { status: "CONFIRMED" },
-        _sum: { totalAmount: true },
-      }),
-      prisma.customer.count(),
+      canViewMatches
+        ? Promise.all([
+            prisma.match.count(),
+            prisma.match.count({ where: { status: "ON_SALE" } }),
+          ])
+        : Promise.resolve(null),
+      canViewBookings
+        ? prisma.booking.count({
+            where: { status: { in: ["PENDING", "CONFIRMED"] } },
+          })
+        : Promise.resolve(null),
+      canViewRevenue
+        ? prisma.booking.aggregate({
+            where: { status: "CONFIRMED" },
+            _sum: { totalAmount: true },
+          })
+        : Promise.resolve(null),
+      canViewCustomers ? prisma.customer.count() : Promise.resolve(null),
     ]);
 
   // สถิติเสริมต่อการ์ด — SUPER_ADMIN เห็นเสมอ, ADMIN เห็นเฉพาะที่มีสิทธิ์
-  const stats: Partial<Record<Permission, string>> = {
-    MATCHES: `${matchCount} แมตช์ · ${onSaleCount} เปิดขาย`,
-    BOOKINGS: `${bookingCount} รายการ active`,
-    CUSTOMERS: `${customerCount} บัญชี`,
-    REPORTS: `ยอดยืนยัน ${formatBaht(revenue._sum.totalAmount ?? 0)}`,
-  };
+  const stats: Partial<Record<Permission, string>> = {};
+  if (matchSummary) {
+    stats.MATCHES = `${matchSummary[0]} แมตช์ · ${matchSummary[1]} เปิดขาย`;
+  }
+  if (bookingCount != null) stats.BOOKINGS = `${bookingCount} รายการ active`;
+  if (customerCount != null) stats.CUSTOMERS = `${customerCount} บัญชี`;
+  if (revenue) stats.REPORTS = `ยอดยืนยัน ${formatBaht(revenue._sum.totalAmount ?? 0)}`;
 
   const canManageBarcodes = hasPermission(user, "BARCODE_MANAGEMENT");
   const canReportMatchResults = hasPermission(user, "MATCH_RESULTS");
@@ -54,20 +71,30 @@ export default async function AdminDashboard() {
         </p>
       </div>
 
-      {/* สรุปตัวเลขรวม */}
-      <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatPill label="แมตช์ทั้งหมด" value={matchCount.toLocaleString("th-TH")} />
-        <StatPill
-          label="เปิดจองอยู่"
-          value={onSaleCount.toLocaleString("th-TH")}
-          highlight
-        />
-        <StatPill label="การจอง active" value={bookingCount.toLocaleString("th-TH")} />
-        <StatPill
-          label="ยอดยืนยัน"
-          value={formatBaht(revenue._sum.totalAmount ?? 0)}
-        />
-      </div>
+      {/* สรุปตัวเลขรวม — แสดงเฉพาะข้อมูลที่บัญชีนี้มีสิทธิ์ */}
+      {(matchSummary || bookingCount != null || revenue) && (
+        <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {matchSummary && (
+            <>
+              <StatPill label="แมตช์ทั้งหมด" value={matchSummary[0].toLocaleString("th-TH")} />
+              <StatPill
+                label="เปิดจองอยู่"
+                value={matchSummary[1].toLocaleString("th-TH")}
+                highlight
+              />
+            </>
+          )}
+          {bookingCount != null && (
+            <StatPill label="การจอง active" value={bookingCount.toLocaleString("th-TH")} />
+          )}
+          {revenue && (
+            <StatPill
+              label="ยอดยืนยัน"
+              value={formatBaht(revenue._sum.totalAmount ?? 0)}
+            />
+          )}
+        </div>
+      )}
 
       {/* การ์ดแต่ละหมวด */}
       {visibleSections.length === 0 && !hasSpecialDashboardCard ? (
@@ -112,7 +139,7 @@ export default async function AdminDashboard() {
               icon="👤"
               label="ข้อมูลผู้ใช้งาน"
               description="ดูข้อมูลผู้ที่สมัครสมาชิกกับสโมสร รวมถึงอีเมล เบอร์โทร และวันที่สมัคร"
-              stat={`${customerCount.toLocaleString("th-TH")} บัญชีสมาชิก`}
+              stat={`${(customerCount ?? 0).toLocaleString("th-TH")} บัญชีสมาชิก`}
               emphasized
             />
           )}

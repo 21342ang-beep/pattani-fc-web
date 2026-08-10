@@ -50,7 +50,9 @@ export default async function proxy(req: NextRequest) {
   if (path.startsWith(ADMIN_PREFIX) && !isAdmin) {
     return NextResponse.redirect(new URL(LOGIN_PATH, req.nextUrl));
   }
-  if (path === LOGIN_PATH && isAdmin) {
+  // reauth=1 ใช้เมื่อ DAL พบว่าบัญชี/รหัสผ่าน/สิทธิ์ถูกแก้ไขหลังออก JWT
+  // ต้องยอมให้เห็นหน้า login เพื่อออก session ใหม่ ไม่เช่นนั้นจะ redirect loop
+  if (path === LOGIN_PATH && isAdmin && req.nextUrl.searchParams.get("reauth") !== "1") {
     return NextResponse.redirect(new URL(ADMIN_PREFIX, req.nextUrl));
   }
   return NextResponse.next();

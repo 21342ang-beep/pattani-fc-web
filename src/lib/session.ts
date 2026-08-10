@@ -14,6 +14,7 @@ export interface SessionPayload {
   userId: string;
   role: string;
   expiresAt: number;
+  iat?: number;
   [key: string]: unknown;
 }
 
@@ -43,9 +44,10 @@ export async function createSession(userId: string, role: string): Promise<void>
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
     expires: new Date(expiresAt),
+    priority: "high",
   });
 }
 

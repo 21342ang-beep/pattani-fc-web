@@ -1,4 +1,5 @@
 import "server-only";
+import { isIP } from "node:net";
 import { headers } from "next/headers";
 
 // Rate limiter แบบ in-memory (เหมาะกับ single-instance dev / small prod)
@@ -27,9 +28,13 @@ function ensureCleanup() {
 
 export async function getClientIp(): Promise<string> {
   const h = await headers();
+  // Production nginx เขียน X-Real-IP ทับด้วย remote_addr จึงเชื่อค่านี้ก่อน
+  // X-Forwarded-For อาจมีค่าที่ client ส่งมาเองนำหน้าและปลอม IP ได้
+  const realIp = h.get("x-real-ip")?.trim();
+  if (realIp && isIP(realIp)) return realIp;
   const xff = h.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return h.get("x-real-ip") ?? "unknown";
+  const forwardedIp = xff?.split(",")[0]?.trim();
+  return forwardedIp && isIP(forwardedIp) ? forwardedIp : "unknown";
 }
 
 export type RateLimitResult = {

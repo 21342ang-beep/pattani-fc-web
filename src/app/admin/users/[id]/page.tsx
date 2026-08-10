@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { verifyAdmin } from "@/lib/dal";
+import { verifySuperAdmin } from "@/lib/dal";
 import EditUserForm from "./EditUserForm";
 import ResetPasswordForm from "./ResetPasswordForm";
 
@@ -11,8 +11,7 @@ export const metadata = { title: "แก้ไขผู้ดูแล — Patta
 export default async function EditUserPage(props: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await verifyAdmin();
-  if (session.role !== "SUPER_ADMIN") redirect("/admin");
+  const user = await verifySuperAdmin();
 
   const { id } = await props.params;
   const target = await prisma.user.findUnique({
@@ -27,7 +26,7 @@ export default async function EditUserPage(props: {
   });
   if (!target) notFound();
 
-  const isSelf = target.id === session.userId;
+  const isSelf = target.id === user.id;
 
   return (
     <div className="max-w-3xl space-y-6">

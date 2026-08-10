@@ -37,19 +37,18 @@ export default function HomeHero({
     );
 
   return (
-    <section className="relative isolate overflow-hidden bg-green-950">
+    <section className="relative isolate min-h-[100svh] overflow-hidden bg-green-950">
       {mediaSlides.length > 0 ? (
         <HomeHeroCarousel slides={mediaSlides} />
       ) : (
         <Image
           src="/home-hero-bg-team-collage.png"
           alt=""
-          width={1584}
-          height={672}
+          fill
           loading="eager"
           fetchPriority="high"
           sizes="100vw"
-          className="pointer-events-none mx-auto h-auto w-full"
+          className="pointer-events-none object-cover"
         />
       )}
     </section>

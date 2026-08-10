@@ -53,19 +53,17 @@ export default async function HomePage() {
   const seatSummary = summarizeSeatAvailability(availabilityByMatch);
   const totalReserved = seatSummary.matchBooked;
   const homePlayers = playersResult.docs as unknown as HomePlayer[];
+  const mainboardSlides = [
+    ...(Array.isArray(homePage.mainboardSlides) ? homePage.mainboardSlides : []),
+    homePage.mainboardVideo,
+  ].filter(
+    (media): media is { url?: string | null; mimeType?: string | null } =>
+      typeof media === "object" && media !== null,
+  );
 
   return (
     <div className="bg-white">
-      <HomeHero
-        slides={
-          Array.isArray(homePage.mainboardSlides)
-            ? homePage.mainboardSlides.filter(
-                (media): media is { url?: string | null; mimeType?: string | null } =>
-                  typeof media === "object" && media !== null,
-              )
-            : []
-        }
-      />
+      <HomeHero slides={mainboardSlides} />
 
       <div className="mx-auto w-full max-w-6xl space-y-14 px-5 py-14 md:px-8 md:py-20">
         <section>

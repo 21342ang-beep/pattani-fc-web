@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { verifyAdmin } from "@/lib/dal";
+import { verifySuperAdmin } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 import { ADMIN_PERMISSION_LABELS } from "@/lib/admin-permissions";
 import CreateUserForm from "./CreateUserForm";
@@ -11,8 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "ผู้ดูแลระบบ — Pattani FC Admin" };
 
 export default async function UsersPage() {
-  const session = await verifyAdmin();
-  if (session.role !== "SUPER_ADMIN") redirect("/admin");
+  const user = await verifySuperAdmin();
 
   const users = await prisma.user.findMany({
     select: {
@@ -58,7 +56,7 @@ export default async function UsersPage() {
               </tr>
             ) : (
               users.map((u) => {
-                const isSelf = u.id === session.userId;
+                const isSelf = u.id === user.id;
                 return (
                   <tr key={u.id} className="border-t align-top">
                     <td className="px-4 py-3 font-medium text-green-900">

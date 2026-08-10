@@ -33,6 +33,19 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     return { error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
   }
 
+  // จำกัดซ้ำตามบัญชีเพื่อกัน distributed brute force จากหลาย IP
+  // ใช้กับอีเมลที่ parse ผ่านทุกค่า จึงไม่เปิดเผยว่าบัญชีมีอยู่จริงหรือไม่
+  const accountRl = await rateLimit("admin_login_account", {
+    max: 10,
+    windowMs: 30 * 60_000,
+    ip: parsed.data.email,
+  });
+  if (!accountRl.ok) {
+    return {
+      error: `พยายามเข้าสู่ระบบบ่อยเกินไป ลองอีกครั้งใน ${accountRl.retryAfterSec} วินาที`,
+    };
+  }
+
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
   // เปรียบเทียบ password เสมอแม้ user ไม่มี เพื่อกัน timing attack
   const dummyHash = "$2b$12$QZJ/HRFVLd4HnZLjo8OBU.j8KD14Szu.WVM20ciuOHbEESySgkRN.";

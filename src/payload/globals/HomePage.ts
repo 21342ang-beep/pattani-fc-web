@@ -39,7 +39,13 @@ export const HomePage: GlobalConfig = {
               name: "mainboardVideo",
               type: "upload",
               relationTo: "media",
-              admin: { hidden: true },
+              label: "วิดีโอ Mainboard",
+              filterOptions: {
+                mimeType: { contains: "video/" },
+              },
+              admin: {
+                description: "แนบวิดีโอ MP4 หรือ WebM สำหรับแสดงบน Mainboard หน้าแรก",
+              },
             },
             {
               name: "mainboardSlides",

@@ -22,7 +22,7 @@ export default function HomeHeroCarousel({ slides }: { slides: Slide[] }) {
   const showNext = () => setActiveIndex((current) => (current + 1) % total);
 
   return (
-    <div className="relative mx-auto aspect-[1584/672] w-full overflow-hidden">
+    <div className="relative mx-auto min-h-[100svh] w-full overflow-hidden">
       {slides.map((slide, index) => (
         slide.mimeType?.startsWith("video/") ? (
           <video

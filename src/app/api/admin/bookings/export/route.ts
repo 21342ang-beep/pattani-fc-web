@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { getAdminUser, hasPermission } from "@/lib/dal";
 
 export const dynamic = "force-dynamic";
 
@@ -13,12 +13,9 @@ function csvEscape(v: string | number | null | undefined): string {
 }
 
 export async function GET() {
-  const session = await readSession();
-  if (
-    !session ||
-    (session.role !== "ADMIN" && session.role !== "SUPER_ADMIN")
-  ) {
-    return new Response("Unauthorized", { status: 401 });
+  const user = await getAdminUser();
+  if (!hasPermission(user, "BOOKINGS")) {
+    return new Response("Forbidden", { status: 403 });
   }
 
   const bookings = await prisma.booking.findMany({

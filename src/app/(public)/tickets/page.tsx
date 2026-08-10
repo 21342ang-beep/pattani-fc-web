@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { MapPin, Users } from "lucide-react";
 import PageHero from "../_components/PageHero";
 import OnSaleMatchBoard from "../_components/OnSaleMatchBoard";
+import StadiumModelViewer, { type StadiumModelZone } from "./_components/StadiumModelViewer";
 import { prisma } from "@/lib/prisma";
 import { aggregateZoneAvailability, getSeatAvailabilityForMatches } from "@/lib/seat-availability";
 import { getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
@@ -42,6 +42,18 @@ const STADIUM_ZONES: StadiumZone[] = [
   { code: "AWAY", label: "ทีมเยือน", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
 ];
 
+const ENGLISH_ZONE_LABELS: Record<StadiumZoneCode, string> = {
+  A: "North Stand · A", B: "North Stand · B", C: "East Stand · C",
+  D: "East Stand · D", E: "South Stand · E", F: "South Stand · F",
+  G: "South Stand · G", I: "West Stand · I", J: "West Stand · J", AWAY: "Away Fans",
+};
+
+const MALAY_ZONE_LABELS: Record<StadiumZoneCode, string> = {
+  A: "Tempat Duduk Utara · A", B: "Tempat Duduk Utara · B", C: "Tempat Duduk Timur · C",
+  D: "Tempat Duduk Timur · D", E: "Tempat Duduk Selatan · E", F: "Tempat Duduk Selatan · F",
+  G: "Tempat Duduk Selatan · G", I: "Tempat Duduk Barat · I", J: "Tempat Duduk Barat · J", AWAY: "Penyokong Pelawat",
+};
+
 export default async function TicketsPage() {
   const [onSaleMatches, { locale }, purchaseSettings] = await Promise.all([prisma.match.findMany({
     where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
@@ -63,6 +75,29 @@ export default async function TicketsPage() {
       seasonReserved: availabilityByZone[zone.code].seasonReserved,
       sharedCapacity: availabilityByZone[zone.code].sharedCapacity,
     };
+  });
+  const modelZones: StadiumModelZone[] = displayZones.map((zone) => {
+    const label = locale === "th"
+      ? zone.label
+      : locale === "ms"
+        ? MALAY_ZONE_LABELS[zone.code]
+        : ENGLISH_ZONE_LABELS[zone.code];
+    const priceLabel = zone.minPriceBaht == null
+      ? t("ยังไม่กำหนดราคา", "Price not set")
+      : zone.minPriceBaht === zone.maxPriceBaht
+        ? `${zone.minPriceBaht.toLocaleString(intlLocale(locale))} ${t("บาท", "THB")}`
+        : `${zone.minPriceBaht.toLocaleString(intlLocale(locale))}–${zone.maxPriceBaht?.toLocaleString(intlLocale(locale))} ${t("บาท", "THB")}`;
+    const availabilityLabel = zone.capacity == null
+      ? t("ยังไม่เปิดขาย", "Not on sale yet")
+      : `${t("คงเหลือ", "Remaining")} ${zone.remaining.toLocaleString(intlLocale(locale))} ${t("ที่นั่ง", "seats")} · ${t("จาก", "of")} ${zone.capacity.toLocaleString(intlLocale(locale))}`;
+    const note = zone.note
+      ? locale === "th"
+        ? zone.note
+        : locale === "ms"
+          ? "Untuk penyokong pelawat sahaja"
+          : "Away fans only"
+      : undefined;
+    return { code: zone.code, label, priceLabel, availabilityLabel, note };
   });
   return (
     <>
@@ -106,24 +141,25 @@ export default async function TicketsPage() {
           </p>
         </div>
 
-        {/* แผนผังสนาม — โชว์บนสุด ให้คนดูมุมมองก่อนเลือกโซน */}
-        <div className="relative aspect-[1553/1058] w-full">
-            <Image
-                src="/stadium-zones-match-2026-27-v5.png?v=20260807-1"
-              alt={t("แผนผังโซนที่นั่งของ Rainbow Stadium — Pattani FC (ความจุ 10,700)", "Rainbow Stadium seating plan — Pattani FC (capacity 10,700)")}
-              fill
-              unoptimized
-              sizes="(min-width: 1024px) 1024px, 100vw"
-              className="object-contain"
-            />
+        <div>
+          <StadiumModelViewer
+            title={t("สนามปัตตานีแบบ 3 มิติ", "Pattani Stadium in 3D")}
+            description={t("สำรวจมุมมองรอบสนามก่อนเลือกโซนที่นั่ง", "Explore the stadium before choosing your seating zone")}
+            loadingLabel={t("กำลังโหลดโมเดลสนาม", "Loading stadium model")}
+            errorLabel={t("อุปกรณ์นี้ไม่สามารถแสดงโมเดล 3 มิติได้", "This device cannot display the 3D model.")}
+            interactionLabel={t("ลากเพื่อหมุน · เลื่อนเพื่อซูม", "Drag to rotate · Scroll to zoom")}
+            plainBackground
+            zones={modelZones}
+            zoneHintLabel={t("ชี้หรือแตะโซนเพื่อดูราคาและรายละเอียด", "Hover or tap a zone to see price and details")}
+          />
         </div>
         <p className="mt-5 text-center text-xl leading-relaxed text-slate-500 md:text-2xl lg:text-3xl">
           {t("ดูมุมมองที่คุณต้องการก่อน แล้วเลือกโซนจากตารางด้านล่าง", "Review the stadium view, then choose a zone below")}
         </p>
 
-        {/* ตารางราคาแยกตามโซน — ต่อจากแผนผัง */}
+        {/* ตารางราคาแยกตามโซน — ต่อจากสนาม 3 มิติ */}
         <p className="mb-10 mt-14 text-center text-xl font-medium leading-relaxed text-slate-500 md:text-2xl lg:text-3xl">
-          {t("สีของแต่ละโซนอ้างอิงจากแผนผังสนามด้านบน — กดที่โซนเพื่อเลือกแมตช์", "Zone colors match the stadium plan above — select a zone to choose a match")}
+          {t("สีของแต่ละโซนตรงกับสนาม 3 มิติด้านบน — กดที่โซนเพื่อเลือกแมตช์", "Zone colors match the 3D stadium above — select a zone to choose a match")}
         </p>
         <ul id="zones" className="grid scroll-mt-24 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
           {displayZones.map((z) => (
@@ -240,16 +276,6 @@ const ZONE_COLORS: Record<
 function ZoneCard({ zone, locale }: { zone: StadiumZone; locale: Locale }) {
   const s = ZONE_COLORS[zone.color];
   const t = (th: string, en: string) => localize(locale, th, en);
-  const englishZoneLabel: Record<StadiumZoneCode, string> = {
-    A: "North Stand · A", B: "North Stand · B", C: "East Stand · C",
-    D: "East Stand · D", E: "South Stand · E", F: "South Stand · F",
-    G: "South Stand · G", I: "West Stand · I", J: "West Stand · J", AWAY: "Away Fans",
-  };
-  const malayZoneLabel: Record<StadiumZoneCode, string> = {
-    A: "Tempat Duduk Utara · A", B: "Tempat Duduk Utara · B", C: "Tempat Duduk Timur · C",
-    D: "Tempat Duduk Timur · D", E: "Tempat Duduk Selatan · E", F: "Tempat Duduk Selatan · F",
-    G: "Tempat Duduk Selatan · G", I: "Tempat Duduk Barat · I", J: "Tempat Duduk Barat · J", AWAY: "Penyokong Pelawat",
-  };
   return (
     <div
       className={`flex h-full flex-col overflow-hidden rounded-2xl border-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${s.wrap}`}
@@ -271,7 +297,7 @@ function ZoneCard({ zone, locale }: { zone: StadiumZone; locale: Locale }) {
       {/* เนื้อการ์ด */}
       <div className="flex flex-1 flex-col px-5 pb-5 pt-4">
         <span className="text-xl font-bold leading-tight text-slate-700">
-          {locale === "th" ? zone.label : locale === "ms" ? malayZoneLabel[zone.code] : englishZoneLabel[zone.code]}
+          {locale === "th" ? zone.label : locale === "ms" ? MALAY_ZONE_LABELS[zone.code] : ENGLISH_ZONE_LABELS[zone.code]}
         </span>
         <span className={`mt-3 text-3xl font-black ${s.price}`}>
           {zone.minPriceBaht == null
