@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import PageHero from "../../_components/PageHero";
 import SeasonPassAnnouncementModal from "../../_components/SeasonPassAnnouncementModal";
-import StadiumModelViewer, { type StadiumModelZone } from "../_components/StadiumModelViewer";
 import {
   SEASON_MATCHES,
   SEASON_TIERS,
@@ -40,34 +39,6 @@ const TIER_MOCKUPS: Partial<Record<SeasonTierId, string>> = {
 export default async function SeasonTicketsPage() {
   const { locale } = await getT();
   const t = (th: string, en: string) => localize(locale, th, en);
-  const seasonModelZones: StadiumModelZone[] = [
-    { code: "A", tierId: "premium" as const, seatLabel: "A" },
-    { code: "B", tierId: "premium" as const, seatLabel: "B" },
-    { code: "F", tierId: "premium" as const, seatLabel: "F" },
-    { code: "C", tierId: "gold" as const, seatLabel: "C" },
-    { code: "E", tierId: "gold" as const, seatLabel: "E" },
-    { code: "G", tierId: "gold" as const, seatLabel: "G" },
-    { code: "J", tierId: "gold" as const, seatLabel: "J" },
-    { code: "VIP-A", tierId: "vip-advanced" as const, seatLabel: "A" },
-    { code: "VIP-B", tierId: "vip-advanced" as const, seatLabel: "B" },
-  ].map(({ code, tierId, seatLabel }) => {
-    const tier = SEASON_TIERS.find((candidate) => candidate.id === tierId)!;
-    const translatedTier = locale === "ms" ? seasonTierMalay(tier.id) : seasonTierEnglish(tier.id);
-    const zoneWord = locale === "th" ? "โซน" : locale === "ms" ? "Zon" : "Zone";
-    const seasonUnit = locale === "th" ? "บาท / ฤดูกาล" : locale === "ms" ? "THB / musim" : "THB / season";
-    const matchDetail = locale === "th"
-      ? `เข้าชม ${SEASON_MATCHES} แมตช์เหย้าตลอดฤดูกาล`
-      : locale === "ms"
-        ? `${SEASON_MATCHES} perlawanan di tempat sendiri sepanjang musim`
-        : `${SEASON_MATCHES} home matches throughout the season`;
-    return {
-      code,
-      label: `${zoneWord} ${tier.badge} · ${seatLabel}`,
-      priceLabel: `${tier.priceBaht.toLocaleString(intlLocale(locale))} ${seasonUnit}`,
-      availabilityLabel: matchDetail,
-      note: locale === "th" ? tier.tagline : translatedTier.tagline,
-    };
-  });
   return (
     <>
       <SeasonPassAnnouncementModal initiallyOpen />
@@ -81,19 +52,16 @@ export default async function SeasonTicketsPage() {
         <section className="mb-12">
           <div className="mb-7 text-center">
             <p className="text-lg font-bold uppercase tracking-widest text-yellow-600 md:text-xl lg:text-2xl">Rainbow Stadium</p>
-            <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">{t("สนามแบบ 3 มิติ", "3D Stadium")}</h2>
+            <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">{t("แผนผังสนาม", "Stadium Map")}</h2>
             <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">{t("ตรวจสอบโซนที่นั่งก่อนเลือกแพ็กเกจสมาชิก", "Review seating zones before choosing your membership package")}</p>
           </div>
-          <div>
-            <StadiumModelViewer
-              title={t("สนามปัตตานีแบบ 3 มิติ", "Pattani Stadium in 3D")}
-              description={t("สำรวจสนามแบบรอบทิศก่อนเลือกแพ็กเกจและโซนรายปี", "Explore the stadium before choosing your season package and zone")}
-              loadingLabel={t("กำลังโหลดโมเดลสนาม", "Loading stadium model")}
-              errorLabel={t("อุปกรณ์นี้ไม่สามารถแสดงโมเดล 3 มิติได้", "This device cannot display the 3D model.")}
-              interactionLabel={t("ลากเพื่อหมุน · เลื่อนเพื่อซูม", "Drag to rotate · Scroll to zoom")}
-              plainBackground
-              zones={seasonModelZones}
-              zoneHintLabel={t("ชี้หรือแตะโซนเพื่อดูราคาและรายละเอียดรายปี", "Hover or tap a zone to see season price and details")}
+          <div className="relative aspect-[1553/1058] w-full">
+            <Image
+              src="/stadium-zones-season-2026-27-v4.png"
+              alt={t("แผนผังโซนที่นั่ง Rainbow Stadium — Pattani FC", "Rainbow Stadium seating plan — Pattani FC")}
+              fill
+              sizes="(max-width: 768px) 100vw, 1152px"
+              className="object-contain"
             />
           </div>
         </section>
