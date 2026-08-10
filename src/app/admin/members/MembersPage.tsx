@@ -255,12 +255,13 @@ export default async function MembersPage(props: {
           <p className="text-sm font-medium text-slate-500">
             พบ {filteredMemberCount.toLocaleString("th-TH")} คน
           </p>
-          <Link
+          <a
             href={membersExportHref(selectedTier, q)}
+            download
             className="rounded-lg bg-green-800 px-5 py-2.5 text-base font-semibold text-yellow-300 shadow-sm hover:bg-green-900"
           >
             📥 ดาวน์โหลดข้อมูลสมาชิก
-          </Link>
+          </a>
         </div>
       </div>
 
