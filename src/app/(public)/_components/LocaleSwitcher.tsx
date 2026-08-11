@@ -76,7 +76,7 @@ export default function LocaleSwitcher({
       {open && (
         <div
           role="menu"
-          className={`absolute right-0 z-50 w-44 overflow-hidden rounded-lg border border-green-900/15 bg-white py-1 text-sm text-green-950 shadow-xl ${
+          className={`absolute right-0 z-[100] w-44 overflow-hidden rounded-lg border border-green-900/15 bg-white py-1 text-sm text-green-950 shadow-xl ${
             openUp ? "bottom-full mb-1" : "top-full mt-1"
           }`}
         >

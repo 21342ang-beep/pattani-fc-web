@@ -309,7 +309,7 @@ export default function TopNav({
             />
           </Link>
         </motion.div>
-        <div className="relative isolate overflow-hidden">
+        <div className="relative z-20 isolate overflow-visible">
           {showLocalVisuals && <BatikLayer className="opacity-[0.76]" />}
           <motion.div
             animate={{ paddingTop: scrolled ? 8 : 12, paddingBottom: scrolled ? 8 : 12 }}
