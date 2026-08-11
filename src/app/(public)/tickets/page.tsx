@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MapPin, Users } from "lucide-react";
 import PageHero from "../_components/PageHero";
 import OnSaleMatchBoard from "../_components/OnSaleMatchBoard";
+import SeasonPassAnnouncementModal from "../_components/SeasonPassAnnouncementModal";
 import { prisma } from "@/lib/prisma";
 import { aggregateZoneAvailability, getSeatAvailabilityForMatches } from "@/lib/seat-availability";
 import { getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
@@ -55,9 +56,12 @@ const MALAY_ZONE_LABELS: Record<StadiumZoneCode, string> = {
 };
 
 export default async function TicketsPage() {
-  const [onSaleMatches, { locale }, purchaseSettings] = await Promise.all([prisma.match.findMany({
+  const [availableMatches, { locale }, purchaseSettings] = await Promise.all([prisma.match.findMany({
     where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
   }), getT(), getTicketPurchaseSettings()]);
+  const onSaleMatches = availableMatches.filter(
+    (match) => match.competitionType !== "LEAGUE" || purchaseSettings.leagueBookingOpen,
+  );
   const t = (th: string, en: string) => localize(locale, th, en);
   const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
   const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
@@ -78,6 +82,11 @@ export default async function TicketsPage() {
   });
   return (
     <>
+      <SeasonPassAnnouncementModal
+        initiallyOpen={!purchaseSettings.leagueBookingOpen}
+        ticketType="match"
+      />
+
       <PageHero
         title={t("จองตั๋วรายแมตช์", "Match Tickets")}
         subtitle={t("เลือกโซนที่นั่งของคุณ — แต่ละโซนของ Rainbow Stadium มีบรรยากาศ ราคา และทัศนียภาพต่างกัน", "Choose your seating zone — each area of Rainbow Stadium offers a different atmosphere, price, and view")}

@@ -7,12 +7,17 @@ export default function SeasonPassAnnouncementModal({
   children,
   className,
   initiallyOpen = false,
+  ticketType = "season",
 }: {
   children?: ReactNode;
   className?: string;
   initiallyOpen?: boolean;
+  ticketType?: "match" | "season";
 }) {
   const [isOpen, setIsOpen] = useState(initiallyOpen);
+  const isMatchTicket = ticketType === "match";
+  const titleId = `${ticketType}-booking-announcement-title`;
+  const descriptionId = `${ticketType}-booking-announcement-description`;
 
   return (
     <>
@@ -27,8 +32,8 @@ export default function SeasonPassAnnouncementModal({
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="season-pass-announcement-title"
-          aria-describedby="season-pass-announcement-description"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
         >
           <section className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-yellow-300/40 bg-white shadow-2xl">
             <div className="h-2 bg-gradient-to-r from-green-800 via-yellow-400 to-green-800" />
@@ -49,13 +54,15 @@ export default function SeasonPassAnnouncementModal({
                 ประกาศสำคัญจากสโมสร
               </p>
               <h2
-                id="season-pass-announcement-title"
+                id={titleId}
                 className="mt-2 text-3xl font-black leading-tight text-green-950 sm:text-4xl"
               >
-                ขณะนี้ยังไม่เปิดจองตั๋วรายปี
+                {isMatchTicket
+                  ? "ขณะนี้ยังไม่เปิดจองตั๋วรายแมตช์"
+                  : "ขณะนี้ยังไม่เปิดจองตั๋วรายปี"}
               </h2>
               <p
-                id="season-pass-announcement-description"
+                id={descriptionId}
                 className="mx-auto mt-4 max-w-md text-lg leading-relaxed text-slate-600 sm:text-xl"
               >
                 กรุณารอประกาศการเปิดจองอย่างเป็นทางการจากสโมสรปัตตานี เอฟซี

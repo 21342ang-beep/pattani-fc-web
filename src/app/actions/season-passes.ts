@@ -154,6 +154,9 @@ export async function createSeasonPassOrder(
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง", fieldErrors };
   }
   const settings = await getTicketPurchaseSettings();
+  if (!settings.seasonPassBookingOpen) {
+    return { ok: false, error: "ขณะนี้ยังไม่เปิดจองตั๋วรายปี" };
+  }
   if (parsed.data.quantity > settings.seasonPassMaxQuantity) {
     return {
       ok: false,

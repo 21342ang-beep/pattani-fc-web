@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyAnyPermission } from "@/lib/dal";
+import { verifyAnyPermission, verifyPermission } from "@/lib/dal";
 
 const settingsSchema = z.object({
   matchMaxQuantity: z.number().int().min(1).max(100),
@@ -14,6 +14,33 @@ export type TicketPurchaseSettingsState =
   | { ok: true; message: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> }
   | undefined;
+
+export type TicketSaleType = "LEAGUE" | "SEASON_PASS";
+
+export async function setTicketSaleOpen(
+  saleType: TicketSaleType,
+  isOpen: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await verifyPermission("MATCHES");
+  if ((saleType !== "LEAGUE" && saleType !== "SEASON_PASS") || typeof isOpen !== "boolean") {
+    return { ok: false, error: "ข้อมูลสถานะการเปิดจองไม่ถูกต้อง" };
+  }
+
+  await prisma.ticketPurchaseSetting.update({
+    where: { id: 1 },
+    data: saleType === "LEAGUE"
+      ? { leagueBookingOpen: isOpen }
+      : { seasonPassBookingOpen: isOpen },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin/matches");
+  revalidatePath("/matches");
+  revalidatePath("/tickets");
+  revalidatePath("/tickets/season");
+  revalidatePath("/season-pass/apply");
+  return { ok: true };
+}
 
 export async function updateTicketPurchaseSettings(
   _previous: TicketPurchaseSettingsState,

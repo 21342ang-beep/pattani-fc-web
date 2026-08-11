@@ -7,6 +7,7 @@ import { formatDateTime } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { intlLocale, localize } from "@/lib/i18n/text";
 import type { Locale } from "@/lib/i18n/dict";
+import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 
 const ALLOWED_FILTERS = ["all", "on_sale", "upcoming"] as const;
 type Filter = (typeof ALLOWED_FILTERS)[number];
@@ -34,14 +35,20 @@ export default async function MatchesListPage(props: {
     : "all";
   const competitionType = competition === "all" ? undefined : competition === "league" ? "LEAGUE" : "CUP";
 
-  const [matches, onSaleMatches, { locale }] = await Promise.all([
+  const [matches, onSaleMatches, { locale }, purchaseSettings] = await Promise.all([
     getMatchesByFilter(filter, competitionType),
     getMatchesByFilter("on_sale", competitionType),
     getT(),
+    getTicketPurchaseSettings(),
   ]);
   const t = (th: string, en: string) => localize(locale, th, en);
   const pattaniMatches = matches.filter(isPattaniFixture);
-  const pattaniOnSaleMatches = onSaleMatches.filter(isPattaniFixture);
+  const isBookingAvailable = (match: (typeof matches)[number]) =>
+    match.status === "ON_SALE" &&
+    (match.competitionType !== "LEAGUE" || purchaseSettings.leagueBookingOpen);
+  const pattaniOnSaleMatches = onSaleMatches
+    .filter(isPattaniFixture)
+    .filter(isBookingAvailable);
   // เลือกโซนแล้วมีแมตช์ที่เปิดขายเพียงรายการเดียว → ข้ามหน้ากดจอง
   // และไปยังฟอร์มกรอกข้อมูลของแมตช์นั้นทันที
   if (zone && pattaniOnSaleMatches.length === 1) {
@@ -49,7 +56,7 @@ export default async function MatchesListPage(props: {
   }
   const listMatches =
     filter === "all" || filter === "upcoming"
-      ? pattaniMatches.filter((match) => match.status !== "ON_SALE")
+      ? pattaniMatches.filter((match) => !isBookingAvailable(match))
       : [];
 
   return (
@@ -113,12 +120,12 @@ export default async function MatchesListPage(props: {
       ) : (
         <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {listMatches.map((m) => {
-            const isOnSale = m.status === "ON_SALE";
+            const isOnSale = isBookingAvailable(m);
             const isPattaniHomeMatch = isPattaniHomeTeam(m.homeTeam);
             return (
               <li key={m.id} className="flex flex-col rounded-xl border bg-white p-5 shadow-sm md:p-6">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <StatusBadge status={m.status} locale={locale} />
+                  <StatusBadge status={isOnSale ? m.status : m.status === "ON_SALE" ? "SCHEDULED" : m.status} locale={locale} />
                   <span className="text-sm text-slate-500 md:text-base">
                     {m.kickoffAt ? formatDateTime(m.kickoffAt, intlLocale(locale)) : t("ยังไม่กำหนด", "To be confirmed")}
                   </span>

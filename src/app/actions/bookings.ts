@@ -59,6 +59,9 @@ export async function createBooking(
       async (tx) => {
         const match = await tx.match.findUnique({ where: { id: parsed.data.matchId } });
         if (!match) throw new Error("ไม่พบแมตช์ที่ต้องการ");
+        if (match.competitionType === "LEAGUE" && !settings.leagueBookingOpen) {
+          throw new Error("ขณะนี้ปิดการจองตั๋วบอลลีกชั่วคราว");
+        }
         if (match.status !== "ON_SALE") throw new Error("แมตช์นี้ยังไม่เปิดจอง หรือปิดการจองแล้ว");
         // defense-in-depth — แมตช์ ON_SALE ควรมีข้อมูลครบเสมอ (validate ตอน save)
         // ถ้ามาถึงตรงนี้แล้ว field ขาด แสดงว่ามีข้อมูลผิดปกติ — refuse booking

@@ -462,6 +462,8 @@ model TicketPurchaseSetting {
   id                    Int      @id
   matchMaxQuantity      Int
   seasonPassMaxQuantity Int
+  leagueBookingOpen     Boolean  @default(true)
+  seasonPassBookingOpen Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

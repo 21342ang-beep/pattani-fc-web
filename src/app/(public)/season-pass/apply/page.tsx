@@ -21,6 +21,9 @@ export default async function SeasonPassApplyPage(props: {
   const tier = getSeasonTier(tierId);
   if (!tier || tier.id === "vvip-elite") notFound();
 
+  const purchaseSettings = await getTicketPurchaseSettings();
+  if (!purchaseSettings.seasonPassBookingOpen) redirect("/tickets/season");
+
   // ⚠️ mock flow — ไม่มีการเขียน DB ใด ๆ
   // session ใช้แค่ auto-fill ฟอร์มให้สมาชิก (guest กรอกเองได้)
   const session = await readCustomerSession();
@@ -28,7 +31,7 @@ export default async function SeasonPassApplyPage(props: {
     // ต้องเป็นสมาชิกก่อนจอง — เข้าสู่ระบบ (หรือกดสมัครจากหน้า login) แล้วเด้งกลับมาต่อ
     redirect(`/member/login?returnTo=${encodeURIComponent(`/tickets/season/apply?tier=${tier.id}`)}`);
   }
-  const [customer, quotas, soldGroups, purchaseSettings] = await Promise.all([
+  const [customer, quotas, soldGroups] = await Promise.all([
     prisma.customer.findUnique({
       where: { id: session.customerId },
       select: {
@@ -53,7 +56,6 @@ export default async function SeasonPassApplyPage(props: {
       },
       _count: { _all: true },
     }),
-    getTicketPurchaseSettings(),
   ]);
   const ranges = calculateSeasonPassZoneRanges(tier.allowedSeatZones, quotas);
   const zoneOptions: SeasonPassZoneOption[] = tier.allowedSeatZones.map((seatZone) => {

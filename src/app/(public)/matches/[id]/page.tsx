@@ -8,6 +8,7 @@ import { getSeatAvailabilityForMatches } from "@/lib/seat-availability";
 import BookingForm from "./BookingForm";
 import { getStadiumZone, getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
+import SeasonPassAnnouncementModal from "../../_components/SeasonPassAnnouncementModal";
 
 // whitelist โซน — กัน XSS ผ่าน URL
 const ALLOWED_ZONES = [
@@ -43,6 +44,7 @@ export default async function MatchDetailPage(props: {
   const remaining = selectedAvailability?.remaining ?? 0;
   const canBook =
     match.status === "ON_SALE" &&
+    (match.competitionType !== "LEAGUE" || purchaseSettings.leagueBookingOpen) &&
     remaining > 0 &&
     selectedZone != null &&
     selectedPrice != null &&
@@ -59,7 +61,12 @@ export default async function MatchDetailPage(props: {
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <>
+      <SeasonPassAnnouncementModal
+        initiallyOpen={match.competitionType === "LEAGUE" && !purchaseSettings.leagueBookingOpen}
+        ticketType="match"
+      />
+      <div className="mx-auto w-full max-w-3xl">
       <Link href="/matches" className="text-base text-slate-500 hover:text-slate-900 md:text-lg">
         ← กลับตารางแข่งขัน
       </Link>
@@ -118,7 +125,9 @@ export default async function MatchDetailPage(props: {
         </div>
       ) : !canBook ? (
         <div className="mt-6 rounded-lg border bg-amber-50 p-5 text-base text-amber-800 md:text-lg">
-          ขณะนี้ยังไม่เปิดจอง หรือที่นั่งเต็มแล้ว
+          {match.competitionType === "LEAGUE" && !purchaseSettings.leagueBookingOpen
+            ? "ขณะนี้ปิดการจองตั๋วบอลลีกชั่วคราว"
+            : "ขณะนี้ยังไม่เปิดจอง หรือที่นั่งเต็มแล้ว"}
         </div>
       ) : (
         <BookingForm
@@ -131,6 +140,7 @@ export default async function MatchDetailPage(props: {
           zone={zone}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }

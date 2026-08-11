@@ -7,6 +7,8 @@ export async function getTicketPurchaseSettings() {
     select: {
       matchMaxQuantity: true,
       seasonPassMaxQuantity: true,
+      leagueBookingOpen: true,
+      seasonPassBookingOpen: true,
     },
   });
   if (!settings) {

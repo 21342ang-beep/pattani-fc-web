@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import {
   Crown,
   Star,
@@ -19,6 +20,7 @@ import {
 import { getT } from "@/lib/i18n/server";
 import { intlLocale, localize } from "@/lib/i18n/text";
 import type { Locale } from "@/lib/i18n/dict";
+import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 
 export const metadata = { title: "ตั๋วรายปี — Pattani FC" };
 
@@ -37,11 +39,14 @@ const TIER_MOCKUPS: Partial<Record<SeasonTierId, string>> = {
 };
 
 export default async function SeasonTicketsPage() {
-  const { locale } = await getT();
+  const [{ locale }, purchaseSettings] = await Promise.all([
+    getT(),
+    getTicketPurchaseSettings(),
+  ]);
   const t = (th: string, en: string) => localize(locale, th, en);
   return (
     <>
-      <SeasonPassAnnouncementModal initiallyOpen />
+      <SeasonPassAnnouncementModal initiallyOpen={!purchaseSettings.seasonPassBookingOpen} />
 
       <PageHero
         title={t("ตั๋วรายปี", "Season Tickets")}
@@ -81,7 +86,12 @@ export default async function SeasonTicketsPage() {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {SEASON_TIERS.filter((t) => t.id !== "vvip-elite").map((t) => (
-            <TierCard key={t.id} tier={t} locale={locale} />
+            <TierCard
+              key={t.id}
+              tier={t}
+              locale={locale}
+              bookingOpen={purchaseSettings.seasonPassBookingOpen}
+            />
           ))}
         </div>
 
@@ -93,7 +103,15 @@ export default async function SeasonTicketsPage() {
   );
 }
 
-function TierCard({ tier, locale }: { tier: SeasonTier; locale: Locale }) {
+function TierCard({
+  tier,
+  locale,
+  bookingOpen,
+}: {
+  tier: SeasonTier;
+  locale: Locale;
+  bookingOpen: boolean;
+}) {
   const t = (th: string, en: string) => localize(locale, th, en);
   const highlighted = tier.highlight;
   const priceLabel = tier.priceBaht.toLocaleString(intlLocale(locale));
@@ -214,15 +232,28 @@ function TierCard({ tier, locale }: { tier: SeasonTier; locale: Locale }) {
         ))}
       </ul>
 
-      <SeasonPassAnnouncementModal
-        className={`mt-8 inline-flex w-full items-center justify-center rounded-full px-6 py-3.5 text-lg font-bold transition md:py-4 md:text-xl ${
-          highlighted
-            ? "bg-yellow-400 text-green-950 hover:bg-yellow-300"
-            : "bg-green-800 text-yellow-300 hover:bg-green-900"
-        }`}
-      >
-        {t("ซื้อบัตรสมาชิกรายปี", "Buy Season Membership")}
-      </SeasonPassAnnouncementModal>
+      {bookingOpen ? (
+        <Link
+          href={`/tickets/season/apply?tier=${tier.id}`}
+          className={`mt-8 inline-flex w-full items-center justify-center rounded-full px-6 py-3.5 text-lg font-bold transition md:py-4 md:text-xl ${
+            highlighted
+              ? "bg-yellow-400 text-green-950 hover:bg-yellow-300"
+              : "bg-green-800 text-yellow-300 hover:bg-green-900"
+          }`}
+        >
+          {t("ซื้อบัตรสมาชิกรายปี", "Buy Season Membership")}
+        </Link>
+      ) : (
+        <SeasonPassAnnouncementModal
+          className={`mt-8 inline-flex w-full items-center justify-center rounded-full px-6 py-3.5 text-lg font-bold transition md:py-4 md:text-xl ${
+            highlighted
+              ? "bg-yellow-400 text-green-950 hover:bg-yellow-300"
+              : "bg-green-800 text-yellow-300 hover:bg-green-900"
+          }`}
+        >
+          {t("ซื้อบัตรสมาชิกรายปี", "Buy Season Membership")}
+        </SeasonPassAnnouncementModal>
+      )}
     </div>
   );
 }

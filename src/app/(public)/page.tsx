@@ -15,12 +15,13 @@ import {
   getSeatAvailabilityForMatches,
   summarizeSeatAvailability,
 } from "@/lib/seat-availability";
+import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 
 export const revalidate = 60;
 
 export default async function HomePage() {
   const cms = await payload();
-  const [featured, onSaleMatches, homePage, playersResult, { locale, dict }] = await Promise.all([
+  const [featured, availableMatches, homePage, playersResult, { locale, dict }, purchaseSettings] = await Promise.all([
     prisma.match.findMany({
       where: {
         status: { in: ["SCHEDULED", "ON_SALE"] },
@@ -46,7 +47,16 @@ export default async function HomePage() {
       overrideAccess: true,
     }),
     getT(),
+    getTicketPurchaseSettings(),
   ]);
+  const isLeagueSaleOpen = (match: { competitionType: string }) =>
+    match.competitionType !== "LEAGUE" || purchaseSettings.leagueBookingOpen;
+  const onSaleMatches = availableMatches.filter(isLeagueSaleOpen);
+  const effectiveFeatured = featured.map((match) =>
+    match.status === "ON_SALE" && !isLeagueSaleOpen(match)
+      ? { ...match, status: "SCHEDULED" }
+      : match,
+  );
   const numberLocale = intlLocale(locale);
   const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
   const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
@@ -123,7 +133,7 @@ export default async function HomePage() {
               {dict.home.viewAll} <ArrowRight className="size-5" />
             </Link>
           </div>
-          <FeaturedMatches matches={featured} locale={locale} labels={dict.home} />
+          <FeaturedMatches matches={effectiveFeatured} locale={locale} labels={dict.home} />
         </section>
 
       </div>

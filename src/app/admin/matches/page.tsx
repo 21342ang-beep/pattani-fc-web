@@ -6,7 +6,9 @@ import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 import { getSeatAvailabilityForMatches, type ZoneAvailability } from "@/lib/seat-availability";
 import { STADIUM_ZONE_CODES, type StadiumZoneCode } from "@/lib/stadium-zones";
+import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import DeleteMatchButton from "./DeleteMatchButton";
+import BookingSaleToggle from "./BookingSaleToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,7 @@ export default async function AdminMatchesPage(props: {
     : undefined;
 
   if (!competition) {
+    const purchaseSettings = await getTicketPurchaseSettings();
     return (
       <div>
         <h1 className="text-xl font-bold">จัดการแมตช์</h1>
@@ -49,6 +52,7 @@ export default async function AdminMatchesPage(props: {
             title="จัดการแมตช์บอลลีก"
             description="เพิ่ม แก้ไข และดูรายการแมตช์ฟุตบอลลีก"
             className="border-emerald-200 bg-emerald-50 hover:border-emerald-400"
+            saleControl={{ type: "LEAGUE", isOpen: purchaseSettings.leagueBookingOpen }}
           />
           <MatchManagementCard
             href="/admin/matches?competition=CUP"
@@ -61,6 +65,7 @@ export default async function AdminMatchesPage(props: {
             title="จัดสรรที่นั่งบัตรรายปี"
             description="กำหนดโควตารวม ที่นั่งสปอนเซอร์ และจำนวนเปิดขายแยกตามแพ็กเกจและโซน"
             className="border-blue-200 bg-blue-50 hover:border-blue-400"
+            saleControl={{ type: "SEASON_PASS", isOpen: purchaseSettings.seasonPassBookingOpen }}
           />
           <MatchManagementCard
             href="/admin/ticket-settings"
@@ -176,18 +181,31 @@ function MatchManagementCard({
   title,
   description,
   className,
+  saleControl,
 }: {
   href: string;
   title: string;
   description: string;
   className: string;
+  saleControl?: {
+    type: "LEAGUE" | "SEASON_PASS";
+    isOpen: boolean;
+  };
 }) {
   return (
-    <Link href={href} className={`rounded-xl border p-6 shadow-sm transition ${className}`}>
-      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-      <p className="mt-2 text-sm text-slate-600">{description}</p>
-      <span className="mt-5 inline-block text-sm font-semibold text-slate-800">เข้าสู่การจัดการ →</span>
-    </Link>
+    <article className={`rounded-xl border p-6 shadow-sm transition ${className}`}>
+      <Link href={href} className="block rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2">
+        <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+        <p className="mt-2 text-sm text-slate-600">{description}</p>
+        <span className="mt-5 inline-block text-sm font-semibold text-slate-800">เข้าสู่การจัดการ →</span>
+      </Link>
+      {saleControl && (
+        <BookingSaleToggle
+          saleType={saleControl.type}
+          initialOpen={saleControl.isOpen}
+        />
+      )}
+    </article>
   );
 }
 
