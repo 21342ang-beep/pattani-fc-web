@@ -47,7 +47,7 @@ export default function HomePlayers({ players, labels }: { players: HomePlayer[]
 
   if (players.length === 0) return null;
   return (
-    <section className="rounded-3xl border border-green-100 bg-white px-5 py-8 shadow-sm sm:px-8 sm:py-10">
+    <section>
       <div>
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
