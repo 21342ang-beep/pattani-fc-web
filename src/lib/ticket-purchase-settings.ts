@@ -8,11 +8,14 @@ export async function getTicketPurchaseSettings() {
       matchMaxQuantity: true,
       seasonPassMaxQuantity: true,
       leagueBookingOpen: true,
-      seasonPassBookingOpen: true,
+      seasonPassSalePhase: true,
     },
   });
   if (!settings) {
     throw new Error("ยังไม่ได้ตั้งค่าจำนวนตั๋วสูงสุด กรุณารัน Prisma migration");
   }
-  return settings;
+  return {
+    ...settings,
+    seasonPassBookingOpen: settings.seasonPassSalePhase === "PUBLIC_OPEN",
+  };
 }

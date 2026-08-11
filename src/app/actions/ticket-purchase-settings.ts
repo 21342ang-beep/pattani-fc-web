@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SeasonPassSalePhase } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyAnyPermission, verifyPermission } from "@/lib/dal";
@@ -15,28 +16,59 @@ export type TicketPurchaseSettingsState =
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> }
   | undefined;
 
-export type TicketSaleType = "LEAGUE" | "SEASON_PASS";
+export type TicketSaleType = "LEAGUE";
 
 export async function setTicketSaleOpen(
   saleType: TicketSaleType,
   isOpen: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await verifyPermission("MATCHES");
-  if ((saleType !== "LEAGUE" && saleType !== "SEASON_PASS") || typeof isOpen !== "boolean") {
+  if (saleType !== "LEAGUE" || typeof isOpen !== "boolean") {
     return { ok: false, error: "ข้อมูลสถานะการเปิดจองไม่ถูกต้อง" };
   }
 
   await prisma.ticketPurchaseSetting.update({
     where: { id: 1 },
-    data: saleType === "LEAGUE"
-      ? { leagueBookingOpen: isOpen }
-      : { seasonPassBookingOpen: isOpen },
+    data: { leagueBookingOpen: isOpen },
   });
 
   revalidatePath("/");
   revalidatePath("/admin/matches");
   revalidatePath("/matches");
   revalidatePath("/tickets");
+  revalidatePath("/tickets/season");
+  revalidatePath("/season-pass/apply");
+  return { ok: true };
+}
+
+const seasonPassSalePhases = new Set<SeasonPassSalePhase>([
+  "STAFF_ONLY",
+  "PUBLIC_OPEN",
+  "CLOSED",
+]);
+
+export async function setSeasonPassSalePhase(
+  phase: SeasonPassSalePhase,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await verifyPermission("MATCHES");
+  if (!seasonPassSalePhases.has(phase)) {
+    return { ok: false, error: "สถานะการขายบัตรรายปีไม่ถูกต้อง" };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('season-pass-sale-phase'))::text AS lock_result`;
+    await tx.ticketPurchaseSetting.update({
+      where: { id: 1 },
+      data: {
+        seasonPassSalePhase: phase,
+        seasonPassBookingOpen: phase === "PUBLIC_OPEN",
+      },
+    });
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin/matches");
+  revalidatePath("/admin/season-passes/staff");
   revalidatePath("/tickets/season");
   revalidatePath("/season-pass/apply");
   return { ok: true };

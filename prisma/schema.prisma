@@ -459,13 +459,21 @@ model SeasonPassOrder {
 
 // ค่าจำนวนสูงสุดต่อหนึ่งคำสั่งซื้อ กำหนดผ่านหลังบ้าน
 model TicketPurchaseSetting {
-  id                    Int      @id
+  id                    Int                 @id
   matchMaxQuantity      Int
   seasonPassMaxQuantity Int
-  leagueBookingOpen     Boolean  @default(true)
-  seasonPassBookingOpen Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  leagueBookingOpen     Boolean             @default(true)
+  // Legacy deployment/rollback compatibility; new code uses seasonPassSalePhase.
+  seasonPassBookingOpen Boolean             @default(false)
+  seasonPassSalePhase   SeasonPassSalePhase @default(STAFF_ONLY)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+}
+
+enum SeasonPassSalePhase {
+  STAFF_ONLY
+  PUBLIC_OPEN
+  CLOSED
 }
 
 // โควตาบัตรรายปีแยกตามฤดูกาล แพ็กเกจ และโซน

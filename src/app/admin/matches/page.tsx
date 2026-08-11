@@ -2,13 +2,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, MapPin, Shield } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { verifyPermission } from "@/lib/dal";
+import { hasPermission, verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 import { getSeatAvailabilityForMatches, type ZoneAvailability } from "@/lib/seat-availability";
 import { STADIUM_ZONE_CODES, type StadiumZoneCode } from "@/lib/stadium-zones";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
+import { SEASON_LABEL, SEASON_TIERS, getSeasonPublicSaleLimit } from "@/lib/season-pass-tiers";
 import DeleteMatchButton from "./DeleteMatchButton";
 import BookingSaleToggle from "./BookingSaleToggle";
+import SeasonPassSalePhaseControl from "./SeasonPassSalePhaseControl";
 
 export const dynamic = "force-dynamic";
 
@@ -34,14 +36,53 @@ const statusClassName: Record<string, string> = {
 export default async function AdminMatchesPage(props: {
   searchParams: Promise<{ competition?: string }>;
 }) {
-  await verifyPermission("MATCHES");
+  const adminUser = await verifyPermission("MATCHES");
   const { competition: rawCompetition } = await props.searchParams;
   const competition = rawCompetition === "CUP" || rawCompetition === "LEAGUE"
     ? rawCompetition
     : undefined;
 
   if (!competition) {
-    const purchaseSettings = await getTicketPurchaseSettings();
+    const [purchaseSettings, seasonOrderGroups, seasonQuotas, availableVvipBarcodes] = await Promise.all([
+      getTicketPurchaseSettings(),
+      prisma.seasonPassOrder.groupBy({
+        by: ["tierId", "salesChannel"],
+        where: { seasonLabel: SEASON_LABEL, status: { in: ["PENDING", "CONFIRMED"] } },
+        _count: { _all: true },
+      }),
+      prisma.seasonPassZoneQuota.findMany({ where: { seasonLabel: SEASON_LABEL } }),
+      prisma.seasonPassBarcode.count({
+        where: { tierId: "vvip-elite", seasonLabel: SEASON_LABEL, isGenerated: true, orderId: null },
+      }),
+    ]);
+    const countOrders = (channels?: readonly string[]) => seasonOrderGroups
+      .filter((group) => !channels || channels.includes(group.salesChannel))
+      .reduce((sum, group) => sum + group._count._all, 0);
+    const activeVvip = seasonOrderGroups
+      .filter((group) => group.tierId === "vvip-elite")
+      .reduce((sum, group) => sum + group._count._all, 0);
+    const configuredPublicCapacity = SEASON_TIERS
+      .filter((tier) => tier.id !== "vvip-elite")
+      .reduce((sum, tier) => {
+        const tierQuotas = seasonQuotas.filter((quota) => quota.tierId === tier.id);
+        if (tierQuotas.length === tier.allowedSeatZones.length) {
+          return sum + tierQuotas.reduce(
+            (tierSum, quota) => tierSum + Math.max(0, quota.totalSeats - quota.sponsorReserved),
+            0,
+          );
+        }
+        return sum + (getSeasonPublicSaleLimit(tier) ?? 0);
+      }, 0);
+    const seasonPassStats = {
+      total: configuredPublicCapacity + activeVvip + availableVvipBarcodes,
+      staffBooked: countOrders(["OFFLINE", "INTERNAL"]),
+      onlineBooked: countOrders(["ONLINE"]),
+      remaining: 0,
+    };
+    seasonPassStats.remaining = Math.max(
+      0,
+      seasonPassStats.total - seasonPassStats.staffBooked - seasonPassStats.onlineBooked,
+    );
     return (
       <div>
         <h1 className="text-xl font-bold">จัดการแมตช์</h1>
@@ -65,7 +106,11 @@ export default async function AdminMatchesPage(props: {
             title="จัดสรรที่นั่งบัตรรายปี"
             description="กำหนดโควตารวม ที่นั่งสปอนเซอร์ และจำนวนเปิดขายแยกตามแพ็กเกจและโซน"
             className="border-blue-200 bg-blue-50 hover:border-blue-400"
-            saleControl={{ type: "SEASON_PASS", isOpen: purchaseSettings.seasonPassBookingOpen }}
+            seasonPassControl={{
+              phase: purchaseSettings.seasonPassSalePhase,
+              stats: seasonPassStats,
+              canBookForCustomer: hasPermission(adminUser, "SEASON_PASSES"),
+            }}
           />
           <MatchManagementCard
             href="/admin/ticket-settings"
@@ -182,14 +227,20 @@ function MatchManagementCard({
   description,
   className,
   saleControl,
+  seasonPassControl,
 }: {
   href: string;
   title: string;
   description: string;
   className: string;
   saleControl?: {
-    type: "LEAGUE" | "SEASON_PASS";
+    type: "LEAGUE";
     isOpen: boolean;
+  };
+  seasonPassControl?: {
+    phase: "STAFF_ONLY" | "PUBLIC_OPEN" | "CLOSED";
+    stats: { total: number; staffBooked: number; onlineBooked: number; remaining: number };
+    canBookForCustomer: boolean;
   };
 }) {
   return (
@@ -203,6 +254,13 @@ function MatchManagementCard({
         <BookingSaleToggle
           saleType={saleControl.type}
           initialOpen={saleControl.isOpen}
+        />
+      )}
+      {seasonPassControl && (
+        <SeasonPassSalePhaseControl
+          initialPhase={seasonPassControl.phase}
+          stats={seasonPassControl.stats}
+          canBookForCustomer={seasonPassControl.canBookForCustomer}
         />
       )}
     </article>

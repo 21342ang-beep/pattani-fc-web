@@ -193,6 +193,17 @@ export async function createSeasonPassOrder(
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      // Serialize sale-state changes with order creation. Once CLOSED/STAFF_ONLY commits,
+      // no new public order can slip through using a stale pre-transaction check.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('season-pass-sale-phase'))::text AS lock_result`;
+      const currentSetting = await tx.ticketPurchaseSetting.findUnique({
+        where: { id: 1 },
+        select: { seasonPassSalePhase: true },
+      });
+      if (currentSetting?.seasonPassSalePhase !== "PUBLIC_OPEN") {
+        throw new Error("SALE_CLOSED");
+      }
+
       // Serialize orders in the same annual package/zone so concurrent payments cannot oversell.
       const quotaLockKey = `${SEASON_LABEL}:${parsed.data.tierId}:${parsed.data.seatZone}`;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))::text AS lock_result`;
@@ -316,6 +327,9 @@ export async function createSeasonPassOrder(
     revalidateSeatAvailability();
     return { ok: true, checkoutCode: result.purchaseCode, passCodes: result.passCodes };
   } catch (error) {
+    if (error instanceof Error && error.message === "SALE_CLOSED") {
+      return { ok: false, error: "ขณะนี้ยังไม่เปิดจองตั๋วรายปี" };
+    }
     if (error instanceof Error && error.message === "ZONE_SOLD_OUT") {
       return { ok: false, error: "บัตรรายปีโซนที่เลือกจำหน่ายหมดแล้ว กรุณาเลือกโซนอื่น" };
     }

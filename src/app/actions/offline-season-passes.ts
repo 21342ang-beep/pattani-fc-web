@@ -55,6 +55,13 @@ export async function registerOfflineVvipSeasonPass(
   const input = parsed.data;
   try {
     await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('season-pass-sale-phase'))::text AS lock_result`;
+      const currentSetting = await tx.ticketPurchaseSetting.findUnique({
+        where: { id: 1 },
+        select: { seasonPassSalePhase: true },
+      });
+      if (currentSetting?.seasonPassSalePhase === "CLOSED") throw new Error("SALE_CLOSED");
+
       const barcode = await tx.seasonPassBarcode.findFirst({
         where: {
           barcode: input.barcode,
@@ -109,6 +116,9 @@ export async function registerOfflineVvipSeasonPass(
       message: `ลงทะเบียนบัตร ${input.barcode} เรียบร้อยแล้ว`,
     };
   } catch (error) {
+    if (error instanceof Error && error.message === "SALE_CLOSED") {
+      return { ok: false, error: "ปิดการจองบัตรรายปีทั้งหมดอยู่ กรุณาเปลี่ยนเป็นรอบทีมงานหรือเปิดจองทั่วไปก่อน" };
+    }
     if (error instanceof Error && error.message === "BARCODE_NOT_FOUND") {
       return { ok: false, error: "ไม่พบบาร์โค้ด VVIP 4,000 นี้ในชุดบาร์โค้ดที่สร้างไว้" };
     }

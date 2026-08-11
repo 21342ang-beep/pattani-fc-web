@@ -1,0 +1,159 @@
+"use client";
+
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  registerStaffSeasonPass,
+  type StaffSeasonPassState,
+} from "@/app/actions/staff-season-passes";
+
+type TierOption = {
+  id: string;
+  badge: string;
+  priceBaht: number;
+  availableBarcodeCount: number;
+  zones: { seatZone: string; remaining: number | null }[];
+};
+
+const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"] as const;
+
+export default function StaffSeasonPassForm({
+  tiers,
+  vvipBarcodes,
+  disabled,
+}: {
+  tiers: TierOption[];
+  vvipBarcodes: string[];
+  disabled: boolean;
+}) {
+  const [state, formAction, pending] = useActionState<StaffSeasonPassState, FormData>(
+    registerStaffSeasonPass,
+    undefined,
+  );
+  const [tierId, setTierId] = useState(tiers[0]?.id ?? "");
+  const formRef = useRef<HTMLFormElement>(null);
+  const router = useRouter();
+  const selectedTier = useMemo(
+    () => tiers.find((tier) => tier.id === tierId) ?? tiers[0],
+    [tierId, tiers],
+  );
+  const isVvip = selectedTier?.id === "vvip-elite";
+
+  useEffect(() => {
+    if (state?.ok) {
+      formRef.current?.reset();
+      router.refresh();
+    }
+  }, [router, state]);
+
+  const errorFor = (field: string) => state && !state.ok ? state.fieldErrors?.[field]?.[0] : undefined;
+  const inputClass = "mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20 disabled:bg-slate-100";
+
+  return (
+    <form ref={formRef} action={formAction} className="space-y-5 rounded-2xl border border-green-100 bg-white p-5 shadow-sm md:p-6">
+      {state && (
+        <div className={`rounded-lg px-4 py-3 text-base font-medium ${state.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>
+          {state.ok ? state.message : state.error}
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="แพ็กเกจ" error={errorFor("tierId")}>
+          <select
+            name="tierId"
+            value={tierId}
+            disabled={disabled || pending}
+            onChange={(event) => setTierId(event.target.value)}
+            className={inputClass}
+          >
+            {tiers.map((tier) => (
+              <option key={tier.id} value={tier.id}>
+                {tier.badge} · {tier.priceBaht.toLocaleString("th-TH")} บาท
+              </option>
+            ))}
+          </select>
+          {selectedTier && (
+            <span className="mt-1 block text-sm text-slate-500">
+              บาร์โค้ดพร้อมใช้ {selectedTier.availableBarcodeCount.toLocaleString("th-TH")} ใบ
+            </span>
+          )}
+        </Field>
+
+        <Field label="โซน" error={errorFor("seatZone")}>
+          <select key={tierId} name="seatZone" required defaultValue="" disabled={disabled || pending} className={inputClass}>
+            <option value="" disabled>เลือกโซน</option>
+            {selectedTier?.zones.map((zone) => (
+              <option key={zone.seatZone} value={zone.seatZone} disabled={zone.remaining === 0}>
+                {zone.seatZone}{zone.remaining == null ? "" : ` · เหลือ ${zone.remaining.toLocaleString("th-TH")}`}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {isVvip && (
+          <>
+            <Field label="บาร์โค้ด VVIP" error={errorFor("barcode")}>
+              <input name="barcode" list="staff-vvip-barcodes" required autoComplete="off" className={`${inputClass} font-mono uppercase`} />
+              <datalist id="staff-vvip-barcodes">
+                {vvipBarcodes.map((barcode) => <option key={barcode} value={barcode} />)}
+              </datalist>
+            </Field>
+            <Field label="หมายเลขที่นั่ง VVIP" error={errorFor("seatNumber")}>
+              <input name="seatNumber" required maxLength={30} placeholder="เช่น A-01" className={inputClass} />
+            </Field>
+          </>
+        )}
+
+        <Field label="ชื่อ-สกุลลูกค้า" error={errorFor("customerName")}>
+          <input name="customerName" required minLength={2} maxLength={100} className={inputClass} />
+        </Field>
+        <Field label="เบอร์โทรศัพท์" error={errorFor("customerPhone")}>
+          <input name="customerPhone" type="tel" inputMode="tel" placeholder="08xxxxxxxx" required className={inputClass} />
+        </Field>
+        <Field label="อีเมล (ไม่บังคับ)" error={errorFor("customerEmail")}>
+          <input name="customerEmail" type="email" maxLength={254} className={inputClass} />
+        </Field>
+        <Field label="ไซส์เสื้อ" error={errorFor("shirtSize")}>
+          <select name="shirtSize" required defaultValue="" className={inputClass}>
+            <option value="" disabled>เลือกไซส์เสื้อ</option>
+            {SHIRT_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+          </select>
+        </Field>
+        <Field label="วิธีชำระเงิน" error={errorFor("paymentMethod")}>
+          <select name="paymentMethod" required defaultValue="" className={inputClass}>
+            <option value="" disabled>เลือกวิธีชำระเงิน</option>
+            <option value="OFFLINE_CASH">เงินสด</option>
+            <option value="OFFLINE_TRANSFER">โอนเงิน</option>
+          </select>
+        </Field>
+        <Field label="เลขที่ใบเสร็จ / เลขอ้างอิง (ไม่บังคับ)" error={errorFor("offlineReceiptNo")}>
+          <input name="offlineReceiptNo" maxLength={100} className={inputClass} />
+        </Field>
+        <Field label="หมายเหตุ (ไม่บังคับ)" error={errorFor("notes")}>
+          <textarea name="notes" rows={3} maxLength={500} className={inputClass} />
+        </Field>
+      </div>
+
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        รายการนี้จะยืนยันสิทธิ์ทันที ตัดโควตาเดียวกับหน้าออนไลน์ และบันทึกบัญชีทีมงานผู้ทำรายการ กรุณาตรวจข้อมูลก่อนบันทึก
+      </div>
+      <button
+        type="submit"
+        disabled={disabled || pending || tiers.length === 0}
+        className="rounded-lg bg-green-800 px-5 py-3 text-lg font-bold text-yellow-300 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {pending ? "กำลังบันทึก..." : disabled ? "ปิดการจองทั้งหมดอยู่" : "ยืนยันการจองโดยทีมงาน"}
+      </button>
+    </form>
+  );
+}
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <label className="block text-base font-semibold text-slate-800">
+      {label}
+      {children}
+      {error && <span className="mt-1 block text-sm font-normal text-red-600">{error}</span>}
+    </label>
+  );
+}
