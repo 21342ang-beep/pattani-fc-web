@@ -100,8 +100,8 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-base text-green-100/50 sm:text-lg lg:text-xl md:flex-row">
-          <p>
-            © {new Date().getFullYear()} Pattani FC. {dict.footer.rights}
+          <p className="text-center leading-relaxed md:text-left">
+            © {new Date().getFullYear()} {dict.footer.rights}
           </p>
           <div className="flex items-center gap-4">
             <p>{dict.footer.tagline}</p>
