@@ -143,7 +143,7 @@ export default async function StaffSeasonPassPage() {
               {recentOrders.map((order) => (
                 <tr key={order.id} className="border-b last:border-0">
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{order.soldAt ? formatDateTime(order.soldAt) : "—"}</td>
-                  <td className="px-3 py-2 font-mono text-sm">{order.passCode.startsWith("PENDING-VVIP-") ? "รอระบุบาร์โค้ด" : order.passCode}</td>
+                  <td className="px-3 py-2 font-mono text-sm">{order.passCode.startsWith("PENDING-") ? "รอระบบผูกบาร์โค้ด" : order.passCode}</td>
                   <td className="px-3 py-2">{SEASON_TIERS.find((tier) => tier.id === order.tierId)?.badge ?? order.tierId}</td>
                   <td className="px-3 py-2 font-medium">{order.customerName}</td>
                   <td className="px-3 py-2 font-mono">•••• {order.customerPhone.replace(/\D/g, "").slice(-4)}</td>

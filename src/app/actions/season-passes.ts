@@ -362,7 +362,7 @@ export async function updateSeasonPassStatus(
       if (!order) throw new Error("NOT_FOUND");
       if (
         status === "CONFIRMED" &&
-        order.tierId === "vvip-elite" &&
+        ["vvip-elite", "vip-advanced"].includes(order.tierId) &&
         order.salesChannel === "OFFLINE" &&
         (!order.seatZone || !order.barcode)
       ) {
@@ -430,7 +430,7 @@ export async function updateSeasonPassStatus(
       return { error: "โซนนี้เต็มตามโควตาบัตรรายปีแล้ว ไม่สามารถเปิดรายการนี้กลับมาได้" };
     }
     if (error instanceof Error && error.message === "DETAILS_REQUIRED") {
-      return { error: "กรุณาระบุโซนและบาร์โค้ดแพ็กเกจ 4,000 บาทก่อนยืนยันรายการ" };
+      return { error: "กรุณาระบุข้อมูลแพ็กเกจรอบทีมงานให้ครบก่อนยืนยันรายการ" };
     }
     return { error: "อัปเดตไม่สำเร็จ" };
   }
@@ -496,11 +496,12 @@ export async function updateSeasonPassOrder(
       if (!order) throw new Error("NOT_FOUND");
       if (input.deliveryMethod !== order.deliveryMethod) throw new Error("INVALID_DELIVERY");
       const tier = SEASON_TIERS.find((item) => item.id === order.tierId);
-      const canDeferVvipDetails = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
-      if (!tier || (!input.seatZone && !canDeferVvipDetails) || (input.seatZone && !tier.allowedSeatZones.includes(input.seatZone))) {
+      const isOfflineVvip = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
+      const canDeferStaffZone = ["vvip-elite", "vip-advanced"].includes(order.tierId) && order.salesChannel === "OFFLINE";
+      if (!tier || (!input.seatZone && !canDeferStaffZone) || (input.seatZone && !tier.allowedSeatZones.includes(input.seatZone))) {
         throw new Error("INVALID_ZONE");
       }
-      if (order.tierId === "vvip-elite" && !input.seatNumber) {
+      if (order.tierId === "vvip-elite" && !input.seatNumber && !isOfflineVvip) {
         throw new Error("SEAT_REQUIRED");
       }
 
@@ -531,10 +532,10 @@ export async function updateSeasonPassOrder(
       }
 
       let assignedBarcode = order.barcode;
-      if (canDeferVvipDetails && order.barcode && input.barcode && input.barcode !== order.barcode.barcode) {
+      if (isOfflineVvip && order.barcode && input.barcode && input.barcode !== order.barcode.barcode) {
         throw new Error("BARCODE_LOCKED");
       }
-      if (canDeferVvipDetails && !order.barcode && input.barcode) {
+      if (isOfflineVvip && !order.barcode && input.barcode) {
         const availableBarcode = await tx.seasonPassBarcode.findFirst({
           where: {
             barcode: input.barcode,
@@ -543,6 +544,56 @@ export async function updateSeasonPassOrder(
             isGenerated: true,
             orderId: null,
           },
+          select: { id: true, barcode: true },
+        });
+        if (!availableBarcode) throw new Error("BARCODE_UNAVAILABLE");
+        const claimed = await tx.seasonPassBarcode.updateMany({
+          where: { id: availableBarcode.id, orderId: null, isGenerated: true },
+          data: { orderId: order.id, assignedAt: new Date(), usesRemaining: SEASON_MATCHES },
+        });
+        if (claimed.count !== 1) throw new Error("BARCODE_UNAVAILABLE");
+        assignedBarcode = availableBarcode;
+      }
+      if (order.tierId === "vip-advanced" && order.salesChannel === "OFFLINE" && !order.barcode && input.seatZone) {
+        const barcodePrefix = `PFC26-${tier.priceBaht}-`;
+        const configuredQuotas = await tx.seasonPassZoneQuota.findMany({
+          where: {
+            seasonLabel: order.seasonLabel,
+            tierId: order.tierId,
+            seatZone: { in: [...tier.allowedSeatZones] },
+          },
+        });
+        const hasCompleteZoneAllocation = configuredQuotas.length === tier.allowedSeatZones.length;
+        const zoneRanges = hasCompleteZoneAllocation
+          ? calculateSeasonPassZoneRanges(tier.allowedSeatZones, configuredQuotas)
+          : [];
+        const selectedRange = zoneRanges.find((range) => range.seatZone === input.seatZone);
+        const legacyPublicSaleLimit = hasCompleteZoneAllocation ? null : getSeasonPublicSaleLimit(tier);
+        const barcodeLowerBound = selectedRange
+          ? `${barcodePrefix}${formatSeasonPassSequence(selectedRange.publicStartSequence)}`
+          : null;
+        const barcodeUpperBound = selectedRange
+          ? `${barcodePrefix}${formatSeasonPassSequence(selectedRange.publicEndSequence)}`
+          : legacyPublicSaleLimit == null
+            ? null
+            : `${barcodePrefix}${formatSeasonPassSequence(legacyPublicSaleLimit)}`;
+        const availableBarcode = await tx.seasonPassBarcode.findFirst({
+          where: {
+            tierId: order.tierId,
+            seasonLabel: order.seasonLabel,
+            isGenerated: true,
+            orderId: null,
+            ...(barcodeUpperBound
+              ? {
+                  barcode: {
+                    startsWith: barcodePrefix,
+                    ...(barcodeLowerBound ? { gte: barcodeLowerBound } : {}),
+                    lte: barcodeUpperBound,
+                  },
+                }
+              : { barcode: { startsWith: barcodePrefix } }),
+          },
+          orderBy: { barcode: "asc" },
           select: { id: true, barcode: true },
         });
         if (!availableBarcode) throw new Error("BARCODE_UNAVAILABLE");
@@ -574,8 +625,8 @@ export async function updateSeasonPassOrder(
           ...(order.salesChannel === "OFFLINE" ? { paymentMethod: input.paymentMethod } : {}),
           offlineReceiptNo: order.salesChannel === "OFFLINE" ? input.offlineReceiptNo || null : order.offlineReceiptNo,
           notes: input.notes || null,
-          ...(canDeferVvipDetails && assignedBarcode ? { passCode: assignedBarcode.barcode } : {}),
-          ...(canDeferVvipDetails && order.status === "PENDING" && detailsComplete ? { status: "CONFIRMED" } : {}),
+          ...(canDeferStaffZone && assignedBarcode ? { passCode: assignedBarcode.barcode } : {}),
+          ...(canDeferStaffZone && order.status === "PENDING" && detailsComplete ? { status: "CONFIRMED" } : {}),
         },
       });
     });

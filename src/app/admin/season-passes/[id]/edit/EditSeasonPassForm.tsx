@@ -53,8 +53,9 @@ export default function EditSeasonPassForm({
   }, [backHref, router, state]);
 
   const errorFor = (field: string) => state && !state.ok ? state.fieldErrors?.[field]?.[0] : undefined;
-  const canDeferVvipDetails = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
-  const displayPassCode = order.passCode.startsWith("PENDING-VVIP-") ? "รอระบุบาร์โค้ด" : order.passCode;
+  const isOfflineVvip = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
+  const canDeferStaffZone = ["vvip-elite", "vip-advanced"].includes(order.tierId) && order.salesChannel === "OFFLINE";
+  const displayPassCode = order.passCode.startsWith("PENDING-") ? "รอระบบผูกบาร์โค้ด" : order.passCode;
   return (
     <form action={formAction} className="space-y-5 rounded-2xl border border-green-100 bg-white p-5 shadow-sm md:p-6">
       <input type="hidden" name="orderId" value={order.id} />
@@ -64,13 +65,13 @@ export default function EditSeasonPassForm({
         <Field label="แพ็กเกจ">
           <input value={`${tierBadge} · ${displayPassCode}`} disabled className={`${inputClass} font-mono`} />
         </Field>
-        <Field label={canDeferVvipDetails ? "โซน (ไม่บังคับ)" : "โซน"} error={errorFor("seatZone")}>
-          <select name="seatZone" defaultValue={order.seatZone} required={!canDeferVvipDetails} className={inputClass}>
-            {canDeferVvipDetails && <option value="">ยังไม่ระบุ — แก้ไขภายหลังได้</option>}
+        <Field label={canDeferStaffZone ? "โซน (ไม่บังคับ)" : "โซน"} error={errorFor("seatZone")}>
+          <select name="seatZone" defaultValue={order.seatZone} required={!canDeferStaffZone} className={inputClass}>
+            {canDeferStaffZone && <option value="">ยังไม่ระบุ — แก้ไขภายหลังได้</option>}
             {zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
           </select>
         </Field>
-        {canDeferVvipDetails && (
+        {isOfflineVvip && (
           <Field label="บาร์โค้ด VVIP (ไม่บังคับ)" error={errorFor("barcode")}>
             <input
               name="barcode"
@@ -107,8 +108,8 @@ export default function EditSeasonPassForm({
         ) : (
           <input type="hidden" name="shirtSize" value="" />
         )}
-        <Field label={order.tierId === "vvip-elite" ? "หมายเลขที่นั่ง VVIP" : "หมายเลขที่นั่ง (ไม่บังคับ)"} error={errorFor("seatNumber")}>
-          <input name="seatNumber" defaultValue={order.seatNumber} required={order.tierId === "vvip-elite"} maxLength={30} className={`${inputClass} uppercase`} />
+        <Field label={order.tierId === "vvip-elite" && !isOfflineVvip ? "หมายเลขที่นั่ง VVIP" : "หมายเลขที่นั่ง (ไม่บังคับ)"} error={errorFor("seatNumber")}>
+          <input name="seatNumber" defaultValue={order.seatNumber} required={order.tierId === "vvip-elite" && !isOfflineVvip} maxLength={30} className={`${inputClass} uppercase`} />
         </Field>
         <Field label="วิธีรับบัตร" error={errorFor("deliveryMethod")}>
           <input type="hidden" name="deliveryMethod" value={order.deliveryMethod} />

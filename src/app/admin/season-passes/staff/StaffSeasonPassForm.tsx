@@ -37,6 +37,7 @@ export default function StaffSeasonPassForm({
     [tierId, tiers],
   );
   const isVvip = selectedTier?.id === "vvip-elite";
+  const canDeferZone = isVvip || selectedTier?.id === "vip-advanced";
   const includesShirt = seasonTierIncludesShirt(selectedTier?.id ?? "");
 
   useEffect(() => {
@@ -79,9 +80,9 @@ export default function StaffSeasonPassForm({
           )}
         </Field>
 
-        <Field label={isVvip ? "โซน (ไม่บังคับ)" : "โซน"} error={errorFor("seatZone")}>
-          <select key={tierId} name="seatZone" required={!isVvip} defaultValue="" disabled={disabled || pending} className={inputClass}>
-            <option value="" disabled={!isVvip}>{isVvip ? "ยังไม่ระบุ — แก้ไขภายหลังได้" : "เลือกโซน"}</option>
+        <Field label={canDeferZone ? "โซน (ไม่บังคับ)" : "โซน"} error={errorFor("seatZone")}>
+          <select key={tierId} name="seatZone" required={!canDeferZone} defaultValue="" disabled={disabled || pending} className={inputClass}>
+            <option value="" disabled={!canDeferZone}>{canDeferZone ? "ยังไม่ระบุ — แก้ไขภายหลังได้" : "เลือกโซน"}</option>
             {selectedTier?.zones.map((zone) => (
               <option key={zone.seatZone} value={zone.seatZone} disabled={zone.remaining === 0}>
                 {zone.seatZone}{zone.remaining == null ? "" : ` · เหลือ ${zone.remaining.toLocaleString("th-TH")}`}
@@ -98,8 +99,8 @@ export default function StaffSeasonPassForm({
                 {vvipBarcodes.map((barcode) => <option key={barcode} value={barcode} />)}
               </datalist>
             </Field>
-            <Field label="หมายเลขที่นั่ง VVIP" error={errorFor("seatNumber")}>
-              <input name="seatNumber" required maxLength={30} placeholder="เช่น A-01" className={inputClass} />
+            <Field label="หมายเลขที่นั่ง VVIP (ไม่บังคับ)" error={errorFor("seatNumber")}>
+              <input name="seatNumber" maxLength={30} placeholder="ยังไม่ระบุ — แก้ไขภายหลังได้" className={inputClass} />
             </Field>
           </>
         )}

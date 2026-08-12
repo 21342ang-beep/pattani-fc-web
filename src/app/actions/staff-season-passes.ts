@@ -38,7 +38,7 @@ const staffSeasonPassSchema = z
   })
   .superRefine((data, context) => {
     const tier = SEASON_TIERS.find((item) => item.id === data.tierId);
-    if (!data.seatZone && data.tierId !== "vvip-elite") {
+    if (!data.seatZone && !["vvip-elite", "vip-advanced"].includes(data.tierId)) {
       context.addIssue({ code: "custom", path: ["seatZone"], message: "กรุณาเลือกโซน" });
     } else if (data.seatZone && !tier?.allowedSeatZones.includes(data.seatZone)) {
       context.addIssue({
@@ -46,9 +46,6 @@ const staffSeasonPassSchema = z
         path: ["seatZone"],
         message: "โซนที่นั่งไม่ตรงกับแพ็กเกจที่เลือก",
       });
-    }
-    if (data.tierId === "vvip-elite" && !data.seatNumber) {
-      context.addIssue({ code: "custom", path: ["seatNumber"], message: "กรุณากรอกหมายเลขที่นั่ง VVIP" });
     }
   });
 
@@ -132,7 +129,7 @@ export async function registerStaffSeasonPass(
             ? null
             : `${barcodePrefix}${formatSeasonPassSequence(legacyPublicSaleLimit)}`;
 
-        if (hasCompleteZoneAllocation) {
+        if (hasCompleteZoneAllocation && input.seatZone) {
           const zoneLimit = selectedRange?.publicSeatCount ?? 0;
           const activeInZone = await tx.seasonPassOrder.count({
             where: {
@@ -146,7 +143,10 @@ export async function registerStaffSeasonPass(
         }
       }
 
-      const barcode = input.tierId === "vvip-elite" && !input.barcode
+      const deferBarcodeAssignment =
+        (input.tierId === "vvip-elite" && !input.barcode) ||
+        (input.tierId === "vip-advanced" && !input.seatZone);
+      const barcode = deferBarcodeAssignment
         ? null
         : await tx.seasonPassBarcode.findFirst({
             where: {
@@ -169,9 +169,10 @@ export async function registerStaffSeasonPass(
             orderBy: { barcode: "asc" },
             select: { id: true, barcode: true },
           });
-      if (!barcode && !(input.tierId === "vvip-elite" && !input.barcode)) throw new Error("SOLD_OUT");
+      if (!barcode && !deferBarcodeAssignment) throw new Error("SOLD_OUT");
 
-      const passCode = barcode?.barcode ?? `PENDING-VVIP-${randomUUID().slice(0, 8).toUpperCase()}`;
+      const pendingTier = input.tierId === "vvip-elite" ? "VVIP" : "VIP";
+      const passCode = barcode?.barcode ?? `PENDING-${pendingTier}-${randomUUID().slice(0, 8).toUpperCase()}`;
       const detailsComplete = Boolean(input.seatZone && barcode);
 
       const order = await tx.seasonPassOrder.create({
@@ -225,7 +226,9 @@ export async function registerStaffSeasonPass(
       ok: true,
       passCode: result.passCode,
       message: !result.detailsComplete
-        ? "บันทึกการจองแพ็กเกจ 4,000 บาทแล้ว กรุณาเพิ่มโซนและบาร์โค้ดภายหลัง"
+        ? input.tierId === "vvip-elite"
+          ? "บันทึกการจองแพ็กเกจ 4,000 บาทแล้ว กรุณาเพิ่มโซนและบาร์โค้ดภายหลัง"
+          : "บันทึกการจองแพ็กเกจ 2,500 บาทแล้ว กรุณาเพิ่มโซนภายหลัง"
         : `จองบัตร ${result.passCode} ให้ลูกค้าเรียบร้อยแล้ว`,
     };
   } catch (error) {
