@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createBeamPromptPayCharge } from "./beam";
+import { createBeamPromptPayCharge, listAllBeamTransactions } from "./beam";
 
 test("creates an idempotent Beam QR PromptPay charge", async () => {
   const originalFetch = globalThis.fetch;
@@ -43,6 +43,71 @@ test("creates an idempotent Beam QR PromptPay charge", async () => {
     assert.equal(body.amount, 15000);
     assert.equal(body.paymentMethod.paymentMethodType, "QR_PROMPT_PAY");
     assert.equal(body.referenceId, "booking_test_12345678");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalMerchantId === undefined) delete process.env.BEAM_MERCHANT_ID;
+    else process.env.BEAM_MERCHANT_ID = originalMerchantId;
+    if (originalApiKey === undefined) delete process.env.BEAM_API_KEY;
+    else process.env.BEAM_API_KEY = originalApiKey;
+  }
+});
+
+test("loads and normalizes every Beam transaction page", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalMerchantId = process.env.BEAM_MERCHANT_ID;
+  const originalApiKey = process.env.BEAM_API_KEY;
+  process.env.BEAM_MERCHANT_ID = "merchant-test";
+  process.env.BEAM_API_KEY = "api-key-test";
+  const offsets: number[] = [];
+
+  globalThis.fetch = async (url, init) => {
+    const requestUrl = new URL(String(url));
+    const offset = Number(requestUrl.searchParams.get("offset"));
+    offsets.push(offset);
+    const headers = init?.headers as Record<string, string>;
+    assert.equal(headers.Authorization, `Basic ${Buffer.from("merchant-test:api-key-test").toString("base64")}`);
+    return Response.json({
+      totalCount: 205,
+      data: [{
+        transactionId: `tx_${offset}`,
+        sourceId: `ch_${offset}`,
+        merchantId: "merchant-test",
+        referenceId: `booking_code${offset}abcd_12345678`,
+        chargeSource: "CHARGE",
+        transactionType: offset === 200 ? "REFUND" : "PAYMENT",
+        currency: "THB",
+        grossAmount: 15_000,
+        feeStrategy: "SUBTRACT_FROM_PAYOUT",
+        feeAmount: 300,
+        vatAmount: 21,
+        netAmount: 14_679,
+        transactionTime: "2030-01-01T00:00:00Z",
+        createdAt: "2030-01-01T00:00:01Z",
+      }],
+    });
+  };
+
+  try {
+    const result = await listAllBeamTransactions();
+    assert.deepEqual(offsets, [0, 100, 200]);
+    assert.equal(result.totalCount, 205);
+    assert.equal(result.truncated, false);
+    assert.equal(result.transactions.length, 3);
+    assert.deepEqual(result.transactions[0], {
+      transactionId: "tx_0",
+      sourceId: "ch_0",
+      referenceId: "booking_code0abcd_12345678",
+      chargeSource: "CHARGE",
+      transactionType: "PAYMENT",
+      currency: "THB",
+      grossAmount: 15_000,
+      feeStrategy: "SUBTRACT_FROM_PAYOUT",
+      feeAmount: 300,
+      vatAmount: 21,
+      netAmount: 14_679,
+      transactionTime: "2030-01-01T00:00:00Z",
+      createdAt: "2030-01-01T00:00:01Z",
+    });
   } finally {
     globalThis.fetch = originalFetch;
     if (originalMerchantId === undefined) delete process.env.BEAM_MERCHANT_ID;
