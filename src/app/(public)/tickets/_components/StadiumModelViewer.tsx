@@ -11,8 +11,6 @@ export type StadiumModelZone = {
   label: string;
   priceLabel: string;
   availabilityLabel: string;
-  markerTitle?: string;
-  markerSubtitle?: string;
   details?: string[];
   note?: string;
 };
@@ -34,27 +32,13 @@ type ModelViewerElement = HTMLElement & {
 
 const ZONE_MATERIAL_PATTERN = /^Zone_(.+)_(?:Deck|Seats)$/;
 
-const ZONE_HOTSPOT_POSITIONS: Record<string, string> = {
-  A: "-42m 15m -67m",
-  B: "40m 15m -67m",
-  C: "67m 15m -59m",
-  D: "94m 15m 0m",
-  E: "67m 15m 59m",
-  F: "0m 15m 67m",
-  G: "-67m 15m 59m",
-  I: "-94m 15m -10m",
-  J: "-68m 15m -59m",
-  AWAY: "-89m 15m 43m",
-  "VIP-A": "-20m 15m -67m",
-  "VIP-B": "19m 15m -67m",
-};
-
 export default function StadiumModelViewer({
   title,
   description,
   loadingLabel,
   errorLabel,
   interactionLabel,
+  labelModelSrc,
   poster,
   plainBackground = false,
   zones = [],
@@ -65,6 +49,7 @@ export default function StadiumModelViewer({
   loadingLabel: string;
   errorLabel: string;
   interactionLabel: string;
+  labelModelSrc: string;
   poster?: string;
   plainBackground?: boolean;
   zones?: StadiumModelZone[];
@@ -253,24 +238,7 @@ export default function StadiumModelViewer({
             "touch-action": "pan-y",
             className: "absolute inset-0 h-full w-full bg-transparent",
           },
-          zones.map((zone) => {
-            const position = ZONE_HOTSPOT_POSITIONS[zone.code];
-            if (!position || !zone.markerTitle) return null;
-            return createElement(
-              "div",
-              {
-                key: `marker-${zone.code}`,
-                slot: `hotspot-${zone.code.toLowerCase()}`,
-                "data-position": position,
-                "data-normal": "0m 1m 0m",
-                className: "pointer-events-none -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/80 bg-white/95 px-1.5 py-1 text-center leading-none text-green-950 shadow-lg backdrop-blur sm:rounded-xl sm:px-2.5 sm:py-1.5",
-              },
-              createElement("span", { className: "block text-[9px] font-black sm:text-xs" }, zone.markerTitle),
-              zone.markerSubtitle
-                ? createElement("span", { className: "mt-0.5 block text-[8px] font-extrabold text-green-700 sm:text-[11px]" }, zone.markerSubtitle)
-                : null,
-            );
-          }),
+          createElement("extra-model", { src: labelModelSrc }),
         )}
 
         {activeZone && loadState === "ready" && (

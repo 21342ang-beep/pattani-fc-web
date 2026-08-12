@@ -70,8 +70,6 @@ export default async function SeasonTicketsPage() {
       label: `${zoneWord} ${tier.badge} · ${seatLabel}`,
       priceLabel: `${tier.priceBaht.toLocaleString(intlLocale(locale))} ${seasonUnit}`,
       availabilityLabel: matchDetail,
-      markerTitle: `${tier.badge} · ${seatLabel}`,
-      markerSubtitle: `${tier.priceBaht.toLocaleString(intlLocale(locale))} ${locale === "th" ? "บาท" : "THB"}`,
       details: [
         locale === "th" ? `แพ็กเกจ ${tier.badge}` : locale === "ms" ? `Pakej ${tier.badge}` : `${tier.badge} package`,
         locale === "th" ? `ทางเข้า Gate ${gate}` : locale === "ms" ? `Pintu masuk Gate ${gate}` : `Entrance Gate ${gate}`,
@@ -103,6 +101,7 @@ export default async function SeasonTicketsPage() {
             loadingLabel={t("กำลังโหลดโมเดลสนาม", "Loading stadium model")}
             errorLabel={t("อุปกรณ์นี้ไม่สามารถแสดงโมเดล 3 มิติได้", "This device cannot display the 3D model.")}
             interactionLabel={t("ลากเพื่อหมุน · เลื่อนเพื่อซูม", "Drag to rotate · Scroll to zoom")}
+            labelModelSrc="/models/pattani-stadium-labels-season.glb?v=20260812-3"
             plainBackground
             zones={seasonModelZones}
             zoneHintLabel={t("ชี้หรือแตะโซนเพื่อดูราคาและรายละเอียดรายปี", "Hover or tap a zone to see season price and details")}
@@ -132,6 +131,17 @@ export default async function SeasonTicketsPage() {
             />
           ))}
         </div>
+
+        <figure className="mx-auto mb-10 mt-10 w-full max-w-5xl md:mb-12 md:mt-12">
+          <Image
+            src="/stadium-zones-season-2026-27.png"
+            alt={t("แผนผังโซนที่นั่งและราคาบัตรสมาชิกรายปี", "Season membership seating zones and prices")}
+            width={1553}
+            height={1058}
+            sizes="(min-width: 1280px) 1024px, (min-width: 768px) calc(100vw - 4rem), calc(100vw - 2rem)"
+            className="h-auto w-full object-contain"
+          />
+        </figure>
 
         <p className="mt-8 text-center text-lg leading-relaxed text-slate-500 md:text-xl lg:text-2xl">
           {t("* บัตรสมาชิกรายปีครอบคลุมเฉพาะแมตช์เหย้าในฤดูกาลปัจจุบัน — ไม่รวมเกมนัดพิเศษ/ทัวร์นาเมนต์นานาชาติ", "* Season passes cover current-season home matches only and exclude special matches and international tournaments.")}

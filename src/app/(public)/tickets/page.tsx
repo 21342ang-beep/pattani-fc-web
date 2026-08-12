@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { MapPin, Users } from "lucide-react";
 import PageHero from "../_components/PageHero";
@@ -130,8 +131,6 @@ export default async function TicketsPage() {
       label,
       priceLabel,
       availabilityLabel,
-      markerTitle: zone.code,
-      markerSubtitle: `${mapDetail.priceBaht.toLocaleString(intlLocale(locale))} ${locale === "th" ? "บาท" : "THB"}`,
       details: [gateLabel, colorLabel],
       note,
     };
@@ -142,16 +141,12 @@ export default async function TicketsPage() {
       label: t("VIP ฝั่ง A", "VIP · Side A"),
       priceLabel: t("สำหรับสมาชิกรายปี", "Season members"),
       availabilityLabel: t("พื้นที่สมาชิก VIP รายปี", "VIP season-member area"),
-      markerTitle: "VIP · A",
-      markerSubtitle: t("รายปี", "SEASON"),
     },
     {
       code: "VIP-B",
       label: t("VIP ฝั่ง B", "VIP · Side B"),
       priceLabel: t("สำหรับสมาชิกรายปี", "Season members"),
       availabilityLabel: t("พื้นที่สมาชิก VIP รายปี", "VIP season-member area"),
-      markerTitle: "VIP · B",
-      markerSubtitle: t("รายปี", "SEASON"),
     },
   );
   return (
@@ -207,6 +202,7 @@ export default async function TicketsPage() {
           loadingLabel={t("กำลังโหลดโมเดลสนาม", "Loading stadium model")}
           errorLabel={t("อุปกรณ์นี้ไม่สามารถแสดงโมเดล 3 มิติได้", "This device cannot display the 3D model.")}
           interactionLabel={t("ลากเพื่อหมุน · เลื่อนเพื่อซูม", "Drag to rotate · Scroll to zoom")}
+          labelModelSrc="/models/pattani-stadium-labels-match.glb?v=20260812-3"
           plainBackground
           zones={modelZones}
           zoneHintLabel={t("ชี้หรือแตะโซนเพื่อดูราคาและรายละเอียด", "Hover or tap a zone to see price and details")}
@@ -231,6 +227,17 @@ export default async function TicketsPage() {
             </li>
           ))}
         </ul>
+
+        <figure className="mx-auto mb-10 mt-10 w-full max-w-5xl md:mb-12 md:mt-12">
+          <Image
+            src="/stadium-zones-match-2026-27.png"
+            alt={t("แผนผังโซนที่นั่งและราคาบัตรรายแมตช์", "Match ticket seating zones and prices")}
+            width={1553}
+            height={1058}
+            sizes="(min-width: 1280px) 1024px, (min-width: 768px) calc(100vw - 4rem), calc(100vw - 2rem)"
+            className="h-auto w-full object-contain"
+          />
+        </figure>
 
         <p className="mt-6 text-center text-lg leading-relaxed text-slate-500 md:text-xl lg:text-2xl">
           {t("* ราคาข้างต้นเป็นราคามาตรฐาน อาจปรับตามแมตช์/คู่แข่ง — การเลือกที่นั่งจริงจะเปิดในขั้นตอนถัดไป", "* Standard prices may vary by match or opponent. Seat selection opens in the next step.")}
