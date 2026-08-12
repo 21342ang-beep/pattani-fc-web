@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { MapPin, Users } from "lucide-react";
 import PageHero from "../_components/PageHero";
 import OnSaleMatchBoard from "../_components/OnSaleMatchBoard";
 import SeasonPassAnnouncementModal from "../_components/SeasonPassAnnouncementModal";
+import StadiumModelViewer, { type StadiumModelZone } from "./_components/StadiumModelViewer";
 import { prisma } from "@/lib/prisma";
 import { aggregateZoneAvailability, getSeatAvailabilityForMatches } from "@/lib/seat-availability";
 import { getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
@@ -80,6 +80,29 @@ export default async function TicketsPage() {
       sharedCapacity: availabilityByZone[zone.code].sharedCapacity,
     };
   });
+  const modelZones: StadiumModelZone[] = displayZones.map((zone) => {
+    const label = locale === "th"
+      ? zone.label
+      : locale === "ms"
+        ? MALAY_ZONE_LABELS[zone.code]
+        : ENGLISH_ZONE_LABELS[zone.code];
+    const priceLabel = zone.minPriceBaht == null
+      ? t("ยังไม่กำหนดราคา", "Price not set")
+      : zone.minPriceBaht === zone.maxPriceBaht
+        ? `${zone.minPriceBaht.toLocaleString(intlLocale(locale))} ${t("บาท", "THB")}`
+        : `${zone.minPriceBaht.toLocaleString(intlLocale(locale))}–${zone.maxPriceBaht?.toLocaleString(intlLocale(locale))} ${t("บาท", "THB")}`;
+    const availabilityLabel = zone.capacity == null
+      ? t("ยังไม่เปิดขาย", "Not on sale yet")
+      : `${t("คงเหลือ", "Remaining")} ${zone.remaining.toLocaleString(intlLocale(locale))} ${t("ที่นั่ง", "seats")} · ${t("จาก", "of")} ${zone.capacity.toLocaleString(intlLocale(locale))}`;
+    const note = zone.note
+      ? locale === "th"
+        ? zone.note
+        : locale === "ms"
+          ? "Untuk penyokong pelawat sahaja"
+          : "Away fans only"
+      : undefined;
+    return { code: zone.code, label, priceLabel, availabilityLabel, note };
+  });
   return (
     <>
       <SeasonPassAnnouncementModal
@@ -127,22 +150,22 @@ export default async function TicketsPage() {
           </p>
         </div>
 
-        <div className="relative aspect-[1553/1058] w-full">
-          <Image
-            src="/stadium-zones-match-2026-27-v5.png?v=20260807-1"
-            alt={t("แผนผังโซนที่นั่งของ Rainbow Stadium — Pattani FC (ความจุ 10,700)", "Rainbow Stadium seating plan — Pattani FC (capacity 10,700)")}
-            fill
-            unoptimized
-            sizes="(min-width: 1024px) 1024px, 100vw"
-            className="object-contain"
-          />
-        </div>
+        <StadiumModelViewer
+          title={t("สนามปัตตานีแบบ 3 มิติ", "Pattani Stadium in 3D")}
+          description={t("สำรวจมุมมองรอบสนามก่อนเลือกโซนที่นั่ง", "Explore the stadium before choosing your seating zone")}
+          loadingLabel={t("กำลังโหลดโมเดลสนาม", "Loading stadium model")}
+          errorLabel={t("อุปกรณ์นี้ไม่สามารถแสดงโมเดล 3 มิติได้", "This device cannot display the 3D model.")}
+          interactionLabel={t("ลากเพื่อหมุน · เลื่อนเพื่อซูม", "Drag to rotate · Scroll to zoom")}
+          plainBackground
+          zones={modelZones}
+          zoneHintLabel={t("ชี้หรือแตะโซนเพื่อดูราคาและรายละเอียด", "Hover or tap a zone to see price and details")}
+        />
         <p className="mt-5 text-center text-xl leading-relaxed text-slate-500 md:text-2xl lg:text-3xl">
           {t("ดูมุมมองที่คุณต้องการก่อน แล้วเลือกโซนจากตารางด้านล่าง", "Review the stadium view, then choose a zone below")}
         </p>
 
         <p className="mb-10 mt-14 text-center text-xl font-medium leading-relaxed text-slate-500 md:text-2xl lg:text-3xl">
-          {t("สีของแต่ละโซนอ้างอิงจากแผนผังสนามด้านบน — กดที่โซนเพื่อเลือกแมตช์", "Zone colors match the stadium plan above — select a zone to choose a match")}
+          {t("สีของแต่ละโซนตรงกับสนาม 3 มิติด้านบน — กดที่โซนเพื่อเลือกแมตช์", "Zone colors match the 3D stadium above — select a zone to choose a match")}
         </p>
         <ul id="zones" className="grid scroll-mt-24 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
           {displayZones.map((z) => (
