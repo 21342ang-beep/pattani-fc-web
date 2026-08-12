@@ -42,6 +42,7 @@ export default async function StaffSeasonPassPage() {
         customerPhone: true,
         seatZone: true,
         seatNumber: true,
+        shirtSize: true,
         paymentMethod: true,
         soldAt: true,
         soldById: true,
@@ -125,7 +126,7 @@ export default async function StaffSeasonPassPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-2xl font-bold text-green-900">รายการที่ทีมงานจองล่าสุด</h2>
         <div className="mt-4 overflow-x-auto rounded-lg border">
-          <table className="w-full min-w-[1000px] text-base">
+          <table className="w-full min-w-[1100px] text-base">
             <thead className="border-b bg-slate-50 text-left">
               <tr>
                 <th className="px-3 py-2">เวลา</th>
@@ -134,6 +135,7 @@ export default async function StaffSeasonPassPage() {
                 <th className="px-3 py-2">ลูกค้า</th>
                 <th className="px-3 py-2">เบอร์ท้าย</th>
                 <th className="px-3 py-2">ที่นั่ง</th>
+                <th className="px-3 py-2">ไซส์เสื้อ</th>
                 <th className="px-3 py-2">ชำระเงิน</th>
                 <th className="px-3 py-2">จองโดย</th>
                 <th className="px-3 py-2 text-right">จัดการ</th>
@@ -148,6 +150,7 @@ export default async function StaffSeasonPassPage() {
                   <td className="px-3 py-2 font-medium">{order.customerName}</td>
                   <td className="px-3 py-2 font-mono">•••• {order.customerPhone.replace(/\D/g, "").slice(-4)}</td>
                   <td className="px-3 py-2">{order.seatZone || "รอระบุโซน"}{order.seatNumber ? ` · ${order.seatNumber}` : ""}</td>
+                  <td className="px-3 py-2 font-semibold">{order.shirtSize || "—"}</td>
                   <td className="px-3 py-2">{order.paymentMethod === "OFFLINE_CASH" ? "เงินสด" : "โอนเงิน"}</td>
                   <td className="px-3 py-2 font-medium text-green-800">{order.soldById ? sellerById.get(order.soldById) ?? "บัญชีเดิม" : "—"}</td>
                   <td className="px-3 py-2 text-right">
@@ -158,7 +161,7 @@ export default async function StaffSeasonPassPage() {
                 </tr>
               ))}
               {recentOrders.length === 0 && (
-                <tr><td colSpan={9} className="p-8 text-center text-slate-500">ยังไม่มีรายการจองโดยทีมงาน</td></tr>
+                <tr><td colSpan={10} className="p-8 text-center text-slate-500">ยังไม่มีรายการจองโดยทีมงาน</td></tr>
               )}
             </tbody>
           </table>
