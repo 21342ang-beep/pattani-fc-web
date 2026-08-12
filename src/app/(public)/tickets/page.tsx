@@ -55,6 +55,19 @@ const MALAY_ZONE_LABELS: Record<StadiumZoneCode, string> = {
   G: "Tempat Duduk Selatan · G", I: "Tempat Duduk Barat · I", J: "Tempat Duduk Barat · J", AWAY: "Penyokong Pelawat",
 };
 
+const MATCH_ZONE_MAP_DETAILS: Record<StadiumZoneCode, { gate: string; color: [string, string, string] }> = {
+  A: { gate: "A", color: ["ฟ้า", "Blue", "Biru"] },
+  B: { gate: "B", color: ["ฟ้า", "Blue", "Biru"] },
+  C: { gate: "C", color: ["เหลือง", "Yellow", "Kuning"] },
+  D: { gate: "D", color: ["ส้ม", "Orange", "Jingga"] },
+  E: { gate: "E", color: ["เหลือง", "Yellow", "Kuning"] },
+  F: { gate: "F1 / F2", color: ["ฟ้า", "Blue", "Biru"] },
+  G: { gate: "G", color: ["เหลือง", "Yellow", "Kuning"] },
+  I: { gate: "I", color: ["ส้ม", "Orange", "Jingga"] },
+  J: { gate: "J", color: ["เหลือง", "Yellow", "Kuning"] },
+  AWAY: { gate: "H", color: ["ม่วง", "Purple", "Ungu"] },
+};
+
 export default async function TicketsPage() {
   const [availableMatches, { locale }, purchaseSettings] = await Promise.all([prisma.match.findMany({
     where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
@@ -101,8 +114,46 @@ export default async function TicketsPage() {
           ? "Untuk penyokong pelawat sahaja"
           : "Away fans only"
       : undefined;
-    return { code: zone.code, label, priceLabel, availabilityLabel, note };
+    const mapDetail = MATCH_ZONE_MAP_DETAILS[zone.code];
+    const colorLabel = locale === "th"
+      ? `สีประจำโซน: ${mapDetail.color[0]}`
+      : locale === "ms"
+        ? `Warna zon: ${mapDetail.color[2]}`
+        : `Zone color: ${mapDetail.color[1]}`;
+    const gateLabel = locale === "th"
+      ? `ทางเข้า Gate ${mapDetail.gate}`
+      : locale === "ms"
+        ? `Pintu masuk Gate ${mapDetail.gate}`
+        : `Entrance Gate ${mapDetail.gate}`;
+    return {
+      code: zone.code,
+      label,
+      priceLabel,
+      availabilityLabel,
+      markerTitle: zone.code,
+      markerSubtitle: priceLabel,
+      details: [gateLabel, colorLabel],
+      note,
+    };
   });
+  modelZones.push(
+    {
+      code: "VIP-A",
+      label: t("VIP ฝั่ง A", "VIP · Side A"),
+      priceLabel: t("สำหรับสมาชิกรายปี", "Season members"),
+      availabilityLabel: t("พื้นที่สมาชิก VIP รายปี", "VIP season-member area"),
+      markerTitle: "VIP · A",
+      markerSubtitle: t("รายปี", "SEASON"),
+    },
+    {
+      code: "VIP-B",
+      label: t("VIP ฝั่ง B", "VIP · Side B"),
+      priceLabel: t("สำหรับสมาชิกรายปี", "Season members"),
+      availabilityLabel: t("พื้นที่สมาชิก VIP รายปี", "VIP season-member area"),
+      markerTitle: "VIP · B",
+      markerSubtitle: t("รายปี", "SEASON"),
+    },
+  );
   return (
     <>
       <SeasonPassAnnouncementModal

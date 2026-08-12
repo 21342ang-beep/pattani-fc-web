@@ -11,6 +11,9 @@ export type StadiumModelZone = {
   label: string;
   priceLabel: string;
   availabilityLabel: string;
+  markerTitle?: string;
+  markerSubtitle?: string;
+  details?: string[];
   note?: string;
 };
 
@@ -30,6 +33,21 @@ type ModelViewerElement = HTMLElement & {
 };
 
 const ZONE_MATERIAL_PATTERN = /^Zone_(.+)_(?:Deck|Seats)$/;
+
+const ZONE_HOTSPOT_POSITIONS: Record<string, string> = {
+  A: "-42m 15m -67m",
+  B: "40m 15m -67m",
+  C: "67m 15m -59m",
+  D: "94m 15m 0m",
+  E: "67m 15m 59m",
+  F: "0m 15m 67m",
+  G: "-67m 15m 59m",
+  I: "-94m 15m -10m",
+  J: "-68m 15m -59m",
+  AWAY: "-89m 15m 43m",
+  "VIP-A": "-20m 15m -67m",
+  "VIP-B": "19m 15m -67m",
+};
 
 export default function StadiumModelViewer({
   title,
@@ -204,35 +222,56 @@ export default function StadiumModelViewer({
       </div>
 
       <div className={`relative h-[320px] w-full sm:h-[430px] lg:h-[560px] ${plainBackground ? "bg-white" : "bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.16),_transparent_65%)]"}`}>
-        {createElement("model-viewer", {
-          ref: viewerRef,
-          src: "/models/pattani-stadium.glb?v=20260808-3",
-          poster,
-          alt: title,
-          "camera-controls": "",
-          "auto-rotate": "",
-          "auto-rotate-delay": "1200",
-          "rotation-per-second": "8deg",
-          // The GLB includes a 1,240 m ground plane around a ~232 m stadium.
-          // Explicit framing keeps the stadium large enough to explore.
-          "camera-target": "0m 5m 0m",
-          "camera-orbit": "35deg 65deg 350m",
-          // Keep the camera above the GLB ground plane (Y=0) so users cannot
-          // rotate underneath the stadium or pan the model through the floor.
-          "min-camera-orbit": plainBackground ? "auto 20deg 210m" : "auto auto 210m",
-          "max-camera-orbit": plainBackground ? "auto 85deg 800m" : "auto auto 800m",
-          "disable-pan": plainBackground ? "" : undefined,
-          "field-of-view": "40deg",
-          "shadow-intensity": "1",
-          "shadow-softness": "0.8",
-          "environment-image": "neutral",
-          "tone-mapping": "neutral",
-          "interaction-prompt": "auto",
-          loading: "eager",
-          reveal: "auto",
-          "touch-action": "pan-y",
-          className: "absolute inset-0 h-full w-full bg-transparent",
-        })}
+        {createElement(
+          "model-viewer",
+          {
+            ref: viewerRef,
+            src: "/models/pattani-stadium.glb?v=20260808-3",
+            poster,
+            alt: title,
+            "camera-controls": "",
+            "auto-rotate": "",
+            "auto-rotate-delay": "1200",
+            "rotation-per-second": "8deg",
+            // The GLB includes a 1,240 m ground plane around a ~232 m stadium.
+            // Explicit framing keeps the stadium large enough to explore.
+            "camera-target": "0m 5m 0m",
+            "camera-orbit": "35deg 65deg 350m",
+            // Keep the camera above the GLB ground plane (Y=0) so users cannot
+            // rotate underneath the stadium or pan the model through the floor.
+            "min-camera-orbit": plainBackground ? "auto 20deg 210m" : "auto auto 210m",
+            "max-camera-orbit": plainBackground ? "auto 85deg 800m" : "auto auto 800m",
+            "disable-pan": plainBackground ? "" : undefined,
+            "field-of-view": "40deg",
+            "shadow-intensity": "1",
+            "shadow-softness": "0.8",
+            "environment-image": "neutral",
+            "tone-mapping": "neutral",
+            "interaction-prompt": "auto",
+            loading: "eager",
+            reveal: "auto",
+            "touch-action": "pan-y",
+            className: "absolute inset-0 h-full w-full bg-transparent",
+          },
+          zones.map((zone) => {
+            const position = ZONE_HOTSPOT_POSITIONS[zone.code];
+            if (!position || !zone.markerTitle) return null;
+            return createElement(
+              "div",
+              {
+                key: `marker-${zone.code}`,
+                slot: `hotspot-${zone.code.toLowerCase()}`,
+                "data-position": position,
+                "data-normal": "0m 1m 0m",
+                className: "pointer-events-none -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/80 bg-white/95 px-1.5 py-1 text-center leading-none text-green-950 shadow-lg backdrop-blur sm:rounded-xl sm:px-2.5 sm:py-1.5",
+              },
+              createElement("span", { className: "block text-[9px] font-black sm:text-xs" }, zone.markerTitle),
+              zone.markerSubtitle
+                ? createElement("span", { className: "mt-0.5 block text-[8px] font-extrabold text-green-700 sm:text-[11px]" }, zone.markerSubtitle)
+                : null,
+            );
+          }),
+        )}
 
         {activeZone && loadState === "ready" && (
           <div
@@ -251,6 +290,16 @@ export default function StadiumModelViewer({
             <p className="mt-1 text-sm font-semibold text-slate-600 sm:text-base">
               {activeZone.availabilityLabel}
             </p>
+            {activeZone.details && activeZone.details.length > 0 && (
+              <ul className="mt-3 space-y-1.5 border-t border-green-100 pt-3 text-sm font-semibold text-slate-700 sm:text-base">
+                {activeZone.details.map((detail) => (
+                  <li key={detail} className="flex items-start gap-2">
+                    <span className="mt-[0.55em] size-1.5 shrink-0 rounded-full bg-yellow-500" />
+                    <span>{detail}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
             {activeZone.note && (
               <p className="mt-2 text-sm font-bold text-fuchsia-700 sm:text-base">{activeZone.note}</p>
             )}

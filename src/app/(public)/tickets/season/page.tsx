@@ -46,16 +46,16 @@ export default async function SeasonTicketsPage() {
   ]);
   const t = (th: string, en: string) => localize(locale, th, en);
   const seasonModelZones: StadiumModelZone[] = [
-    { code: "A", tierId: "premium" as const, seatLabel: "A" },
-    { code: "B", tierId: "premium" as const, seatLabel: "B" },
-    { code: "F", tierId: "premium" as const, seatLabel: "F" },
-    { code: "C", tierId: "gold" as const, seatLabel: "C" },
-    { code: "E", tierId: "gold" as const, seatLabel: "E" },
-    { code: "G", tierId: "gold" as const, seatLabel: "G" },
-    { code: "J", tierId: "gold" as const, seatLabel: "J" },
-    { code: "VIP-A", tierId: "vip-advanced" as const, seatLabel: "A" },
-    { code: "VIP-B", tierId: "vip-advanced" as const, seatLabel: "B" },
-  ].map(({ code, tierId, seatLabel }) => {
+    { code: "A", tierId: "premium" as const, seatLabel: "A", gate: "A" },
+    { code: "B", tierId: "premium" as const, seatLabel: "B", gate: "B" },
+    { code: "F", tierId: "premium" as const, seatLabel: "F", gate: "F1 / F2" },
+    { code: "C", tierId: "gold" as const, seatLabel: "C", gate: "C" },
+    { code: "E", tierId: "gold" as const, seatLabel: "E", gate: "E" },
+    { code: "G", tierId: "gold" as const, seatLabel: "G", gate: "G" },
+    { code: "J", tierId: "gold" as const, seatLabel: "J", gate: "J" },
+    { code: "VIP-A", tierId: "vip-advanced" as const, seatLabel: "A", gate: "A" },
+    { code: "VIP-B", tierId: "vip-advanced" as const, seatLabel: "B", gate: "B" },
+  ].map(({ code, tierId, seatLabel, gate }) => {
     const tier = SEASON_TIERS.find((candidate) => candidate.id === tierId)!;
     const translatedTier = locale === "ms" ? seasonTierMalay(tier.id) : seasonTierEnglish(tier.id);
     const zoneWord = locale === "th" ? "โซน" : locale === "ms" ? "Zon" : "Zone";
@@ -70,6 +70,12 @@ export default async function SeasonTicketsPage() {
       label: `${zoneWord} ${tier.badge} · ${seatLabel}`,
       priceLabel: `${tier.priceBaht.toLocaleString(intlLocale(locale))} ${seasonUnit}`,
       availabilityLabel: matchDetail,
+      markerTitle: `${tier.badge} · ${seatLabel}`,
+      markerSubtitle: `${tier.priceBaht.toLocaleString(intlLocale(locale))} ${locale === "th" ? "บาท" : "THB"}`,
+      details: [
+        locale === "th" ? `แพ็กเกจ ${tier.badge}` : locale === "ms" ? `Pakej ${tier.badge}` : `${tier.badge} package`,
+        locale === "th" ? `ทางเข้า Gate ${gate}` : locale === "ms" ? `Pintu masuk Gate ${gate}` : `Entrance Gate ${gate}`,
+      ],
       note: locale === "th" ? tier.tagline : translatedTier.tagline,
     };
   });
