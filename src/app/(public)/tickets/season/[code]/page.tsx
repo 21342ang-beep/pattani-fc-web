@@ -5,6 +5,7 @@ import { ArrowLeft, Barcode, CalendarDays, DoorOpen, MapPin } from "lucide-react
 import { prisma } from "@/lib/prisma";
 import { verifyCustomer } from "@/lib/customer-dal";
 import { formatDateTime } from "@/lib/format";
+import { getMemberTicketIds } from "@/lib/member-tickets";
 import { getSeasonTier } from "@/lib/season-pass-tiers";
 
 export const dynamic = "force-dynamic";
@@ -30,11 +31,12 @@ function getGateForSeatZone(seatZone: string) {
 export default async function SeasonPassTicketPage({ params }: { params: Promise<{ code: string }> }) {
   const [{ code }, customer] = await Promise.all([params, verifyCustomer()]);
   if (!code || !/^PFC26-[A-Z0-9-]+$/i.test(code)) notFound();
+  const ticketIds = await getMemberTicketIds(customer);
 
   const pass = await prisma.seasonPassOrder.findFirst({
     where: {
       passCode: code,
-      OR: [{ customerId: customer.id }, { customerEmail: { equals: customer.email, mode: "insensitive" } }],
+      id: { in: ticketIds.seasonPassOrderIds },
     },
     select: {
       passCode: true, customerName: true, seatZone: true, seasonLabel: true, tierId: true,

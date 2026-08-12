@@ -1,0 +1,132 @@
+"use client";
+
+import Link from "next/link";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { updateSeasonPassOrder, type EditSeasonPassState } from "@/app/actions/season-passes";
+
+type EditableOrder = {
+  id: string;
+  tierId: string;
+  passCode: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  seatZone: string;
+  seatNumber: string;
+  shirtSize: string;
+  deliveryMethod: "SHIPPING" | "PICKUP";
+  shipAddress: string;
+  shipCity: string;
+  shipProvince: string;
+  shipPostalCode: string;
+  shipNote: string;
+  pickupLocation: string;
+  paymentMethod: string;
+  offlineReceiptNo: string;
+  notes: string;
+  salesChannel: "ONLINE" | "OFFLINE" | "INTERNAL";
+};
+
+const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"];
+const inputClass = "mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20 disabled:bg-slate-100";
+
+export default function EditSeasonPassForm({
+  order,
+  tierBadge,
+  zones,
+  backHref,
+}: {
+  order: EditableOrder;
+  tierBadge: string;
+  zones: string[];
+  backHref: string;
+}) {
+  const [state, formAction, pending] = useActionState<EditSeasonPassState, FormData>(updateSeasonPassOrder, undefined);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state?.ok) router.push(backHref);
+  }, [backHref, router, state]);
+
+  const errorFor = (field: string) => state && !state.ok ? state.fieldErrors?.[field]?.[0] : undefined;
+  return (
+    <form action={formAction} className="space-y-5 rounded-2xl border border-green-100 bg-white p-5 shadow-sm md:p-6">
+      <input type="hidden" name="orderId" value={order.id} />
+      {state && !state.ok && <div className="rounded-lg bg-red-50 px-4 py-3 text-base font-medium text-red-700">{state.error}</div>}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="แพ็กเกจ">
+          <input value={`${tierBadge} · ${order.passCode}`} disabled className={`${inputClass} font-mono`} />
+        </Field>
+        <Field label="โซน" error={errorFor("seatZone")}>
+          <select name="seatZone" defaultValue={order.seatZone} required className={inputClass}>
+            {zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+          </select>
+        </Field>
+        <Field label="ชื่อ-สกุลลูกค้า" error={errorFor("customerName")}>
+          <input name="customerName" defaultValue={order.customerName} required minLength={2} maxLength={100} className={inputClass} />
+        </Field>
+        <Field label="เบอร์โทรศัพท์" error={errorFor("customerPhone")}>
+          <input name="customerPhone" type="tel" defaultValue={order.customerPhone} required className={inputClass} />
+        </Field>
+        <Field label="อีเมล (ไม่บังคับ)" error={errorFor("customerEmail")}>
+          <input name="customerEmail" type="email" defaultValue={order.customerEmail} maxLength={200} className={inputClass} />
+        </Field>
+        <Field label="ไซส์เสื้อ" error={errorFor("shirtSize")}>
+          <select name="shirtSize" defaultValue={order.shirtSize} required className={inputClass}>
+            <option value="" disabled>เลือกไซส์เสื้อ</option>
+            {SHIRT_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+          </select>
+        </Field>
+        <Field label={order.tierId === "vvip-elite" ? "หมายเลขที่นั่ง VVIP" : "หมายเลขที่นั่ง (ไม่บังคับ)"} error={errorFor("seatNumber")}>
+          <input name="seatNumber" defaultValue={order.seatNumber} required={order.tierId === "vvip-elite"} maxLength={30} className={`${inputClass} uppercase`} />
+        </Field>
+        <Field label="วิธีรับบัตร" error={errorFor("deliveryMethod")}>
+          <input type="hidden" name="deliveryMethod" value={order.deliveryMethod} />
+          <input value={order.deliveryMethod === "SHIPPING" ? "ส่งพัสดุ" : "รับด้วยตัวเอง"} disabled className={inputClass} />
+        </Field>
+
+        {order.deliveryMethod === "SHIPPING" ? (
+          <>
+            <Field label="ที่อยู่จัดส่ง" error={errorFor("shipAddress")}><textarea name="shipAddress" defaultValue={order.shipAddress} rows={3} required className={inputClass} /></Field>
+            <Field label="อำเภอ/เขต" error={errorFor("shipCity")}><input name="shipCity" defaultValue={order.shipCity} required className={inputClass} /></Field>
+            <Field label="จังหวัด" error={errorFor("shipProvince")}><input name="shipProvince" defaultValue={order.shipProvince} required className={inputClass} /></Field>
+            <Field label="รหัสไปรษณีย์" error={errorFor("shipPostalCode")}><input name="shipPostalCode" inputMode="numeric" defaultValue={order.shipPostalCode} required pattern="\d{5}" className={inputClass} /></Field>
+            <Field label="หมายเหตุจัดส่ง (ไม่บังคับ)" error={errorFor("shipNote")}><input name="shipNote" defaultValue={order.shipNote} maxLength={300} className={inputClass} /></Field>
+          </>
+        ) : (
+          <Field label="จุดรับบัตร" error={errorFor("pickupLocation")}>
+            <input name="pickupLocation" defaultValue={order.pickupLocation} required maxLength={200} className={inputClass} />
+          </Field>
+        )}
+
+        {order.salesChannel === "OFFLINE" ? (
+          <>
+            <Field label="วิธีชำระเงิน">
+              <select name="paymentMethod" defaultValue={order.paymentMethod} className={inputClass}>
+                <option value="OFFLINE_CASH">เงินสด</option>
+                <option value="OFFLINE_TRANSFER">โอนเงิน</option>
+              </select>
+            </Field>
+            <Field label="เลขที่ใบเสร็จ / เลขอ้างอิง (ไม่บังคับ)"><input name="offlineReceiptNo" defaultValue={order.offlineReceiptNo} maxLength={100} className={inputClass} /></Field>
+          </>
+        ) : (
+          <input type="hidden" name="paymentMethod" value={order.paymentMethod} />
+        )}
+        <Field label="หมายเหตุ (ไม่บังคับ)" error={errorFor("notes")}><textarea name="notes" defaultValue={order.notes} rows={3} maxLength={500} className={inputClass} /></Field>
+      </div>
+
+      <div className="flex flex-wrap justify-end gap-3 border-t pt-5">
+        <Link href={backHref} className="rounded-lg border border-slate-300 px-5 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-50">ยกเลิก</Link>
+        <button type="submit" disabled={pending} className="rounded-lg bg-green-800 px-5 py-2.5 text-base font-bold text-yellow-300 hover:bg-green-900 disabled:opacity-50">
+          {pending ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return <label className="block text-base font-semibold text-slate-800">{label}{children}{error && <span className="mt-1 block text-sm font-normal text-red-600">{error}</span>}</label>;
+}

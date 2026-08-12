@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { getAllProvinces } from "geothai";
-import type { SeasonPassOrderStatus } from "@prisma/client";
+import { Prisma, type SeasonPassOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readCustomerSession } from "@/lib/customer-session";
 import { verifyPermission } from "@/lib/dal";
@@ -423,6 +423,133 @@ export async function updateSeasonPassStatus(
       return { error: "โซนนี้เต็มตามโควตาบัตรรายปีแล้ว ไม่สามารถเปิดรายการนี้กลับมาได้" };
     }
     return { error: "อัปเดตไม่สำเร็จ" };
+  }
+}
+
+const editSeasonPassSchema = z
+  .object({
+    orderId: z.string().regex(/^[a-z0-9]+$/i),
+    customerName: z.string().trim().min(2, "กรุณากรอกชื่อ").max(100),
+    customerPhone: z.string().trim().regex(/^[0-9+\-\s()]{9,15}$/, "เบอร์โทรไม่ถูกต้อง"),
+    customerEmail: z.string().trim().toLowerCase().email("รูปแบบอีเมลไม่ถูกต้อง").max(200).optional().or(z.literal("")),
+    seatZone: z.enum(SEASON_PASS_SEAT_ZONES),
+    seatNumber: z.string().trim().toUpperCase().max(30).optional().or(z.literal("")),
+    shirtSize: z.enum(["S", "M", "L", "XL", "2XL", "3XL"] as const),
+    deliveryMethod: z.enum(["SHIPPING", "PICKUP"] as const),
+    shipAddress: z.string().trim().max(300).optional().or(z.literal("")),
+    shipCity: z.string().trim().max(100).optional().or(z.literal("")),
+    shipProvince: z.string().trim().max(100).optional().or(z.literal("")),
+    shipPostalCode: z.string().trim().regex(/^\d{5}$/, "รหัสไปรษณีย์ต้องเป็นเลข 5 หลัก").optional().or(z.literal("")),
+    shipNote: z.string().trim().max(300).optional().or(z.literal("")),
+    pickupLocation: z.string().trim().max(200).optional().or(z.literal("")),
+    paymentMethod: z.string().trim().max(50),
+    offlineReceiptNo: z.string().trim().max(100).optional().or(z.literal("")),
+    notes: z.string().trim().max(500).optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    if (data.deliveryMethod === "SHIPPING") {
+      for (const field of ["shipAddress", "shipCity", "shipProvince", "shipPostalCode"] as const) {
+        if (!data[field]) ctx.addIssue({ code: "custom", path: [field], message: "กรุณากรอกข้อมูลให้ครบ" });
+      }
+    } else if (!data.pickupLocation) {
+      ctx.addIssue({ code: "custom", path: ["pickupLocation"], message: "กรุณาระบุจุดรับบัตร" });
+    }
+  });
+
+export type EditSeasonPassState =
+  | undefined
+  | { ok: true }
+  | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+
+export async function updateSeasonPassOrder(
+  _previousState: EditSeasonPassState,
+  formData: FormData,
+): Promise<EditSeasonPassState> {
+  await verifyPermission("SEASON_PASSES");
+  const parsed = editSeasonPassSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "กรุณาตรวจสอบข้อมูลที่กรอก",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  const input = parsed.data;
+  try {
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.seasonPassOrder.findUnique({ where: { id: input.orderId } });
+      if (!order) throw new Error("NOT_FOUND");
+      if (input.deliveryMethod !== order.deliveryMethod) throw new Error("INVALID_DELIVERY");
+      const tier = SEASON_TIERS.find((item) => item.id === order.tierId);
+      if (!tier || !tier.allowedSeatZones.includes(input.seatZone)) {
+        throw new Error("INVALID_ZONE");
+      }
+      if (order.tierId === "vvip-elite" && !input.seatNumber) {
+        throw new Error("SEAT_REQUIRED");
+      }
+
+      if (order.seatZone !== input.seatZone && ["PENDING", "CONFIRMED"].includes(order.status)) {
+        const quotaLockKey = `${order.seasonLabel}:${order.tierId}:${input.seatZone}`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))::text AS lock_result`;
+        const quotas = await tx.seasonPassZoneQuota.findMany({
+          where: {
+            seasonLabel: order.seasonLabel,
+            tierId: order.tierId,
+            seatZone: { in: [...tier.allowedSeatZones] },
+          },
+        });
+        if (quotas.length === tier.allowedSeatZones.length) {
+          const quota = quotas.find((item) => item.seatZone === input.seatZone);
+          const limit = quota ? Math.max(0, quota.totalSeats - quota.sponsorReserved) : 0;
+          const active = await tx.seasonPassOrder.count({
+            where: {
+              id: { not: order.id },
+              seasonLabel: order.seasonLabel,
+              tierId: order.tierId,
+              seatZone: input.seatZone,
+              status: { in: ["PENDING", "CONFIRMED"] },
+            },
+          });
+          if (active >= limit) throw new Error("ZONE_SOLD_OUT");
+        }
+      }
+
+      await tx.seasonPassOrder.update({
+        where: { id: order.id },
+        data: {
+          customerName: input.customerName,
+          customerPhone: input.customerPhone,
+          customerEmail: input.customerEmail || null,
+          seatZone: input.seatZone,
+          seatNumber: input.seatNumber || null,
+          shirtSize: input.shirtSize,
+          deliveryMethod: input.deliveryMethod,
+          shipAddress: input.deliveryMethod === "SHIPPING" ? input.shipAddress || null : null,
+          shipCity: input.deliveryMethod === "SHIPPING" ? input.shipCity || null : null,
+          shipProvince: input.deliveryMethod === "SHIPPING" ? input.shipProvince || null : null,
+          shipPostalCode: input.deliveryMethod === "SHIPPING" ? input.shipPostalCode || null : null,
+          shipNote: input.deliveryMethod === "SHIPPING" ? input.shipNote || null : null,
+          pickupLocation: input.deliveryMethod === "PICKUP" ? input.pickupLocation || null : null,
+          ...(order.salesChannel === "OFFLINE" ? { paymentMethod: input.paymentMethod } : {}),
+          offlineReceiptNo: order.salesChannel === "OFFLINE" ? input.offlineReceiptNo || null : order.offlineReceiptNo,
+          notes: input.notes || null,
+        },
+      });
+    });
+    revalidatePath("/admin/season-passes");
+    revalidatePath("/admin/season-passes/check");
+    revalidateSeatAvailability();
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_ZONE") return { ok: false, error: "โซนไม่ตรงกับแพ็กเกจนี้" };
+    if (error instanceof Error && error.message === "INVALID_DELIVERY") return { ok: false, error: "ไม่สามารถเปลี่ยนวิธีรับบัตรหลังสร้างรายการได้" };
+    if (error instanceof Error && error.message === "SEAT_REQUIRED") return { ok: false, error: "แพ็กเกจ VVIP ต้องระบุหมายเลขที่นั่ง" };
+    if (error instanceof Error && error.message === "ZONE_SOLD_OUT") return { ok: false, error: "โซนที่เลือกเต็มตามโควตาแล้ว" };
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { ok: false, error: "หมายเลขที่นั่งนี้ถูกใช้งานแล้ว" };
+    }
+    return { ok: false, error: "บันทึกการแก้ไขไม่สำเร็จ" };
   }
 }
 

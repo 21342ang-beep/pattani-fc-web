@@ -309,10 +309,18 @@ export default async function AdminSeasonPassesPage(props: {
                       {formatDateTime(o.createdAt)}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <DeleteSeasonPassButton
-                        orderId={o.id}
-                        passCode={o.passCode}
-                      />
+                      <div className="flex items-center justify-end gap-3">
+                        <Link
+                          href={`/admin/season-passes/${o.id}/edit?tier=${selectedTier}`}
+                          className="text-xs font-semibold text-green-700 hover:text-green-900 md:text-sm"
+                        >
+                          แก้ไข
+                        </Link>
+                        <DeleteSeasonPassButton
+                          orderId={o.id}
+                          passCode={o.passCode}
+                        />
+                      </div>
                     </td>
                   </tr>
                 );
