@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
@@ -24,7 +25,7 @@ import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 const staffSeasonPassSchema = z
   .object({
     tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"] as const),
-    seatZone: z.enum(SEASON_PASS_SEAT_ZONES),
+    seatZone: z.union([z.enum(SEASON_PASS_SEAT_ZONES), z.literal("")]),
     barcode: z.string().trim().toUpperCase().max(50),
     seatNumber: z.string().trim().toUpperCase().max(30),
     customerName: z.string().trim().min(2).max(100),
@@ -37,15 +38,14 @@ const staffSeasonPassSchema = z
   })
   .superRefine((data, context) => {
     const tier = SEASON_TIERS.find((item) => item.id === data.tierId);
-    if (!tier?.allowedSeatZones.includes(data.seatZone)) {
+    if (!data.seatZone && data.tierId !== "vvip-elite") {
+      context.addIssue({ code: "custom", path: ["seatZone"], message: "กรุณาเลือกโซน" });
+    } else if (data.seatZone && !tier?.allowedSeatZones.includes(data.seatZone)) {
       context.addIssue({
         code: "custom",
         path: ["seatZone"],
         message: "โซนที่นั่งไม่ตรงกับแพ็กเกจที่เลือก",
       });
-    }
-    if (data.tierId === "vvip-elite" && !data.barcode) {
-      context.addIssue({ code: "custom", path: ["barcode"], message: "กรุณาเลือกบาร์โค้ด VVIP" });
     }
     if (data.tierId === "vvip-elite" && !data.seatNumber) {
       context.addIssue({ code: "custom", path: ["seatNumber"], message: "กรุณากรอกหมายเลขที่นั่ง VVIP" });
@@ -94,7 +94,7 @@ export async function registerStaffSeasonPass(
   const barcodePrefix = `PFC26-${tier.priceBaht}-`;
 
   try {
-    const passCode = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('season-pass-sale-phase'))::text AS lock_result`;
       const currentSetting = await tx.ticketPurchaseSetting.findUnique({
         where: { id: 1 },
@@ -146,32 +146,37 @@ export async function registerStaffSeasonPass(
         }
       }
 
-      const barcode = await tx.seasonPassBarcode.findFirst({
-        where: {
-          tierId: input.tierId,
-          seasonLabel: SEASON_LABEL,
-          orderId: null,
-          isGenerated: true,
-          ...(input.tierId === "vvip-elite"
-            ? { barcode: input.barcode }
-            : barcodeUpperBound
-              ? {
-                  barcode: {
-                    startsWith: barcodePrefix,
-                    ...(barcodeLowerBound ? { gte: barcodeLowerBound } : {}),
-                    lte: barcodeUpperBound,
-                  },
-                }
-              : { barcode: { startsWith: barcodePrefix } }),
-        },
-        orderBy: { barcode: "asc" },
-        select: { id: true, barcode: true },
-      });
-      if (!barcode) throw new Error("SOLD_OUT");
+      const barcode = input.tierId === "vvip-elite" && !input.barcode
+        ? null
+        : await tx.seasonPassBarcode.findFirst({
+            where: {
+              tierId: input.tierId,
+              seasonLabel: SEASON_LABEL,
+              orderId: null,
+              isGenerated: true,
+              ...(input.tierId === "vvip-elite"
+                ? { barcode: input.barcode }
+                : barcodeUpperBound
+                  ? {
+                      barcode: {
+                        startsWith: barcodePrefix,
+                        ...(barcodeLowerBound ? { gte: barcodeLowerBound } : {}),
+                        lte: barcodeUpperBound,
+                      },
+                    }
+                  : { barcode: { startsWith: barcodePrefix } }),
+            },
+            orderBy: { barcode: "asc" },
+            select: { id: true, barcode: true },
+          });
+      if (!barcode && !(input.tierId === "vvip-elite" && !input.barcode)) throw new Error("SOLD_OUT");
+
+      const passCode = barcode?.barcode ?? `PENDING-VVIP-${randomUUID().slice(0, 8).toUpperCase()}`;
+      const detailsComplete = Boolean(input.seatZone && barcode);
 
       const order = await tx.seasonPassOrder.create({
         data: {
-          passCode: barcode.barcode,
+          passCode,
           tierId: input.tierId,
           seatZone: input.seatZone,
           seatNumber: input.seatNumber || null,
@@ -185,7 +190,7 @@ export async function registerStaffSeasonPass(
           pickupLocation: "สโมสร",
           shirtSize: seasonTierIncludesShirt(input.tierId) ? input.shirtSize || null : null,
           paymentMethod: input.paymentMethod,
-          status: "CONFIRMED",
+          status: detailsComplete ? "CONFIRMED" : "PENDING",
           salesChannel: "OFFLINE",
           offlineReceiptNo: input.offlineReceiptNo || null,
           soldAt: new Date(),
@@ -195,16 +200,18 @@ export async function registerStaffSeasonPass(
         select: { id: true },
       });
 
-      const claimed = await tx.seasonPassBarcode.updateMany({
-        where: { id: barcode.id, orderId: null, isGenerated: true },
-        data: {
-          orderId: order.id,
-          assignedAt: new Date(),
-          usesRemaining: SEASON_MATCHES,
-        },
-      });
-      if (claimed.count !== 1) throw new Error("SOLD_OUT");
-      return barcode.barcode;
+      if (barcode) {
+        const claimed = await tx.seasonPassBarcode.updateMany({
+          where: { id: barcode.id, orderId: null, isGenerated: true },
+          data: {
+            orderId: order.id,
+            assignedAt: new Date(),
+            usesRemaining: SEASON_MATCHES,
+          },
+        });
+        if (claimed.count !== 1) throw new Error("SOLD_OUT");
+      }
+      return { passCode, detailsComplete };
     });
 
     revalidatePath("/admin/matches");
@@ -214,7 +221,13 @@ export async function registerStaffSeasonPass(
     revalidatePath("/admin/season-passes/staff");
     revalidatePath("/tickets/season");
     revalidateTag("bookings", { expire: 0 });
-    return { ok: true, passCode, message: `จองบัตร ${passCode} ให้ลูกค้าเรียบร้อยแล้ว` };
+    return {
+      ok: true,
+      passCode: result.passCode,
+      message: !result.detailsComplete
+        ? "บันทึกการจองแพ็กเกจ 4,000 บาทแล้ว กรุณาเพิ่มโซนและบาร์โค้ดภายหลัง"
+        : `จองบัตร ${result.passCode} ให้ลูกค้าเรียบร้อยแล้ว`,
+    };
   } catch (error) {
     if (error instanceof Error && error.message === "SALE_CLOSED") {
       return { ok: false, error: "ปิดการจองบัตรรายปีทั้งหมดอยู่ กรุณาเปลี่ยนเป็นรอบทีมงานหรือเปิดจองทั่วไปก่อน" };

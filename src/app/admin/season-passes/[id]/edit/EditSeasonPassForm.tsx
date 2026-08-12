@@ -10,6 +10,7 @@ type EditableOrder = {
   id: string;
   tierId: string;
   passCode: string;
+  barcode: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -35,11 +36,13 @@ export default function EditSeasonPassForm({
   order,
   tierBadge,
   zones,
+  vvipBarcodes,
   backHref,
 }: {
   order: EditableOrder;
   tierBadge: string;
   zones: string[];
+  vvipBarcodes: string[];
   backHref: string;
 }) {
   const [state, formAction, pending] = useActionState<EditSeasonPassState, FormData>(updateSeasonPassOrder, undefined);
@@ -50,6 +53,8 @@ export default function EditSeasonPassForm({
   }, [backHref, router, state]);
 
   const errorFor = (field: string) => state && !state.ok ? state.fieldErrors?.[field]?.[0] : undefined;
+  const canDeferVvipDetails = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
+  const displayPassCode = order.passCode.startsWith("PENDING-VVIP-") ? "รอระบุบาร์โค้ด" : order.passCode;
   return (
     <form action={formAction} className="space-y-5 rounded-2xl border border-green-100 bg-white p-5 shadow-sm md:p-6">
       <input type="hidden" name="orderId" value={order.id} />
@@ -57,13 +62,32 @@ export default function EditSeasonPassForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="แพ็กเกจ">
-          <input value={`${tierBadge} · ${order.passCode}`} disabled className={`${inputClass} font-mono`} />
+          <input value={`${tierBadge} · ${displayPassCode}`} disabled className={`${inputClass} font-mono`} />
         </Field>
-        <Field label="โซน" error={errorFor("seatZone")}>
-          <select name="seatZone" defaultValue={order.seatZone} required className={inputClass}>
+        <Field label={canDeferVvipDetails ? "โซน (ไม่บังคับ)" : "โซน"} error={errorFor("seatZone")}>
+          <select name="seatZone" defaultValue={order.seatZone} required={!canDeferVvipDetails} className={inputClass}>
+            {canDeferVvipDetails && <option value="">ยังไม่ระบุ — แก้ไขภายหลังได้</option>}
             {zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
           </select>
         </Field>
+        {canDeferVvipDetails && (
+          <Field label="บาร์โค้ด VVIP (ไม่บังคับ)" error={errorFor("barcode")}>
+            <input
+              name="barcode"
+              list={order.barcode ? undefined : "edit-vvip-barcodes"}
+              defaultValue={order.barcode}
+              readOnly={Boolean(order.barcode)}
+              autoComplete="off"
+              placeholder="ยังไม่ระบุ — แก้ไขภายหลังได้"
+              className={`${inputClass} font-mono uppercase`}
+            />
+            {!order.barcode && (
+              <datalist id="edit-vvip-barcodes">
+                {vvipBarcodes.map((barcode) => <option key={barcode} value={barcode} />)}
+              </datalist>
+            )}
+          </Field>
+        )}
         <Field label="ชื่อ-สกุลลูกค้า" error={errorFor("customerName")}>
           <input name="customerName" defaultValue={order.customerName} required minLength={2} maxLength={100} className={inputClass} />
         </Field>

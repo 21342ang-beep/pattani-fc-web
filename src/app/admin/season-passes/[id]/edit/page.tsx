@@ -13,15 +13,28 @@ export default async function EditSeasonPassPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tier?: string }>;
+  searchParams: Promise<{ tier?: string; from?: string }>;
 }) {
   await verifyPermission("SEASON_PASSES");
-  const [{ id }, { tier: returnTier }] = await Promise.all([params, searchParams]);
-  const order = await prisma.seasonPassOrder.findUnique({ where: { id } });
+  const [{ id }, { tier: returnTier, from }] = await Promise.all([params, searchParams]);
+  const order = await prisma.seasonPassOrder.findUnique({
+    where: { id },
+    include: { barcode: { select: { barcode: true } } },
+  });
   if (!order) notFound();
   const tier = SEASON_TIERS.find((item) => item.id === order.tierId);
   if (!tier) notFound();
-  const backHref = `/admin/season-passes?tier=${returnTier || order.tierId}`;
+  const backHref = from === "staff"
+    ? "/admin/season-passes/staff"
+    : `/admin/season-passes?tier=${returnTier || order.tierId}`;
+  const vvipBarcodes = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE" && !order.barcode
+    ? await prisma.seasonPassBarcode.findMany({
+        where: { tierId: order.tierId, seasonLabel: order.seasonLabel, isGenerated: true, orderId: null },
+        orderBy: { barcode: "asc" },
+        take: 500,
+        select: { barcode: true },
+      })
+    : [];
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -39,6 +52,7 @@ export default async function EditSeasonPassPage({
           id: order.id,
           tierId: order.tierId,
           passCode: order.passCode,
+          barcode: order.barcode?.barcode ?? "",
           customerName: order.customerName,
           customerPhone: order.customerPhone,
           customerEmail: order.customerEmail ?? "",
@@ -59,6 +73,7 @@ export default async function EditSeasonPassPage({
         }}
         tierBadge={tier.badge}
         zones={[...tier.allowedSeatZones]}
+        vvipBarcodes={vvipBarcodes.map((item) => item.barcode)}
         backHref={backHref}
       />
     </div>

@@ -355,8 +355,19 @@ export async function updateSeasonPassStatus(
   }
   try {
     await prisma.$transaction(async (tx) => {
-      const order = await tx.seasonPassOrder.findUnique({ where: { id: orderId } });
+      const order = await tx.seasonPassOrder.findUnique({
+        where: { id: orderId },
+        include: { barcode: { select: { id: true } } },
+      });
       if (!order) throw new Error("NOT_FOUND");
+      if (
+        status === "CONFIRMED" &&
+        order.tierId === "vvip-elite" &&
+        order.salesChannel === "OFFLINE" &&
+        (!order.seatZone || !order.barcode)
+      ) {
+        throw new Error("DETAILS_REQUIRED");
+      }
 
       const groupedOrders = order.purchaseId
         ? await tx.seasonPassOrder.findMany({
@@ -418,6 +429,9 @@ export async function updateSeasonPassStatus(
     if (error instanceof Error && error.message === "ZONE_SOLD_OUT") {
       return { error: "โซนนี้เต็มตามโควตาบัตรรายปีแล้ว ไม่สามารถเปิดรายการนี้กลับมาได้" };
     }
+    if (error instanceof Error && error.message === "DETAILS_REQUIRED") {
+      return { error: "กรุณาระบุโซนและบาร์โค้ดแพ็กเกจ 4,000 บาทก่อนยืนยันรายการ" };
+    }
     return { error: "อัปเดตไม่สำเร็จ" };
   }
 }
@@ -428,8 +442,9 @@ const editSeasonPassSchema = z
     customerName: z.string().trim().min(2, "กรุณากรอกชื่อ").max(100),
     customerPhone: z.string().trim().regex(/^[0-9+\-\s()]{9,15}$/, "เบอร์โทรไม่ถูกต้อง"),
     customerEmail: z.string().trim().toLowerCase().email("รูปแบบอีเมลไม่ถูกต้อง").max(200).optional().or(z.literal("")),
-    seatZone: z.enum(SEASON_PASS_SEAT_ZONES),
+    seatZone: z.union([z.enum(SEASON_PASS_SEAT_ZONES), z.literal("")]),
     seatNumber: z.string().trim().toUpperCase().max(30).optional().or(z.literal("")),
+    barcode: z.string().trim().toUpperCase().max(50).optional().or(z.literal("")),
     shirtSize: z.enum(SEASON_PASS_SHIRT_SIZES).optional().or(z.literal("")),
     deliveryMethod: z.enum(["SHIPPING", "PICKUP"] as const),
     shipAddress: z.string().trim().max(300).optional().or(z.literal("")),
@@ -474,18 +489,22 @@ export async function updateSeasonPassOrder(
   const input = parsed.data;
   try {
     await prisma.$transaction(async (tx) => {
-      const order = await tx.seasonPassOrder.findUnique({ where: { id: input.orderId } });
+      const order = await tx.seasonPassOrder.findUnique({
+        where: { id: input.orderId },
+        include: { barcode: { select: { id: true, barcode: true } } },
+      });
       if (!order) throw new Error("NOT_FOUND");
       if (input.deliveryMethod !== order.deliveryMethod) throw new Error("INVALID_DELIVERY");
       const tier = SEASON_TIERS.find((item) => item.id === order.tierId);
-      if (!tier || !tier.allowedSeatZones.includes(input.seatZone)) {
+      const canDeferVvipDetails = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
+      if (!tier || (!input.seatZone && !canDeferVvipDetails) || (input.seatZone && !tier.allowedSeatZones.includes(input.seatZone))) {
         throw new Error("INVALID_ZONE");
       }
       if (order.tierId === "vvip-elite" && !input.seatNumber) {
         throw new Error("SEAT_REQUIRED");
       }
 
-      if (order.seatZone !== input.seatZone && ["PENDING", "CONFIRMED"].includes(order.status)) {
+      if (order.seatZone !== input.seatZone && input.seatZone && ["PENDING", "CONFIRMED"].includes(order.status)) {
         const quotaLockKey = `${order.seasonLabel}:${order.tierId}:${input.seatZone}`;
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))::text AS lock_result`;
         const quotas = await tx.seasonPassZoneQuota.findMany({
@@ -511,6 +530,31 @@ export async function updateSeasonPassOrder(
         }
       }
 
+      let assignedBarcode = order.barcode;
+      if (canDeferVvipDetails && order.barcode && input.barcode && input.barcode !== order.barcode.barcode) {
+        throw new Error("BARCODE_LOCKED");
+      }
+      if (canDeferVvipDetails && !order.barcode && input.barcode) {
+        const availableBarcode = await tx.seasonPassBarcode.findFirst({
+          where: {
+            barcode: input.barcode,
+            tierId: order.tierId,
+            seasonLabel: order.seasonLabel,
+            isGenerated: true,
+            orderId: null,
+          },
+          select: { id: true, barcode: true },
+        });
+        if (!availableBarcode) throw new Error("BARCODE_UNAVAILABLE");
+        const claimed = await tx.seasonPassBarcode.updateMany({
+          where: { id: availableBarcode.id, orderId: null, isGenerated: true },
+          data: { orderId: order.id, assignedAt: new Date(), usesRemaining: SEASON_MATCHES },
+        });
+        if (claimed.count !== 1) throw new Error("BARCODE_UNAVAILABLE");
+        assignedBarcode = availableBarcode;
+      }
+
+      const detailsComplete = Boolean(input.seatZone && assignedBarcode);
       await tx.seasonPassOrder.update({
         where: { id: order.id },
         data: {
@@ -530,11 +574,15 @@ export async function updateSeasonPassOrder(
           ...(order.salesChannel === "OFFLINE" ? { paymentMethod: input.paymentMethod } : {}),
           offlineReceiptNo: order.salesChannel === "OFFLINE" ? input.offlineReceiptNo || null : order.offlineReceiptNo,
           notes: input.notes || null,
+          ...(canDeferVvipDetails && assignedBarcode ? { passCode: assignedBarcode.barcode } : {}),
+          ...(canDeferVvipDetails && order.status === "PENDING" && detailsComplete ? { status: "CONFIRMED" } : {}),
         },
       });
     });
     revalidatePath("/admin/season-passes");
     revalidatePath("/admin/season-passes/check");
+    revalidatePath("/admin/season-passes/staff");
+    revalidateTag("bookings", { expire: 0 });
     revalidateSeatAvailability();
     return { ok: true };
   } catch (error) {
@@ -542,6 +590,8 @@ export async function updateSeasonPassOrder(
     if (error instanceof Error && error.message === "INVALID_DELIVERY") return { ok: false, error: "ไม่สามารถเปลี่ยนวิธีรับบัตรหลังสร้างรายการได้" };
     if (error instanceof Error && error.message === "SEAT_REQUIRED") return { ok: false, error: "แพ็กเกจ VVIP ต้องระบุหมายเลขที่นั่ง" };
     if (error instanceof Error && error.message === "ZONE_SOLD_OUT") return { ok: false, error: "โซนที่เลือกเต็มตามโควตาแล้ว" };
+    if (error instanceof Error && error.message === "BARCODE_UNAVAILABLE") return { ok: false, error: "บาร์โค้ดนี้ไม่พร้อมใช้งานหรือถูกจองไปแล้ว" };
+    if (error instanceof Error && error.message === "BARCODE_LOCKED") return { ok: false, error: "บาร์โค้ดที่ผูกกับรายการแล้วไม่สามารถเปลี่ยนได้" };
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { ok: false, error: "หมายเลขที่นั่งนี้ถูกใช้งานแล้ว" };
     }

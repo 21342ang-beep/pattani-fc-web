@@ -79,9 +79,9 @@ export default function StaffSeasonPassForm({
           )}
         </Field>
 
-        <Field label="โซน" error={errorFor("seatZone")}>
-          <select key={tierId} name="seatZone" required defaultValue="" disabled={disabled || pending} className={inputClass}>
-            <option value="" disabled>เลือกโซน</option>
+        <Field label={isVvip ? "โซน (ไม่บังคับ)" : "โซน"} error={errorFor("seatZone")}>
+          <select key={tierId} name="seatZone" required={!isVvip} defaultValue="" disabled={disabled || pending} className={inputClass}>
+            <option value="" disabled={!isVvip}>{isVvip ? "ยังไม่ระบุ — แก้ไขภายหลังได้" : "เลือกโซน"}</option>
             {selectedTier?.zones.map((zone) => (
               <option key={zone.seatZone} value={zone.seatZone} disabled={zone.remaining === 0}>
                 {zone.seatZone}{zone.remaining == null ? "" : ` · เหลือ ${zone.remaining.toLocaleString("th-TH")}`}
@@ -92,8 +92,8 @@ export default function StaffSeasonPassForm({
 
         {isVvip && (
           <>
-            <Field label="บาร์โค้ด VVIP" error={errorFor("barcode")}>
-              <input name="barcode" list="staff-vvip-barcodes" required autoComplete="off" className={`${inputClass} font-mono uppercase`} />
+            <Field label="บาร์โค้ด VVIP (ไม่บังคับ)" error={errorFor("barcode")}>
+              <input name="barcode" list="staff-vvip-barcodes" autoComplete="off" placeholder="ยังไม่ระบุ — แก้ไขภายหลังได้" className={`${inputClass} font-mono uppercase`} />
               <datalist id="staff-vvip-barcodes">
                 {vvipBarcodes.map((barcode) => <option key={barcode} value={barcode} />)}
               </datalist>

@@ -136,23 +136,29 @@ export default async function StaffSeasonPassPage() {
                 <th className="px-3 py-2">ที่นั่ง</th>
                 <th className="px-3 py-2">ชำระเงิน</th>
                 <th className="px-3 py-2">จองโดย</th>
+                <th className="px-3 py-2 text-right">จัดการ</th>
               </tr>
             </thead>
             <tbody>
               {recentOrders.map((order) => (
                 <tr key={order.id} className="border-b last:border-0">
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{order.soldAt ? formatDateTime(order.soldAt) : "—"}</td>
-                  <td className="px-3 py-2 font-mono text-sm">{order.passCode}</td>
+                  <td className="px-3 py-2 font-mono text-sm">{order.passCode.startsWith("PENDING-VVIP-") ? "รอระบุบาร์โค้ด" : order.passCode}</td>
                   <td className="px-3 py-2">{SEASON_TIERS.find((tier) => tier.id === order.tierId)?.badge ?? order.tierId}</td>
                   <td className="px-3 py-2 font-medium">{order.customerName}</td>
                   <td className="px-3 py-2 font-mono">•••• {order.customerPhone.replace(/\D/g, "").slice(-4)}</td>
-                  <td className="px-3 py-2">{order.seatZone}{order.seatNumber ? ` · ${order.seatNumber}` : ""}</td>
+                  <td className="px-3 py-2">{order.seatZone || "รอระบุโซน"}{order.seatNumber ? ` · ${order.seatNumber}` : ""}</td>
                   <td className="px-3 py-2">{order.paymentMethod === "OFFLINE_CASH" ? "เงินสด" : "โอนเงิน"}</td>
                   <td className="px-3 py-2 font-medium text-green-800">{order.soldById ? sellerById.get(order.soldById) ?? "บัญชีเดิม" : "—"}</td>
+                  <td className="px-3 py-2 text-right">
+                    <Link href={`/admin/season-passes/${order.id}/edit?tier=${order.tierId}&from=staff`} className="font-semibold text-green-700 hover:text-green-900">
+                      แก้ไข
+                    </Link>
+                  </td>
                 </tr>
               ))}
               {recentOrders.length === 0 && (
-                <tr><td colSpan={8} className="p-8 text-center text-slate-500">ยังไม่มีรายการจองโดยทีมงาน</td></tr>
+                <tr><td colSpan={9} className="p-8 text-center text-slate-500">ยังไม่มีรายการจองโดยทีมงาน</td></tr>
               )}
             </tbody>
           </table>
