@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { updateSeasonPassOrder, type EditSeasonPassState } from "@/app/actions/season-passes";
+import { SEASON_PASS_SHIRT_SIZES, seasonTierIncludesShirt } from "@/lib/season-pass-tiers";
 
 type EditableOrder = {
   id: string;
@@ -28,7 +29,6 @@ type EditableOrder = {
   salesChannel: "ONLINE" | "OFFLINE" | "INTERNAL";
 };
 
-const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"];
 const inputClass = "mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20 disabled:bg-slate-100";
 
 export default function EditSeasonPassForm({
@@ -73,12 +73,16 @@ export default function EditSeasonPassForm({
         <Field label="อีเมล (ไม่บังคับ)" error={errorFor("customerEmail")}>
           <input name="customerEmail" type="email" defaultValue={order.customerEmail} maxLength={200} className={inputClass} />
         </Field>
-        <Field label="ไซส์เสื้อ" error={errorFor("shirtSize")}>
-          <select name="shirtSize" defaultValue={order.shirtSize} required className={inputClass}>
-            <option value="" disabled>เลือกไซส์เสื้อ</option>
-            {SHIRT_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
-          </select>
-        </Field>
+        {seasonTierIncludesShirt(order.tierId) ? (
+          <Field label="ไซส์เสื้อ (ไม่บังคับ)" error={errorFor("shirtSize")}>
+            <select name="shirtSize" defaultValue={order.shirtSize} className={inputClass}>
+              <option value="">ยังไม่ระบุ</option>
+              {SEASON_PASS_SHIRT_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </Field>
+        ) : (
+          <input type="hidden" name="shirtSize" value="" />
+        )}
         <Field label={order.tierId === "vvip-elite" ? "หมายเลขที่นั่ง VVIP" : "หมายเลขที่นั่ง (ไม่บังคับ)"} error={errorFor("seatNumber")}>
           <input name="seatNumber" defaultValue={order.seatNumber} required={order.tierId === "vvip-elite"} maxLength={30} className={`${inputClass} uppercase`} />
         </Field>

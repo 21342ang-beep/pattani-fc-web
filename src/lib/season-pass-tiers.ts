@@ -38,6 +38,12 @@ export const SEASON_PASS_PICKUP_LOCATION_INFO: Record<
 };
 
 export type SeasonTierId = "vvip-elite" | "vip-advanced" | "premium" | "gold";
+export const SEASON_PASS_SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
+
+export function seasonTierIncludesShirt(tierId: string): boolean {
+  return tierId === "vvip-elite" || tierId === "vip-advanced";
+}
+
 export const SEASON_PASS_SEAT_ZONES = [
   "VVIP-A",
   "VVIP-B",

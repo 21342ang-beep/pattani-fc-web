@@ -6,6 +6,7 @@ import {
   registerStaffSeasonPass,
   type StaffSeasonPassState,
 } from "@/app/actions/staff-season-passes";
+import { SEASON_PASS_SHIRT_SIZES, seasonTierIncludesShirt } from "@/lib/season-pass-tiers";
 
 type TierOption = {
   id: string;
@@ -14,8 +15,6 @@ type TierOption = {
   availableBarcodeCount: number;
   zones: { seatZone: string; remaining: number | null }[];
 };
-
-const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"] as const;
 
 export default function StaffSeasonPassForm({
   tiers,
@@ -38,6 +37,7 @@ export default function StaffSeasonPassForm({
     [tierId, tiers],
   );
   const isVvip = selectedTier?.id === "vvip-elite";
+  const includesShirt = seasonTierIncludesShirt(selectedTier?.id ?? "");
 
   useEffect(() => {
     if (state?.ok) {
@@ -113,12 +113,14 @@ export default function StaffSeasonPassForm({
         <Field label="อีเมล (ไม่บังคับ)" error={errorFor("customerEmail")}>
           <input name="customerEmail" type="email" maxLength={254} className={inputClass} />
         </Field>
-        <Field label="ไซส์เสื้อ" error={errorFor("shirtSize")}>
-          <select name="shirtSize" required defaultValue="" className={inputClass}>
-            <option value="" disabled>เลือกไซส์เสื้อ</option>
-            {SHIRT_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
-          </select>
-        </Field>
+        {includesShirt && (
+          <Field label="ไซส์เสื้อ (ไม่บังคับ)" error={errorFor("shirtSize")}>
+            <select key={tierId} name="shirtSize" defaultValue="" className={inputClass}>
+              <option value="">ยังไม่ระบุ — แก้ไขภายหลังได้</option>
+              {SEASON_PASS_SHIRT_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="วิธีชำระเงิน" error={errorFor("paymentMethod")}>
           <select name="paymentMethod" required defaultValue="" className={inputClass}>
             <option value="" disabled>เลือกวิธีชำระเงิน</option>

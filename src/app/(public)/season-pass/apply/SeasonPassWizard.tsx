@@ -29,7 +29,9 @@ import {
   SEASON_LABEL,
   SEASON_PASS_PICKUP_LOCATIONS,
   SEASON_PASS_PICKUP_LOCATION_INFO,
+  SEASON_PASS_SHIRT_SIZES,
   SEASON_PASS_SHIPPING_FEE_BAHT,
+  seasonTierIncludesShirt,
   type SeasonPassPickupLocation,
   type SeasonPassSeatZone,
   type SeasonTier,
@@ -50,7 +52,6 @@ const ZONE_MAP_IMAGE: Partial<Record<SeasonTierId, string>> = {
 type Step = "form" | "payment" | "success";
 type Method = "card" | "promptpay" | "banking";
 type DeliveryMethod = "SHIPPING" | "PICKUP";
-const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"] as const;
 
 export type ShippingProvince = {
   name: string;
@@ -76,7 +77,7 @@ interface CustomerData {
   shipCity: string;
   shipProvince: string;
   shipPostalCode: string;
-  shirtSize: (typeof SHIRT_SIZES)[number] | "";
+  shirtSize: (typeof SEASON_PASS_SHIRT_SIZES)[number] | "";
   shipNote: string;
   pickupLocation: string;
 }
@@ -353,6 +354,7 @@ function FormStep({
     (district) => district.name === shipCity,
   );
   const selectedZone = zoneOptions.find((option) => option.seatZone === seatZone);
+  const includesShirt = seasonTierIncludesShirt(tier.id);
   const effectiveMaxQuantity = Math.max(
     1,
     Math.min(maxQuantity, selectedZone?.remaining ?? maxQuantity),
@@ -382,14 +384,13 @@ function FormStep({
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > effectiveMaxQuantity) {
       nextErrors.quantity = `เลือกได้สูงสุด ${effectiveMaxQuantity} ใบ`;
     }
-    if (!shirtSize) nextErrors.shirtSize = "กรุณาเลือกไซส์เสื้อ";
+    if (includesShirt && !shirtSize) nextErrors.shirtSize = "กรุณาเลือกไซส์เสื้อ";
     if (deliveryMethod === "SHIPPING") {
       if (!shipAddress.trim()) nextErrors.shipAddress = "กรุณากรอกที่อยู่";
       if (!selectedProvince) nextErrors.shipProvince = "กรุณาเลือกจังหวัดจากรายการ";
       if (!selectedDistrict) nextErrors.shipCity = "กรุณาเลือกอำเภอ/เขต";
       if (!selectedDistrict?.postalCodes.includes(shipPostalCode))
         nextErrors.shipPostalCode = "กรุณาเลือกรหัสไปรษณีย์ที่ตรงกับอำเภอ";
-      if (!shirtSize) nextErrors.shirtSize = "กรุณาเลือกไซส์เสื้อ";
     } else {
       if (!pickupLocation.trim())
         nextErrors.pickupLocation = "กรุณาเลือกจุดรับบัตร";
@@ -408,7 +409,7 @@ function FormStep({
       shipCity: shipCity.trim(),
       shipProvince: shipProvince.trim(),
       shipPostalCode: shipPostalCode.trim(),
-      shirtSize,
+      shirtSize: includesShirt ? shirtSize : "",
       shipNote: shipNote.trim(),
       pickupLocation: pickupLocation.trim(),
     });
@@ -630,23 +631,25 @@ function FormStep({
                 ))}
               </select>
             </Field>
-            <Field label="ไซส์เสื้อ" htmlFor="sp-shirt-size" error={errors.shirtSize}>
-              <select
-                id="sp-shirt-size"
-                value={shirtSize}
-                onChange={(e) =>
-                  setShirtSize(e.target.value as CustomerData["shirtSize"])
-                }
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20 sm:max-w-[180px]"
-              >
-                <option value="">เลือกไซส์เสื้อ</option>
-                {SHIRT_SIZES.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            {includesShirt && (
+              <Field label="ไซส์เสื้อ" htmlFor="sp-shirt-size" error={errors.shirtSize}>
+                <select
+                  id="sp-shirt-size"
+                  value={shirtSize}
+                  onChange={(e) =>
+                    setShirtSize(e.target.value as CustomerData["shirtSize"])
+                  }
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20 sm:max-w-[180px]"
+                >
+                  <option value="">เลือกไซส์เสื้อ</option>
+                  {SEASON_PASS_SHIRT_SIZES.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Field label="หมายเหตุ (ไม่บังคับ)" htmlFor="sp-ship-note">
               <input
                 id="sp-ship-note"
@@ -678,17 +681,19 @@ function FormStep({
                 ))}
               </select>
             </Field>
-            <Field label="ไซส์เสื้อ" htmlFor="sp-pickup-shirt-size" error={errors.shirtSize}>
-              <select
-                id="sp-pickup-shirt-size"
-                value={shirtSize}
-                onChange={(e) => setShirtSize(e.target.value as CustomerData["shirtSize"])}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20 sm:max-w-[180px]"
-              >
-                <option value="">เลือกไซส์เสื้อ</option>
-                {SHIRT_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
-              </select>
-            </Field>
+            {includesShirt && (
+              <Field label="ไซส์เสื้อ" htmlFor="sp-pickup-shirt-size" error={errors.shirtSize}>
+                <select
+                  id="sp-pickup-shirt-size"
+                  value={shirtSize}
+                  onChange={(e) => setShirtSize(e.target.value as CustomerData["shirtSize"])}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-green-800 focus:ring-2 focus:ring-green-800/20 sm:max-w-[180px]"
+                >
+                  <option value="">เลือกไซส์เสื้อ</option>
+                  {SEASON_PASS_SHIRT_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+                </select>
+              </Field>
+            )}
             {(() => {
               const info =
                 SEASON_PASS_PICKUP_LOCATION_INFO[pickupLocation as SeasonPassPickupLocation];

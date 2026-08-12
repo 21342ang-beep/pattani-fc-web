@@ -14,9 +14,11 @@ import {
   SEASON_LABEL,
   SEASON_MATCHES,
   SEASON_PASS_SEAT_ZONES,
+  SEASON_PASS_SHIRT_SIZES,
   SEASON_PASS_SHIPPING_FEE_BAHT,
   SEASON_TIERS,
   getSeasonPublicSaleLimit,
+  seasonTierIncludesShirt,
 } from "@/lib/season-pass-tiers";
 import {
   calculateSeasonPassZoneRanges,
@@ -62,7 +64,7 @@ const createSchema = z
       .regex(/^\d{5}$/, "รหัสไปรษณีย์ต้องเป็นเลข 5 หลัก")
       .optional()
       .or(z.literal("")),
-    shirtSize: z.enum(["S", "M", "L", "XL", "2XL", "3XL"] as const).optional().or(z.literal("")),
+    shirtSize: z.enum(SEASON_PASS_SHIRT_SIZES).optional().or(z.literal("")),
     shipNote: z.string().trim().max(300).optional().or(z.literal("")),
     // pickup — required only if deliveryMethod=PICKUP
     pickupLocation: z.string().trim().max(200).optional().or(z.literal("")),
@@ -77,7 +79,7 @@ const createSchema = z
       });
     }
 
-    if (!d.shirtSize) {
+    if (seasonTierIncludesShirt(d.tierId) && !d.shirtSize) {
       ctx.addIssue({ code: "custom", path: ["shirtSize"], message: "กรุณาเลือกไซส์เสื้อ" });
     }
 
@@ -105,12 +107,6 @@ const createSchema = z
           code: "custom",
           path: ["shipPostalCode"],
           message: "กรุณากรอกรหัสไปรษณีย์",
-        });
-      if (!d.shirtSize)
-        ctx.addIssue({
-          code: "custom",
-          path: ["shirtSize"],
-          message: "กรุณาเลือกไซส์เสื้อ",
         });
     } else if (d.deliveryMethod === "PICKUP") {
       if (!d.pickupLocation)
@@ -306,7 +302,7 @@ export async function createSeasonPassOrder(
             shipCity: parsed.data.shipCity || null,
             shipProvince: parsed.data.shipProvince || null,
             shipPostalCode: parsed.data.shipPostalCode || null,
-            shirtSize: parsed.data.shirtSize || null,
+            shirtSize: seasonTierIncludesShirt(parsed.data.tierId) ? parsed.data.shirtSize || null : null,
             shipNote: parsed.data.shipNote || null,
             pickupLocation: parsed.data.pickupLocation || null,
             paymentMethod: parsed.data.paymentMethod,
@@ -434,7 +430,7 @@ const editSeasonPassSchema = z
     customerEmail: z.string().trim().toLowerCase().email("รูปแบบอีเมลไม่ถูกต้อง").max(200).optional().or(z.literal("")),
     seatZone: z.enum(SEASON_PASS_SEAT_ZONES),
     seatNumber: z.string().trim().toUpperCase().max(30).optional().or(z.literal("")),
-    shirtSize: z.enum(["S", "M", "L", "XL", "2XL", "3XL"] as const),
+    shirtSize: z.enum(SEASON_PASS_SHIRT_SIZES).optional().or(z.literal("")),
     deliveryMethod: z.enum(["SHIPPING", "PICKUP"] as const),
     shipAddress: z.string().trim().max(300).optional().or(z.literal("")),
     shipCity: z.string().trim().max(100).optional().or(z.literal("")),
@@ -523,7 +519,7 @@ export async function updateSeasonPassOrder(
           customerEmail: input.customerEmail || null,
           seatZone: input.seatZone,
           seatNumber: input.seatNumber || null,
-          shirtSize: input.shirtSize,
+          shirtSize: input.shirtSize || null,
           deliveryMethod: input.deliveryMethod,
           shipAddress: input.deliveryMethod === "SHIPPING" ? input.shipAddress || null : null,
           shipCity: input.deliveryMethod === "SHIPPING" ? input.shipCity || null : null,
