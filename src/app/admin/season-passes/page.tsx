@@ -28,14 +28,13 @@ export default async function AdminSeasonPassesPage(props: {
 }) {
   await verifyPermission("SEASON_PASSES");
   const { tier: rawTier } = await props.searchParams;
-  const saleTiers = SEASON_TIERS.filter((tier) => tier.id !== "vvip-elite");
+  const saleTiers = SEASON_TIERS;
   const selectedTier = saleTiers.some((tier) => tier.id === rawTier)
     ? (rawTier as SeasonTierId)
     : saleTiers[0].id;
 
   const orders = await prisma.seasonPassOrder.findMany({
     orderBy: { createdAt: "desc" },
-    take: 200,
   });
 
   const tierById = new Map(SEASON_TIERS.map((t) => [t.id, t]));
@@ -69,10 +68,10 @@ export default async function AdminSeasonPassesPage(props: {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href="/admin/season-passes/offline"
+            href="/admin/season-passes/staff"
             className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-base font-medium text-amber-900 hover:bg-amber-100 md:text-lg"
           >
-            + ลงทะเบียน VVIP 4,000 ออฟไลน์
+            + จองบัตรรายปีให้ลูกค้า
           </Link>
           <Link
             href="/admin/ticket-settings"
@@ -123,7 +122,7 @@ export default async function AdminSeasonPassesPage(props: {
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-2xl font-bold text-green-900 md:text-3xl">ข้อมูลการจองตามแพ็กเกจ</h2>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="tablist" aria-label="แพ็กเกจบัตรรายปี">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="tablist" aria-label="แพ็กเกจบัตรรายปี">
           {saleTiers.map((tier) => {
             const tierOrders = ordersByTier.get(tier.id) ?? [];
             const confirmed = tierOrders.filter((order) => order.status === "CONFIRMED");
@@ -144,6 +143,11 @@ export default async function AdminSeasonPassesPage(props: {
               >
                 <p className="text-sm font-bold uppercase tracking-widest text-yellow-700 md:text-base">แพ็กเกจ ฿{tier.priceBaht.toLocaleString("th-TH")}</p>
                 <p className="mt-1 text-base font-bold text-green-900 md:text-lg">{tier.badge}</p>
+                {tier.id === "vvip-elite" && (
+                  <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                    จองผ่านทีมงานเท่านั้น
+                  </span>
+                )}
                 <p className="mt-3 text-3xl font-black text-green-900 md:text-4xl">{tierOrders.length.toLocaleString("th-TH")} <span className="text-base font-medium md:text-lg">รายการ</span></p>
                 <p className="mt-1 text-sm text-slate-600 md:text-base">ยืนยันแล้ว {confirmed.length} รายการ · ฿{revenue.toLocaleString("th-TH")}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5" aria-label={`รายละเอียดโซนแพ็กเกจ ${tier.badge}`}>

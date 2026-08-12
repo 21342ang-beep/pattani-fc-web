@@ -13,9 +13,7 @@ export async function GET(request: Request) {
   await verifyPermission("SEASON_PASSES");
 
   const rawTier = new URL(request.url).searchParams.get("tier");
-  const tier = SEASON_TIERS.find(
-    (item) => item.id !== "vvip-elite" && item.id === rawTier,
-  );
+  const tier = SEASON_TIERS.find((item) => item.id === rawTier);
   if (!tier) return new Response("Invalid season-pass tier", { status: 400 });
 
   const orders = await prisma.seasonPassOrder.findMany({
@@ -113,6 +111,8 @@ function paymentMethodLabel(method: string) {
     card: "บัตรเครดิต/เดบิต",
     promptpay: "พร้อมเพย์",
     banking: "โมบายแบงก์กิ้ง",
+    OFFLINE_CASH: "เงินสด (ทีมงาน)",
+    OFFLINE_TRANSFER: "โอนเงิน (ทีมงาน)",
   };
   return labels[method] ?? method;
 }

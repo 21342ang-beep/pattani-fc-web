@@ -59,10 +59,10 @@ export default async function SeasonPassCheckPage() {
           ใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC {SEASON_MATCHES} แมตช์เท่านั้น · บอลถ้วยและเกมเยือนไม่รวมสิทธิ์บัตรรายปี
         </p>
         <Link
-          href="/admin/season-passes/offline"
+          href="/admin/season-passes/staff"
           className="mt-4 inline-flex rounded-lg bg-green-800 px-4 py-2.5 text-base font-bold text-yellow-300 hover:bg-green-900"
         >
-          + ลงทะเบียน VVIP 4,000 แบบขายออฟไลน์
+          + จองบัตรรายปีให้ลูกค้า
         </Link>
       </header>
 
