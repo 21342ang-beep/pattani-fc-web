@@ -1,6 +1,7 @@
 "use client";
 
 import { createElement, useEffect, useRef, useState } from "react";
+import Script from "next/script";
 import { Box, Loader2, MousePointer2, Rotate3D } from "lucide-react";
 
 type LoadState = "loading" | "ready" | "error";
@@ -67,8 +68,6 @@ export default function StadiumModelViewer({
     let active = true;
     const viewer = viewerRef.current;
     if (!viewer) return;
-
-    let script: HTMLScriptElement | null = null;
 
     const setZoneEmphasis = (zoneCode: string | null) => {
       if (highlightedZoneRef.current === zoneCode) return;
@@ -148,20 +147,6 @@ export default function StadiumModelViewer({
     viewer.addEventListener("pointerup", onPointerUp, { capture: true });
     viewer.addEventListener("pointerleave", onPointerLeave, { capture: true });
 
-    if (!customElements.get("model-viewer")) {
-      script = document.querySelector<HTMLScriptElement>(
-        'script[data-pattani-model-viewer="true"]',
-      );
-      if (!script) {
-        script = document.createElement("script");
-        script.type = "module";
-        script.src = "/vendor/model-viewer-4.3.1.min.js";
-        script.dataset.pattaniModelViewer = "true";
-        document.head.appendChild(script);
-      }
-      script.addEventListener("error", onError, { once: true });
-    }
-
     void customElements.whenDefined("model-viewer").then(() => {
       if (active && (viewer as ModelViewerElement).loaded) {
         onLoad();
@@ -170,7 +155,6 @@ export default function StadiumModelViewer({
 
     return () => {
       active = false;
-      script?.removeEventListener("error", onError);
       viewer.removeEventListener("load", onLoad);
       viewer.removeEventListener("error", onError);
       viewer.removeEventListener("progress", onProgress);
@@ -187,11 +171,12 @@ export default function StadiumModelViewer({
 
   return (
     <>
-      <script
+      <Script
+        id="pattani-model-viewer"
         type="module"
-        defer
         src="/vendor/model-viewer-4.3.1.min.js"
-        data-pattani-model-viewer="true"
+        strategy="afterInteractive"
+        onError={() => setLoadState("error")}
       />
       <div
         className={
@@ -243,7 +228,7 @@ export default function StadiumModelViewer({
           "environment-image": "neutral",
           "tone-mapping": "neutral",
           "interaction-prompt": "auto",
-          loading: "lazy",
+          loading: "eager",
           reveal: "auto",
           "touch-action": "pan-y",
           className: "absolute inset-0 h-full w-full bg-transparent",
