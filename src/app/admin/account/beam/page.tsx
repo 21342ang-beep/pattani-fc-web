@@ -12,6 +12,7 @@ import { BeamApiError, listAllBeamTransactions, type BeamTransaction } from "@/l
 import { verifyPermission } from "@/lib/dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import ClearBeamHistoryButton from "./ClearBeamHistoryButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "ธุรกรรม Beam — Pattani FC Admin" };
@@ -95,6 +96,12 @@ export default async function BeamTransactionsPage(props: { searchParams: Promis
   let truncated = false;
   let apiError = "";
 
+  const viewState = await prisma.beamAccountingViewState.findUnique({
+    where: { id: 1 },
+    select: { hiddenBefore: true },
+  });
+  const hiddenBeforeTime = viewState?.hiddenBefore?.getTime() ?? Number.NEGATIVE_INFINITY;
+
   try {
     const result = await listAllBeamTransactions();
     transactions = result.transactions;
@@ -109,9 +116,13 @@ export default async function BeamTransactionsPage(props: { searchParams: Promis
   const filtered = transactions
     .filter((transaction) => {
       const date = transactionDate(transaction);
-      return date && date.getTime() >= fromTime && date.getTime() <= toTime;
+      return date && date.getTime() > hiddenBeforeTime && date.getTime() >= fromTime && date.getTime() <= toTime;
     })
     .sort((a, b) => (transactionDate(b)?.getTime() ?? 0) - (transactionDate(a)?.getTime() ?? 0));
+  const hasVisibleTransactions = transactions.some((transaction) => {
+    const date = transactionDate(transaction);
+    return date && date.getTime() > hiddenBeforeTime;
+  });
 
   const references = [...new Set(filtered.map((transaction) => transaction.referenceId))];
   const paymentLinks = references.length > 0
@@ -246,7 +257,10 @@ export default async function BeamTransactionsPage(props: { searchParams: Promis
                 <h2 className="text-lg font-black text-green-900">รายละเอียดเงินเข้าและรายการปรับยอด</h2>
                 <p className="text-sm text-slate-500">พบ {filtered.length.toLocaleString("th-TH")} รายการในช่วงที่เลือก</p>
               </div>
-              <Banknote className="size-7 text-violet-600" />
+              <div className="flex items-center gap-2">
+                <ClearBeamHistoryButton disabled={!hasVisibleTransactions} />
+                <Banknote className="size-7 text-violet-600" />
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1150px] text-sm">
