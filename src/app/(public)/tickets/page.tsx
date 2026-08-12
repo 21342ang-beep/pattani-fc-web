@@ -55,17 +55,17 @@ const MALAY_ZONE_LABELS: Record<StadiumZoneCode, string> = {
   G: "Tempat Duduk Selatan · G", I: "Tempat Duduk Barat · I", J: "Tempat Duduk Barat · J", AWAY: "Penyokong Pelawat",
 };
 
-const MATCH_ZONE_MAP_DETAILS: Record<StadiumZoneCode, { gate: string; color: [string, string, string] }> = {
-  A: { gate: "A", color: ["ฟ้า", "Blue", "Biru"] },
-  B: { gate: "B", color: ["ฟ้า", "Blue", "Biru"] },
-  C: { gate: "C", color: ["เหลือง", "Yellow", "Kuning"] },
-  D: { gate: "D", color: ["ส้ม", "Orange", "Jingga"] },
-  E: { gate: "E", color: ["เหลือง", "Yellow", "Kuning"] },
-  F: { gate: "F1 / F2", color: ["ฟ้า", "Blue", "Biru"] },
-  G: { gate: "G", color: ["เหลือง", "Yellow", "Kuning"] },
-  I: { gate: "I", color: ["ส้ม", "Orange", "Jingga"] },
-  J: { gate: "J", color: ["เหลือง", "Yellow", "Kuning"] },
-  AWAY: { gate: "H", color: ["ม่วง", "Purple", "Ungu"] },
+const MATCH_ZONE_MAP_DETAILS: Record<StadiumZoneCode, { gate: string; priceBaht: number; color: [string, string, string] }> = {
+  A: { gate: "A", priceBaht: 150, color: ["ฟ้า", "Blue", "Biru"] },
+  B: { gate: "B", priceBaht: 150, color: ["ฟ้า", "Blue", "Biru"] },
+  C: { gate: "C", priceBaht: 120, color: ["เหลือง", "Yellow", "Kuning"] },
+  D: { gate: "D", priceBaht: 100, color: ["ส้ม", "Orange", "Jingga"] },
+  E: { gate: "E", priceBaht: 120, color: ["เหลือง", "Yellow", "Kuning"] },
+  F: { gate: "F1 / F2", priceBaht: 150, color: ["ฟ้า", "Blue", "Biru"] },
+  G: { gate: "G", priceBaht: 120, color: ["เหลือง", "Yellow", "Kuning"] },
+  I: { gate: "I", priceBaht: 100, color: ["ส้ม", "Orange", "Jingga"] },
+  J: { gate: "J", priceBaht: 120, color: ["เหลือง", "Yellow", "Kuning"] },
+  AWAY: { gate: "H", priceBaht: 200, color: ["ม่วง", "Purple", "Ungu"] },
 };
 
 export default async function TicketsPage() {
@@ -131,7 +131,7 @@ export default async function TicketsPage() {
       priceLabel,
       availabilityLabel,
       markerTitle: zone.code,
-      markerSubtitle: priceLabel,
+      markerSubtitle: `${mapDetail.priceBaht.toLocaleString(intlLocale(locale))} ${locale === "th" ? "บาท" : "THB"}`,
       details: [gateLabel, colorLabel],
       note,
     };
