@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getAllProvinces } from "geothai";
 import { Prisma, type SeasonPassOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { normalizeBookingSearchPhone } from "@/lib/booking-search-otp";
 import { readCustomerSession } from "@/lib/customer-session";
 import { verifyPermission } from "@/lib/dal";
 import { rateLimit } from "@/lib/rate-limit";
@@ -439,6 +440,7 @@ export async function updateSeasonPassStatus(
 const editSeasonPassSchema = z
   .object({
     orderId: z.string().regex(/^[a-z0-9]+$/i),
+    customerId: z.string().trim().optional().or(z.literal("")),
     customerName: z.string().trim().min(2, "กรุณากรอกชื่อ").max(100),
     customerPhone: z.string().trim().regex(/^[0-9+\-\s()]{9,15}$/, "เบอร์โทรไม่ถูกต้อง"),
     customerEmail: z.string().trim().toLowerCase().email("รูปแบบอีเมลไม่ถูกต้อง").max(200).optional().or(z.literal("")),
@@ -495,6 +497,21 @@ export async function updateSeasonPassOrder(
       });
       if (!order) throw new Error("NOT_FOUND");
       if (input.deliveryMethod !== order.deliveryMethod) throw new Error("INVALID_DELIVERY");
+      const linkedCustomer = order.salesChannel === "OFFLINE"
+        ? input.customerId
+          ? await tx.customer.findUnique({
+              where: { id: input.customerId },
+              select: { id: true, name: true, phone: true, email: true },
+            })
+          : null
+        : null;
+      if (order.salesChannel === "OFFLINE" && !linkedCustomer) throw new Error("MEMBER_REQUIRED");
+      const linkedCustomerPhone = linkedCustomer
+        ? normalizeBookingSearchPhone(linkedCustomer.phone ?? "")
+        : null;
+      if (linkedCustomer && !/^0[689]\d{8}$/.test(linkedCustomerPhone ?? "")) {
+        throw new Error("MEMBER_PHONE_REQUIRED");
+      }
       const tier = SEASON_TIERS.find((item) => item.id === order.tierId);
       const isOfflineVvip = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
       const canDeferStaffZone = ["vvip-elite", "vip-advanced"].includes(order.tierId) && order.salesChannel === "OFFLINE";
@@ -609,9 +626,10 @@ export async function updateSeasonPassOrder(
       await tx.seasonPassOrder.update({
         where: { id: order.id },
         data: {
-          customerName: input.customerName,
-          customerPhone: input.customerPhone,
-          customerEmail: input.customerEmail || null,
+          customerId: linkedCustomer ? linkedCustomer.id : order.customerId,
+          customerName: linkedCustomer ? linkedCustomer.name : input.customerName,
+          customerPhone: linkedCustomerPhone ?? input.customerPhone,
+          customerEmail: linkedCustomer ? linkedCustomer.email : input.customerEmail || null,
           seatZone: input.seatZone,
           seatNumber: input.seatNumber || null,
           shirtSize: input.shirtSize || null,
@@ -633,10 +651,14 @@ export async function updateSeasonPassOrder(
     revalidatePath("/admin/season-passes");
     revalidatePath("/admin/season-passes/check");
     revalidatePath("/admin/season-passes/staff");
+    revalidatePath("/admin/members");
+    revalidatePath("/member");
     revalidateTag("bookings", { expire: 0 });
     revalidateSeatAvailability();
     return { ok: true };
   } catch (error) {
+    if (error instanceof Error && error.message === "MEMBER_REQUIRED") return { ok: false, error: "กรุณาเลือกสมาชิกที่สมัครแล้วสำหรับรายการรอบทีมงาน", fieldErrors: { customerId: ["กรุณาเลือกสมาชิก"] } };
+    if (error instanceof Error && error.message === "MEMBER_PHONE_REQUIRED") return { ok: false, error: "สมาชิกที่เลือกยังไม่มีเบอร์โทรศัพท์ที่ถูกต้อง กรุณาแก้ไขข้อมูลสมาชิกก่อน", fieldErrors: { customerId: ["ข้อมูลสมาชิกไม่มีเบอร์โทรศัพท์ที่ถูกต้อง"] } };
     if (error instanceof Error && error.message === "INVALID_ZONE") return { ok: false, error: "โซนไม่ตรงกับแพ็กเกจนี้" };
     if (error instanceof Error && error.message === "INVALID_DELIVERY") return { ok: false, error: "ไม่สามารถเปลี่ยนวิธีรับบัตรหลังสร้างรายการได้" };
     if (error instanceof Error && error.message === "SEAT_REQUIRED") return { ok: false, error: "แพ็กเกจ VVIP ต้องระบุหมายเลขที่นั่ง" };

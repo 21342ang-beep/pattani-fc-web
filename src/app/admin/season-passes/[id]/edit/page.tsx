@@ -35,6 +35,12 @@ export default async function EditSeasonPassPage({
         select: { barcode: true },
       })
     : [];
+  const members = order.salesChannel === "OFFLINE"
+    ? await prisma.customer.findMany({
+        orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+        select: { id: true, name: true, phone: true, email: true },
+      })
+    : [];
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -53,6 +59,7 @@ export default async function EditSeasonPassPage({
           tierId: order.tierId,
           passCode: order.passCode,
           barcode: order.barcode?.barcode ?? "",
+          customerId: order.customerId ?? "",
           customerName: order.customerName,
           customerPhone: order.customerPhone,
           customerEmail: order.customerEmail ?? "",
@@ -74,6 +81,7 @@ export default async function EditSeasonPassPage({
         tierBadge={tier.badge}
         zones={[...tier.allowedSeatZones]}
         vvipBarcodes={vvipBarcodes.map((item) => item.barcode)}
+        members={members}
         backHref={backHref}
       />
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateSeasonPassOrder, type EditSeasonPassState } from "@/app/actions/season-passes";
 import { SEASON_PASS_SHIRT_SIZES, seasonTierIncludesShirt } from "@/lib/season-pass-tiers";
@@ -11,6 +11,7 @@ type EditableOrder = {
   tierId: string;
   passCode: string;
   barcode: string;
+  customerId: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -30,6 +31,13 @@ type EditableOrder = {
   salesChannel: "ONLINE" | "OFFLINE" | "INTERNAL";
 };
 
+type MemberOption = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string;
+};
+
 const inputClass = "mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20 disabled:bg-slate-100";
 
 export default function EditSeasonPassForm({
@@ -37,16 +45,23 @@ export default function EditSeasonPassForm({
   tierBadge,
   zones,
   vvipBarcodes,
+  members,
   backHref,
 }: {
   order: EditableOrder;
   tierBadge: string;
   zones: string[];
   vvipBarcodes: string[];
+  members: MemberOption[];
   backHref: string;
 }) {
   const [state, formAction, pending] = useActionState<EditSeasonPassState, FormData>(updateSeasonPassOrder, undefined);
   const router = useRouter();
+  const [customerId, setCustomerId] = useState(order.customerId);
+  const selectedMember = useMemo(
+    () => members.find((member) => member.id === customerId) ?? null,
+    [customerId, members],
+  );
 
   useEffect(() => {
     if (state?.ok) router.push(backHref);
@@ -89,15 +104,50 @@ export default function EditSeasonPassForm({
             )}
           </Field>
         )}
-        <Field label="ชื่อ-สกุลลูกค้า" error={errorFor("customerName")}>
-          <input name="customerName" defaultValue={order.customerName} required minLength={2} maxLength={100} className={inputClass} />
-        </Field>
-        <Field label="เบอร์โทรศัพท์" error={errorFor("customerPhone")}>
-          <input name="customerPhone" type="tel" defaultValue={order.customerPhone} required className={inputClass} />
-        </Field>
-        <Field label="อีเมล (ไม่บังคับ)" error={errorFor("customerEmail")}>
-          <input name="customerEmail" type="email" defaultValue={order.customerEmail} maxLength={200} className={inputClass} />
-        </Field>
+        {order.salesChannel === "OFFLINE" ? (
+          <Field label="สมาชิกที่เป็นเจ้าของบัตร" error={errorFor("customerId")}>
+            <select
+              name="customerId"
+              value={customerId}
+              required
+              onChange={(event) => setCustomerId(event.target.value)}
+              className={inputClass}
+            >
+              <option value="" disabled>เลือกสมาชิกที่สมัครแล้ว</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name} · {member.phone || "ไม่มีเบอร์"} · {member.email}
+                </option>
+              ))}
+            </select>
+            {selectedMember && (
+              <span className="mt-1.5 block rounded-md bg-emerald-50 px-3 py-2 text-sm font-normal text-emerald-800">
+                บัตรจะเชื่อมกับ {selectedMember.name} ({selectedMember.email})
+              </span>
+            )}
+          </Field>
+        ) : (
+          <input type="hidden" name="customerId" value={order.customerId} />
+        )}
+        {order.salesChannel === "OFFLINE" ? (
+          <>
+            <input type="hidden" name="customerName" value={selectedMember?.name ?? order.customerName} />
+            <input type="hidden" name="customerPhone" value={selectedMember?.phone ?? order.customerPhone} />
+            <input type="hidden" name="customerEmail" value={selectedMember?.email ?? order.customerEmail} />
+          </>
+        ) : (
+          <>
+            <Field label="ชื่อ-สกุลลูกค้า" error={errorFor("customerName")}>
+              <input name="customerName" defaultValue={order.customerName} required minLength={2} maxLength={100} className={inputClass} />
+            </Field>
+            <Field label="เบอร์โทรศัพท์" error={errorFor("customerPhone")}>
+              <input name="customerPhone" type="tel" defaultValue={order.customerPhone} required className={inputClass} />
+            </Field>
+            <Field label="อีเมล (ไม่บังคับ)" error={errorFor("customerEmail")}>
+              <input name="customerEmail" type="email" defaultValue={order.customerEmail} maxLength={200} className={inputClass} />
+            </Field>
+          </>
+        )}
         {seasonTierIncludesShirt(order.tierId) ? (
           <Field label="ไซส์เสื้อ (ไม่บังคับ)" error={errorFor("shirtSize")}>
             <select name="shirtSize" defaultValue={order.shirtSize} className={inputClass}>
