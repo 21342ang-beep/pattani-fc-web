@@ -40,6 +40,7 @@ export default function StaffSeasonPassForm({
   );
   const [tierId, setTierId] = useState(tiers[0]?.id ?? "");
   const [memberId, setMemberId] = useState("");
+  const [customerMode, setCustomerMode] = useState<"EXISTING" | "NEW_NAME">("EXISTING");
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const selectedTier = useMemo(
@@ -58,6 +59,7 @@ export default function StaffSeasonPassForm({
     if (state?.ok) {
       formRef.current?.reset();
       setMemberId("");
+      setCustomerMode("EXISTING");
       router.refresh();
     }
   }, [router, state]);
@@ -74,28 +76,40 @@ export default function StaffSeasonPassForm({
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="สมาชิกที่จองบัตร" error={errorFor("customerId")}>
-          <select
-            name="customerId"
-            value={memberId}
-            required
-            disabled={disabled || pending}
-            onChange={(event) => setMemberId(event.target.value)}
-            className={inputClass}
-          >
-            <option value="" disabled>เลือกสมาชิกที่สมัครแล้ว</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name} · {member.phone || "ไม่มีเบอร์"} · {member.email}
-              </option>
-            ))}
-          </select>
-          {selectedMember && (
-            <span className="mt-1.5 block rounded-md bg-emerald-50 px-3 py-2 text-sm font-normal text-emerald-800">
-              ระบบจะผูกบัตรกับ {selectedMember.name} ({selectedMember.email})
-            </span>
-          )}
-        </Field>
+        <div className="md:col-span-2">
+          <p className="text-base font-semibold text-slate-800">สมาชิกที่จองบัตร</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <button type="button" onClick={() => setCustomerMode("EXISTING")} className={`rounded-lg border px-4 py-3 text-left font-semibold ${customerMode === "EXISTING" ? "border-green-700 bg-green-50 text-green-900 ring-2 ring-green-700/20" : "border-slate-300 bg-white text-slate-700"}`}>
+              เลือกสมาชิกเดิม
+            </button>
+            <button type="button" onClick={() => { setCustomerMode("NEW_NAME"); setMemberId(""); }} className={`rounded-lg border px-4 py-3 text-left font-semibold ${customerMode === "NEW_NAME" ? "border-green-700 bg-green-50 text-green-900 ring-2 ring-green-700/20" : "border-slate-300 bg-white text-slate-700"}`}>
+              + เพิ่มชื่อลูกค้าใหม่
+            </button>
+          </div>
+          <input type="hidden" name="customerMode" value={customerMode} />
+        </div>
+
+        {customerMode === "EXISTING" ? (
+          <div className="md:col-span-2">
+            <Field label="เลือกสมาชิกที่สมัครแล้ว" error={errorFor("customerId")}>
+              <select name="customerId" value={memberId} required disabled={disabled || pending} onChange={(event) => setMemberId(event.target.value)} className={inputClass}>
+                <option value="" disabled>เลือกสมาชิกที่สมัครแล้ว</option>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.name} · {member.phone || "ไม่มีเบอร์"} · {member.email}</option>)}
+              </select>
+              {selectedMember && <span className="mt-1.5 block rounded-md bg-emerald-50 px-3 py-2 text-sm font-normal text-emerald-800">ระบบจะผูกบัตรกับ {selectedMember.name} ({selectedMember.email})</span>}
+            </Field>
+          </div>
+        ) : (
+          <>
+            <input type="hidden" name="customerId" value="" />
+            <div className="md:col-span-2">
+              <Field label="ชื่อลูกค้าใหม่" error={errorFor("newCustomerName")}>
+                <input name="newCustomerName" required minLength={2} maxLength={100} placeholder="กรอกชื่อ-นามสกุล" className={inputClass} />
+                <span className="mt-1.5 block text-sm font-normal text-slate-500">บันทึกชื่อนี้เฉพาะในรายการจอง โดยไม่สร้างบัญชีสมาชิก</span>
+              </Field>
+            </div>
+          </>
+        )}
 
         <Field label="แพ็กเกจ" error={errorFor("tierId")}>
           <select

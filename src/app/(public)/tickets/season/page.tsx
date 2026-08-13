@@ -101,7 +101,7 @@ export default async function SeasonTicketsPage() {
             loadingLabel={t("กำลังโหลดโมเดลสนาม", "Loading stadium model")}
             errorLabel={t("อุปกรณ์นี้ไม่สามารถแสดงโมเดล 3 มิติได้", "This device cannot display the 3D model.")}
             interactionLabel={t("ลากเพื่อหมุน · เลื่อนเพื่อซูม", "Drag to rotate · Scroll to zoom")}
-            labelModelSrc="/models/pattani-stadium-labels-season.glb?v=20260812-3"
+            labelModelSrc="/models/pattani-stadium-labels-season.glb?v=20260813-6"
             plainBackground
             zones={seasonModelZones}
             zoneHintLabel={t("ชี้หรือแตะโซนเพื่อดูราคาและรายละเอียดรายปี", "Hover or tap a zone to see season price and details")}

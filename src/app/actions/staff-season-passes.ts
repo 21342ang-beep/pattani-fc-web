@@ -24,7 +24,9 @@ import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 
 const staffSeasonPassSchema = z
   .object({
-    customerId: z.string().trim().min(1, "กรุณาเลือกสมาชิก"),
+    customerMode: z.enum(["EXISTING", "NEW_NAME"]),
+    customerId: z.string().trim().max(100),
+    newCustomerName: z.string().trim().max(100),
     tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"] as const),
     seatZone: z.union([z.enum(SEASON_PASS_SEAT_ZONES), z.literal("")]),
     barcode: z.string().trim().toUpperCase().max(50),
@@ -35,6 +37,12 @@ const staffSeasonPassSchema = z
     notes: z.string().trim().max(500),
   })
   .superRefine((data, context) => {
+    if (data.customerMode === "EXISTING" && !data.customerId) {
+      context.addIssue({ code: "custom", path: ["customerId"], message: "กรุณาเลือกสมาชิก" });
+    }
+    if (data.customerMode === "NEW_NAME" && data.newCustomerName.length < 2) {
+      context.addIssue({ code: "custom", path: ["newCustomerName"], message: "กรุณากรอกชื่อลูกค้า" });
+    }
     const tier = SEASON_TIERS.find((item) => item.id === data.tierId);
     if (!data.seatZone && !["vvip-elite", "vip-advanced"].includes(data.tierId)) {
       context.addIssue({ code: "custom", path: ["seatZone"], message: "กรุณาเลือกโซน" });
@@ -58,7 +66,9 @@ export async function registerStaffSeasonPass(
 ): Promise<StaffSeasonPassState> {
   const user = await verifyPermission("SEASON_PASSES");
   const parsed = staffSeasonPassSchema.safeParse({
-    customerId: formData.get("customerId"),
+    customerMode: formData.get("customerMode") ?? "EXISTING",
+    customerId: formData.get("customerId") ?? "",
+    newCustomerName: formData.get("newCustomerName") ?? "",
     tierId: formData.get("tierId"),
     seatZone: formData.get("seatZone"),
     barcode: formData.get("barcode") ?? "",
@@ -85,16 +95,19 @@ export async function registerStaffSeasonPass(
   const input = parsed.data;
   const tier = SEASON_TIERS.find((item) => item.id === input.tierId)!;
   const barcodePrefix = `PFC26-${tier.priceBaht}-`;
-
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.findUnique({
-        where: { id: input.customerId },
-        select: { id: true, name: true, phone: true, email: true },
-      });
+      const customer = input.customerMode === "EXISTING"
+        ? await tx.customer.findUnique({
+          where: { id: input.customerId },
+          select: { id: true, name: true, phone: true, email: true },
+        })
+        : { id: null, name: input.newCustomerName, phone: "", email: null };
       if (!customer) throw new Error("MEMBER_NOT_FOUND");
       const customerPhone = normalizeBookingSearchPhone(customer.phone ?? "");
-      if (!/^0[689]\d{8}$/.test(customerPhone)) throw new Error("MEMBER_PHONE_REQUIRED");
+      if (input.customerMode === "EXISTING" && !/^0[689]\d{8}$/.test(customerPhone)) {
+        throw new Error("MEMBER_PHONE_REQUIRED");
+      }
 
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('season-pass-sale-phase'))::text AS lock_result`;
       const currentSetting = await tx.ticketPurchaseSetting.findUnique({

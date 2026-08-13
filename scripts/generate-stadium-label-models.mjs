@@ -69,14 +69,16 @@ function escapeXml(value) {
 }
 
 async function labelPng(title, subtitle, tone) {
-  const fill = tone === "light" ? "#ffffff" : "#061f15";
-  const stroke = tone === "light" ? "#07140d" : "#ffffff";
+  void tone;
   const svg = `
     <svg width="512" height="256" viewBox="0 0 512 256" xmlns="http://www.w3.org/2000/svg">
-      <g text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900"
-         fill="${fill}" stroke="${stroke}" stroke-width="9" paint-order="stroke fill" stroke-linejoin="round">
-        <text x="256" y="106" font-size="86">${escapeXml(title)}</text>
-        <text x="256" y="210" font-size="80">${escapeXml(subtitle)}</text>
+      <g transform="rotate(180 256 128)" text-anchor="middle"
+         font-family="Arial, Helvetica, sans-serif" font-weight="900" fill="#050505">
+        <!-- The label plane is rotated toward the pitch. Store the two lines
+             in reverse texture order so they appear zone-above-price on the
+             sloped stand after that 180-degree in-plane rotation. -->
+        <text x="256" y="106" font-size="80">${escapeXml(subtitle)}</text>
+        <text x="256" y="210" font-size="86">${escapeXml(title)}</text>
       </g>
     </svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();
@@ -145,8 +147,11 @@ async function makeGlb(labels, outputName) {
     const radialZ = z / radius;
     // Local X follows the seat row. Local Z climbs outward with the stand.
     // Local Y is the surface normal, keeping the text plane flush to the seats.
-    const xAxis = [radialZ, 0, -radialX];
-    const zAxis = [Math.cos(pitch) * radialX, Math.sin(pitch), Math.cos(pitch) * radialZ];
+    // Point the label toward the pitch so it reads upright from the standard
+    // stadium camera. Negating both in-plane axes rotates the artwork 180°
+    // without changing its stand slope or surface normal.
+    const xAxis = [-radialZ, 0, radialX];
+    const zAxis = [-Math.cos(pitch) * radialX, -Math.sin(pitch), -Math.cos(pitch) * radialZ];
     const yAxis = [
       zAxis[1] * xAxis[2] - zAxis[2] * xAxis[1],
       zAxis[2] * xAxis[0] - zAxis[0] * xAxis[2],
