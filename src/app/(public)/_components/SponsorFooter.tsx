@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-const SPONSOR_IMAGE = "/sponsors-pattani-fc-2026-v3.png";
+const SPONSOR_IMAGE = "/sponsors-pattani-fc-2026-v4.png";
 const IMAGE_WIDTH = 3000;
 const IMAGE_HEIGHT = 1175;
 

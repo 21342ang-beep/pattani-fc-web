@@ -38,7 +38,6 @@ export default function StadiumModelViewer({
   loadingLabel,
   errorLabel,
   interactionLabel,
-  labelModelSrc,
   poster,
   plainBackground = false,
   zones = [],
@@ -49,7 +48,6 @@ export default function StadiumModelViewer({
   loadingLabel: string;
   errorLabel: string;
   interactionLabel: string;
-  labelModelSrc: string;
   poster?: string;
   plainBackground?: boolean;
   zones?: StadiumModelZone[];
@@ -238,7 +236,6 @@ export default function StadiumModelViewer({
             "touch-action": "pan-y",
             className: "absolute inset-0 h-full w-full bg-transparent",
           },
-          createElement("extra-model", { src: labelModelSrc }),
         )}
 
         {activeZone && loadState === "ready" && (

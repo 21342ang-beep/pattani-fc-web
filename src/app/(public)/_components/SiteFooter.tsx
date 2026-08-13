@@ -33,14 +33,14 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
                 alt="Pattani FC"
                 width={88}
                 height={88}
-                className="size-16 object-contain sm:size-20 lg:size-24"
+                className="size-14 object-contain sm:size-16 lg:size-20"
               />
               <Image
                 src="/uni-x-logo.png"
                 alt="UNI-X"
                 width={1187}
                 height={303}
-                className="h-auto w-40 object-contain sm:w-52 lg:w-64"
+                className="h-auto w-36 object-contain sm:w-44 lg:w-52"
               />
             </Link>
             <p className="mx-auto mt-7 max-w-3xl text-lg leading-relaxed text-green-100/80 sm:text-xl lg:text-2xl">
