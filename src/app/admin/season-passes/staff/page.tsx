@@ -12,7 +12,7 @@ export const metadata = { title: "จองบัตรรายปีโดย�
 
 export default async function StaffSeasonPassPage() {
   await verifyPermission("SEASON_PASSES");
-  const [settings, quotas, soldGroups, availableBarcodes, vvipBarcodes, recentOrders] = await Promise.all([
+  const [settings, quotas, soldGroups, availableBarcodes, vvipBarcodes, recentOrders, members] = await Promise.all([
     getTicketPurchaseSettings(),
     prisma.seasonPassZoneQuota.findMany({ where: { seasonLabel: SEASON_LABEL } }),
     prisma.seasonPassOrder.groupBy({
@@ -40,6 +40,7 @@ export default async function StaffSeasonPassPage() {
         tierId: true,
         customerName: true,
         customerPhone: true,
+        customerId: true,
         seatZone: true,
         seatNumber: true,
         shirtSize: true,
@@ -47,6 +48,10 @@ export default async function StaffSeasonPassPage() {
         soldAt: true,
         soldById: true,
       },
+    }),
+    prisma.customer.findMany({
+      orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+      select: { id: true, name: true, phone: true, email: true },
     }),
   ]);
 
@@ -120,6 +125,7 @@ export default async function StaffSeasonPassPage() {
       <StaffSeasonPassForm
         tiers={tierOptions}
         vvipBarcodes={vvipBarcodes.map((item) => item.barcode)}
+        members={members}
         disabled={settings.seasonPassSalePhase === "CLOSED"}
       />
 
@@ -147,7 +153,12 @@ export default async function StaffSeasonPassPage() {
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">{order.soldAt ? formatDateTime(order.soldAt) : "—"}</td>
                   <td className="px-3 py-2 font-mono text-sm">{order.passCode.startsWith("PENDING-") ? "รอระบบผูกบาร์โค้ด" : order.passCode}</td>
                   <td className="px-3 py-2">{SEASON_TIERS.find((tier) => tier.id === order.tierId)?.badge ?? order.tierId}</td>
-                  <td className="px-3 py-2 font-medium">{order.customerName}</td>
+                  <td className="px-3 py-2 font-medium">
+                    <div>{order.customerName}</div>
+                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${order.customerId ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+                      {order.customerId ? "เชื่อมสมาชิกแล้ว" : "รายการเดิมยังไม่เชื่อมสมาชิก"}
+                    </span>
+                  </td>
                   <td className="px-3 py-2 font-mono">•••• {order.customerPhone.replace(/\D/g, "").slice(-4)}</td>
                   <td className="px-3 py-2">{order.seatZone || "รอระบุโซน"}{order.seatNumber ? ` · ${order.seatNumber}` : ""}</td>
                   <td className="px-3 py-2 font-semibold">{order.shirtSize || "—"}</td>

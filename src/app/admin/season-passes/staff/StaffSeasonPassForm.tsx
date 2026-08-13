@@ -16,13 +16,22 @@ type TierOption = {
   zones: { seatZone: string; remaining: number | null }[];
 };
 
+type MemberOption = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string;
+};
+
 export default function StaffSeasonPassForm({
   tiers,
   vvipBarcodes,
+  members,
   disabled,
 }: {
   tiers: TierOption[];
   vvipBarcodes: string[];
+  members: MemberOption[];
   disabled: boolean;
 }) {
   const [state, formAction, pending] = useActionState<StaffSeasonPassState, FormData>(
@@ -30,6 +39,7 @@ export default function StaffSeasonPassForm({
     undefined,
   );
   const [tierId, setTierId] = useState(tiers[0]?.id ?? "");
+  const [memberId, setMemberId] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const selectedTier = useMemo(
@@ -39,10 +49,15 @@ export default function StaffSeasonPassForm({
   const isVvip = selectedTier?.id === "vvip-elite";
   const canDeferZone = isVvip || selectedTier?.id === "vip-advanced";
   const includesShirt = seasonTierIncludesShirt(selectedTier?.id ?? "");
+  const selectedMember = useMemo(
+    () => members.find((member) => member.id === memberId) ?? null,
+    [memberId, members],
+  );
 
   useEffect(() => {
     if (state?.ok) {
       formRef.current?.reset();
+      setMemberId("");
       router.refresh();
     }
   }, [router, state]);
@@ -59,6 +74,29 @@ export default function StaffSeasonPassForm({
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
+        <Field label="สมาชิกที่จองบัตร" error={errorFor("customerId")}>
+          <select
+            name="customerId"
+            value={memberId}
+            required
+            disabled={disabled || pending}
+            onChange={(event) => setMemberId(event.target.value)}
+            className={inputClass}
+          >
+            <option value="" disabled>เลือกสมาชิกที่สมัครแล้ว</option>
+            {members.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name} · {member.phone || "ไม่มีเบอร์"} · {member.email}
+              </option>
+            ))}
+          </select>
+          {selectedMember && (
+            <span className="mt-1.5 block rounded-md bg-emerald-50 px-3 py-2 text-sm font-normal text-emerald-800">
+              ระบบจะผูกบัตรกับ {selectedMember.name} ({selectedMember.email})
+            </span>
+          )}
+        </Field>
+
         <Field label="แพ็กเกจ" error={errorFor("tierId")}>
           <select
             name="tierId"
@@ -105,15 +143,6 @@ export default function StaffSeasonPassForm({
           </>
         )}
 
-        <Field label="ชื่อ-สกุลลูกค้า" error={errorFor("customerName")}>
-          <input name="customerName" required minLength={2} maxLength={100} className={inputClass} />
-        </Field>
-        <Field label="เบอร์โทรศัพท์" error={errorFor("customerPhone")}>
-          <input name="customerPhone" type="tel" inputMode="tel" placeholder="08xxxxxxxx" required className={inputClass} />
-        </Field>
-        <Field label="อีเมล (ไม่บังคับ)" error={errorFor("customerEmail")}>
-          <input name="customerEmail" type="email" maxLength={254} className={inputClass} />
-        </Field>
         {includesShirt && (
           <Field label="ไซส์เสื้อ (ไม่บังคับ)" error={errorFor("shirtSize")}>
             <select key={tierId} name="shirtSize" defaultValue="" className={inputClass}>

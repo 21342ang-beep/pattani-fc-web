@@ -24,13 +24,11 @@ import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 
 const staffSeasonPassSchema = z
   .object({
+    customerId: z.string().trim().min(1, "กรุณาเลือกสมาชิก"),
     tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"] as const),
     seatZone: z.union([z.enum(SEASON_PASS_SEAT_ZONES), z.literal("")]),
     barcode: z.string().trim().toUpperCase().max(50),
     seatNumber: z.string().trim().toUpperCase().max(30),
-    customerName: z.string().trim().min(2).max(100),
-    customerPhone: z.string().transform(normalizeBookingSearchPhone).pipe(z.string().regex(/^0[689]\d{8}$/)),
-    customerEmail: z.union([z.literal(""), z.string().trim().toLowerCase().email().max(254)]),
     shirtSize: z.enum(SEASON_PASS_SHIRT_SIZES).optional().or(z.literal("")),
     paymentMethod: z.enum(["OFFLINE_CASH", "OFFLINE_TRANSFER"]),
     offlineReceiptNo: z.string().trim().max(100),
@@ -60,13 +58,11 @@ export async function registerStaffSeasonPass(
 ): Promise<StaffSeasonPassState> {
   const user = await verifyPermission("SEASON_PASSES");
   const parsed = staffSeasonPassSchema.safeParse({
+    customerId: formData.get("customerId"),
     tierId: formData.get("tierId"),
     seatZone: formData.get("seatZone"),
     barcode: formData.get("barcode") ?? "",
     seatNumber: formData.get("seatNumber") ?? "",
-    customerName: formData.get("customerName"),
-    customerPhone: formData.get("customerPhone"),
-    customerEmail: formData.get("customerEmail") ?? "",
     shirtSize: formData.get("shirtSize") ?? "",
     paymentMethod: formData.get("paymentMethod"),
     offlineReceiptNo: formData.get("offlineReceiptNo") ?? "",
@@ -92,6 +88,14 @@ export async function registerStaffSeasonPass(
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({
+        where: { id: input.customerId },
+        select: { id: true, name: true, phone: true, email: true },
+      });
+      if (!customer) throw new Error("MEMBER_NOT_FOUND");
+      const customerPhone = normalizeBookingSearchPhone(customer.phone ?? "");
+      if (!/^0[689]\d{8}$/.test(customerPhone)) throw new Error("MEMBER_PHONE_REQUIRED");
+
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('season-pass-sale-phase'))::text AS lock_result`;
       const currentSetting = await tx.ticketPurchaseSetting.findUnique({
         where: { id: 1 },
@@ -184,9 +188,10 @@ export async function registerStaffSeasonPass(
           seasonLabel: SEASON_LABEL,
           priceBaht: tier.priceBaht,
           shippingFeeBaht: 0,
-          customerName: input.customerName,
-          customerPhone: input.customerPhone,
-          customerEmail: input.customerEmail || null,
+          customerId: customer.id,
+          customerName: customer.name,
+          customerPhone,
+          customerEmail: customer.email,
           deliveryMethod: "PICKUP",
           pickupLocation: "สโมสร",
           shirtSize: seasonTierIncludesShirt(input.tierId) ? input.shirtSize || null : null,
@@ -220,6 +225,8 @@ export async function registerStaffSeasonPass(
     revalidatePath("/admin/season-passes");
     revalidatePath("/admin/season-passes/check");
     revalidatePath("/admin/season-passes/staff");
+    revalidatePath("/admin/members");
+    revalidatePath("/member");
     revalidatePath("/tickets/season");
     revalidateTag("bookings", { expire: 0 });
     return {
@@ -232,6 +239,12 @@ export async function registerStaffSeasonPass(
         : `จองบัตร ${result.passCode} ให้ลูกค้าเรียบร้อยแล้ว`,
     };
   } catch (error) {
+    if (error instanceof Error && error.message === "MEMBER_NOT_FOUND") {
+      return { ok: false, error: "ไม่พบบัญชีสมาชิกที่เลือก กรุณาเลือกสมาชิกใหม่", fieldErrors: { customerId: ["ไม่พบบัญชีสมาชิก"] } };
+    }
+    if (error instanceof Error && error.message === "MEMBER_PHONE_REQUIRED") {
+      return { ok: false, error: "สมาชิกที่เลือกยังไม่มีเบอร์โทรศัพท์ที่ถูกต้อง กรุณาแก้ไขข้อมูลสมาชิกก่อนจอง", fieldErrors: { customerId: ["ข้อมูลสมาชิกไม่มีเบอร์โทรศัพท์ที่ถูกต้อง"] } };
+    }
     if (error instanceof Error && error.message === "SALE_CLOSED") {
       return { ok: false, error: "ปิดการจองบัตรรายปีทั้งหมดอยู่ กรุณาเปลี่ยนเป็นรอบทีมงานหรือเปิดจองทั่วไปก่อน" };
     }
