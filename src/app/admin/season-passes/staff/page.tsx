@@ -4,7 +4,6 @@ import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 import { SEASON_LABEL, SEASON_TIERS } from "@/lib/season-pass-tiers";
 import { calculateSeasonPassZoneRanges, formatSeasonPassSequence } from "@/lib/season-pass-zone-ranges";
-import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import StaffSeasonPassForm from "./StaffSeasonPassForm";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +11,7 @@ export const metadata = { title: "จองบัตรรายปีโดย�
 
 export default async function StaffSeasonPassPage() {
   await verifyPermission("SEASON_PASSES");
-  const [settings, quotas, soldGroups, availableBarcodes, vvipBarcodes, recentOrders, members] = await Promise.all([
-    getTicketPurchaseSettings(),
+  const [quotas, soldGroups, availableBarcodes, vvipBarcodes, recentOrders, members] = await Promise.all([
     prisma.seasonPassZoneQuota.findMany({ where: { seasonLabel: SEASON_LABEL } }),
     prisma.seasonPassOrder.groupBy({
       by: ["tierId", "seatZone"],
@@ -61,7 +59,7 @@ export default async function StaffSeasonPassPage() {
     : [];
   const sellerById = new Map(sellers.map((seller) => [seller.id, seller.name || seller.email]));
 
-  const tierOptions = SEASON_TIERS.map((tier) => {
+  const tierOptions = SEASON_TIERS.filter((tier) => tier.id === "vvip-elite").map((tier) => {
     const tierQuotas = quotas.filter((quota) => quota.tierId === tier.id);
     const hasCompleteAllocation = tier.inventory != null && tierQuotas.length === tier.allowedSeatZones.length;
     const ranges = hasCompleteAllocation
@@ -99,12 +97,6 @@ export default async function StaffSeasonPassPage() {
     };
   });
 
-  const phaseLabel = {
-    STAFF_ONLY: "รอบทีมงาน",
-    PUBLIC_OPEN: "เปิดจองทั่วไปแล้ว",
-    CLOSED: "ปิดการจองทั้งหมด",
-  }[settings.seasonPassSalePhase];
-
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header>
@@ -112,13 +104,13 @@ export default async function StaffSeasonPassPage() {
           ← กลับหน้าจัดการแมตช์
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold text-green-900 md:text-4xl">จองบัตรรายปีโดยทีมงาน</h1>
-          <span className={`rounded-full px-3 py-1 text-sm font-bold ${settings.seasonPassSalePhase === "CLOSED" ? "bg-red-100 text-red-700" : settings.seasonPassSalePhase === "PUBLIC_OPEN" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
-            {phaseLabel}
+          <h1 className="text-3xl font-bold text-green-900 md:text-4xl">จองแพ็กเกจ 4,000 บาทโดยทีมงาน</h1>
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-800">
+            VVIP ELITE เท่านั้น
           </span>
         </div>
         <p className="mt-2 text-base text-slate-600 md:text-lg">
-          ฤดูกาล {SEASON_LABEL} · บันทึกเป็นช่องทางทีมงานและระบุบัญชีผู้ทำรายการทุกครั้ง
+          ฤดูกาล {SEASON_LABEL} · ช่องทางทีมงานสำหรับแพ็กเกจ VVIP ELITE 4,000 บาท
         </p>
       </header>
 
@@ -126,7 +118,7 @@ export default async function StaffSeasonPassPage() {
         tiers={tierOptions}
         vvipBarcodes={vvipBarcodes.map((item) => item.barcode)}
         members={members}
-        disabled={settings.seasonPassSalePhase === "CLOSED"}
+        disabled={false}
       />
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

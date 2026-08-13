@@ -20,7 +20,6 @@ import {
   calculateSeasonPassZoneRanges,
   formatSeasonPassSequence,
 } from "@/lib/season-pass-zone-ranges";
-import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 
 const staffSeasonPassSchema = z
   .object({
@@ -87,9 +86,12 @@ export async function registerStaffSeasonPass(
     };
   }
 
-  const settings = await getTicketPurchaseSettings();
-  if (settings.seasonPassSalePhase === "CLOSED") {
-    return { ok: false, error: "ปิดการจองบัตรรายปีทั้งหมดอยู่ กรุณาเปลี่ยนเป็นรอบทีมงานหรือเปิดจองทั่วไปก่อน" };
+  if (parsed.data.tierId !== "vvip-elite") {
+    return {
+      ok: false,
+      error: "รอบทีมงานเปิดให้จองเฉพาะแพ็กเกจ 4,000 บาทเท่านั้น",
+      fieldErrors: { tierId: ["แพ็กเกจนี้เปิดจองเฉพาะรอบทั่วไป"] },
+    };
   }
 
   const input = parsed.data;
@@ -108,13 +110,6 @@ export async function registerStaffSeasonPass(
       if (input.customerMode === "EXISTING" && !/^0[689]\d{8}$/.test(customerPhone)) {
         throw new Error("MEMBER_PHONE_REQUIRED");
       }
-
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('season-pass-sale-phase'))::text AS lock_result`;
-      const currentSetting = await tx.ticketPurchaseSetting.findUnique({
-        where: { id: 1 },
-        select: { seasonPassSalePhase: true },
-      });
-      if (currentSetting?.seasonPassSalePhase === "CLOSED") throw new Error("SALE_CLOSED");
 
       const quotaLockKey = `${SEASON_LABEL}:${input.tierId}:${input.seatZone}`;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))::text AS lock_result`;
@@ -257,9 +252,6 @@ export async function registerStaffSeasonPass(
     }
     if (error instanceof Error && error.message === "MEMBER_PHONE_REQUIRED") {
       return { ok: false, error: "สมาชิกที่เลือกยังไม่มีเบอร์โทรศัพท์ที่ถูกต้อง กรุณาแก้ไขข้อมูลสมาชิกก่อนจอง", fieldErrors: { customerId: ["ข้อมูลสมาชิกไม่มีเบอร์โทรศัพท์ที่ถูกต้อง"] } };
-    }
-    if (error instanceof Error && error.message === "SALE_CLOSED") {
-      return { ok: false, error: "ปิดการจองบัตรรายปีทั้งหมดอยู่ กรุณาเปลี่ยนเป็นรอบทีมงานหรือเปิดจองทั่วไปก่อน" };
     }
     if (error instanceof Error && error.message === "ZONE_SOLD_OUT") {
       return { ok: false, error: "โซนนี้เต็มตามโควตาบัตรรายปีแล้ว กรุณาเลือกโซนอื่น" };

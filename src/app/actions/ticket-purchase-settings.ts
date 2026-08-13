@@ -42,7 +42,6 @@ export async function setTicketSaleOpen(
 }
 
 const seasonPassSalePhases = new Set<SeasonPassSalePhase>([
-  "STAFF_ONLY",
   "PUBLIC_OPEN",
   "CLOSED",
 ]);

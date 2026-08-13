@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, MapPin, Shield } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { hasPermission, verifyPermission } from "@/lib/dal";
+import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 import { getSeatAvailabilityForMatches, type ZoneAvailability } from "@/lib/seat-availability";
 import { STADIUM_ZONE_CODES, type StadiumZoneCode } from "@/lib/stadium-zones";
@@ -36,7 +36,7 @@ const statusClassName: Record<string, string> = {
 export default async function AdminMatchesPage(props: {
   searchParams: Promise<{ competition?: string }>;
 }) {
-  const adminUser = await verifyPermission("MATCHES");
+  await verifyPermission("MATCHES");
   const { competition: rawCompetition } = await props.searchParams;
   const competition = rawCompetition === "CUP" || rawCompetition === "LEAGUE"
     ? rawCompetition
@@ -109,7 +109,6 @@ export default async function AdminMatchesPage(props: {
             seasonPassControl={{
               phase: purchaseSettings.seasonPassSalePhase,
               stats: seasonPassStats,
-              canBookForCustomer: hasPermission(adminUser, "SEASON_PASSES"),
             }}
           />
           <MatchManagementCard
@@ -240,7 +239,6 @@ function MatchManagementCard({
   seasonPassControl?: {
     phase: "STAFF_ONLY" | "PUBLIC_OPEN" | "CLOSED";
     stats: { total: number; staffBooked: number; onlineBooked: number; remaining: number };
-    canBookForCustomer: boolean;
   };
 }) {
   return (
@@ -260,7 +258,6 @@ function MatchManagementCard({
         <SeasonPassSalePhaseControl
           initialPhase={seasonPassControl.phase}
           stats={seasonPassControl.stats}
-          canBookForCustomer={seasonPassControl.canBookForCustomer}
         />
       )}
     </article>
