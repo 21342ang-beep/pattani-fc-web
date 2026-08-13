@@ -134,7 +134,7 @@ export default async function SeasonTicketsPage() {
 
         <figure className="mx-auto mb-10 mt-10 w-full max-w-5xl md:mb-12 md:mt-12">
           <Image
-            src="/stadium-zones-season-2026-27.png"
+            src="/stadium-zones-season-2026-27-v5.png"
             alt={t("แผนผังโซนที่นั่งและราคาบัตรสมาชิกรายปี", "Season membership seating zones and prices")}
             width={1553}
             height={1058}

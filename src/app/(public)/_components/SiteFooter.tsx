@@ -7,14 +7,8 @@ import SponsorFooter from "./SponsorFooter";
 // แสดง Footer หลักของเว็บไซต์ พร้อมส่วนสปอนเซอร์ด้านบน
 const SHOW_SITE_FOOTER = true;
 
-function SocialIcon({
-  symbol,
-  tone,
-}: {
-  symbol: string;
-  tone: string;
-}) {
-  return <span className={`flex size-9 items-center justify-center rounded-lg bg-white/10 text-lg font-black text-green-100/60 transition-colors ${tone}`} aria-hidden>{symbol}</span>;
+function SocialIcon({ symbol }: { symbol: string }) {
+  return <span className="flex size-11 items-center justify-center rounded-xl bg-white/[0.07] text-lg font-black text-green-100/55 transition-colors group-hover:bg-white/15 group-hover:text-yellow-300" aria-hidden>{symbol}</span>;
 }
 
 export default function SiteFooter({ dict }: { dict: Dict }) {
@@ -30,81 +24,83 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
           aria-hidden
           className="absolute inset-0 opacity-[0.03] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:48px_48px]"
         />
-        <div className="relative mx-auto max-w-7xl px-4 pt-14 pb-6">
-        <div className="flex justify-center">
-          <div className="max-w-2xl text-center">
-            <Link href="/" className="inline-flex items-center gap-3">
+        <div className="relative mx-auto max-w-7xl px-4 pb-6 pt-14 sm:pt-16">
+        <div className="flex justify-center text-center">
+          <div className="w-full max-w-5xl">
+            <Link href="/" className="inline-flex items-center justify-center gap-5 sm:gap-6" aria-label="Pattani FC และ UNI-X">
               <Image
                 src="/logo-pattani-fc.png"
                 alt="Pattani FC"
-                width={56}
-                height={56}
+                width={88}
+                height={88}
+                className="size-16 object-contain sm:size-20 lg:size-24"
               />
-              <div>
-                <p className="text-xl font-black tracking-wide text-yellow-300 sm:text-2xl lg:text-3xl">
-                  {dict.brand.name}
-                </p>
-                <p className="text-base uppercase tracking-widest text-green-300 sm:text-lg">
-                  {dict.footer.estTagline}
-                </p>
-              </div>
+              <Image
+                src="/uni-x-logo.png"
+                alt="UNI-X"
+                width={1187}
+                height={303}
+                className="h-auto w-44 object-contain sm:w-56 lg:w-72"
+              />
             </Link>
-            <p className="mx-auto mt-4 max-w-md text-lg text-green-100/70 sm:text-xl lg:text-2xl">
+            <p className="mx-auto mt-7 max-w-3xl text-lg leading-relaxed text-green-100/80 sm:text-xl lg:text-2xl">
               {dict.footer.description}
             </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-3 text-lg text-green-100/60 sm:gap-x-6 sm:text-xl lg:text-2xl">
+            <p className="mx-auto mt-1 max-w-3xl text-lg font-bold leading-relaxed text-yellow-300 sm:text-xl lg:text-2xl">
+              {dict.footer.tagline}
+            </p>
+            <div className="mt-12 flex flex-col items-center justify-center gap-4 text-base text-green-100/60 sm:flex-row sm:flex-wrap sm:gap-x-8 sm:text-lg lg:gap-x-12 lg:text-xl">
               <div className="flex items-center gap-2">
-                <MapPin className="size-4 shrink-0 sm:size-5" /> {dict.footer.location}
+                <MapPin className="size-5 shrink-0" /> {dict.footer.location}
               </div>
               <a
                 href="mailto:pattanifc2009@gmail.com"
                 className="flex items-center gap-2 transition hover:text-yellow-300"
               >
-                <Mail className="size-4 shrink-0 sm:size-5" /> pattanifc2009@gmail.com
+                <Mail className="size-5 shrink-0" /> pattanifc2009@gmail.com
               </a>
               <a
                 href="tel:+66731234567"
                 className="flex items-center gap-2 transition hover:text-yellow-300"
               >
-                <Phone className="size-4 shrink-0 sm:size-5" /> {dict.footer.phoneLabel} +66 (0) 73-123-4567
+                <Phone className="size-5 shrink-0" /> {dict.footer.phoneLabel} +66 (0) 73-123-4567
               </a>
             </div>
-            <div className="mt-5 flex justify-center gap-3">
+            <div className="mt-8 flex justify-center gap-4">
               <SocialButton
                 href="https://www.facebook.com/PattaniFC"
                 label="Facebook"
               >
-                <SocialIcon symbol="f" tone="hover:bg-[#1877f2] hover:text-white" />
+                <SocialIcon symbol="f" />
               </SocialButton>
               <SocialButton
                 href="https://www.instagram.com/pattanifc.official/"
                 label="Instagram"
               >
-                <SocialIcon symbol="◎" tone="hover:bg-[#d62976] hover:text-white" />
+                <SocialIcon symbol="◎" />
               </SocialButton>
               <SocialButton
                 href="https://www.youtube.com/@PattaniFCTV"
                 label="YouTube"
               >
-                <SocialIcon symbol="▶" tone="hover:bg-[#ff0000] hover:text-white" />
+                <SocialIcon symbol="▶" />
               </SocialButton>
               <SocialButton
                 href="https://www.tiktok.com/@pattanifc.official"
                 label="TikTok"
               >
-                <SocialIcon symbol="♪" tone="hover:bg-slate-900 hover:text-white" />
+                <SocialIcon symbol="♪" />
               </SocialButton>
             </div>
           </div>
 
         </div>
 
-        <div className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-base text-green-100/50 sm:text-lg lg:text-xl md:flex-row">
+        <div className="mt-12 flex flex-col items-center justify-between gap-2 border-t border-yellow-300/10 pt-4 text-sm text-green-100/45 sm:text-base md:flex-row">
           <p className="text-center leading-relaxed md:text-left">
             © {new Date().getFullYear()} {dict.footer.rights}
           </p>
           <div className="flex items-center gap-4">
-            <p>{dict.footer.tagline}</p>
             <Link
               href="/login"
               className="inline-flex items-center gap-1 text-green-100/40 transition hover:text-yellow-300"
@@ -136,7 +132,7 @@ function SocialButton({
       aria-label={label}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex size-10 items-center justify-center transition-transform hover:scale-110"
+      className="group flex size-11 items-center justify-center transition-transform hover:scale-110"
     >
       {children}
     </a>

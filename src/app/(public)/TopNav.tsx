@@ -90,6 +90,7 @@ export default function TopNav({
       children: [
         { href: "/club", label: dict.nav.club },
         { href: "/management", label: dict.nav.management },
+        { href: "/partners", label: dict.nav.partners },
         { href: "/squad", label: dict.nav.squad },
         { href: "/youth", label: dict.nav.youth },
       ],

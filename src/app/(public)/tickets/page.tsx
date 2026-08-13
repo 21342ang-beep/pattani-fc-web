@@ -230,7 +230,7 @@ export default async function TicketsPage() {
 
         <figure className="mx-auto mb-10 mt-10 w-full max-w-5xl md:mb-12 md:mt-12">
           <Image
-            src="/stadium-zones-match-2026-27.png"
+            src="/stadium-zones-match-2026-27-v6.png"
             alt={t("แผนผังโซนที่นั่งและราคาบัตรรายแมตช์", "Match ticket seating zones and prices")}
             width={1553}
             height={1058}
