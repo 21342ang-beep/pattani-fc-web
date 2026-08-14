@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { SEASON_LABEL, getSeasonTier } from "@/lib/season-pass-tiers";
+import { activeSeasonPassOrderWhere, expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export type SeasonPassZoneQuotaState =
   | { success: string; error?: never }
@@ -56,6 +57,7 @@ export async function updateSeasonPassZoneQuotas(
   }
 
   try {
+    await expirePendingSeasonPassPurchases();
     await prisma.$transaction(async (tx) => {
       // Use the same locks as checkout so an allocation cannot be reduced while an order is created.
       for (const row of rows) {
@@ -67,7 +69,7 @@ export async function updateSeasonPassZoneQuotas(
         where: {
           seasonLabel: SEASON_LABEL,
           tierId,
-          status: { in: ["PENDING", "CONFIRMED"] },
+          ...activeSeasonPassOrderWhere(),
         },
         _count: { _all: true },
       });

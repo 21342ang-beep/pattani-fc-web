@@ -11,6 +11,7 @@ import { SEASON_LABEL, SEASON_TIERS, getSeasonPublicSaleLimit } from "@/lib/seas
 import DeleteMatchButton from "./DeleteMatchButton";
 import BookingSaleToggle from "./BookingSaleToggle";
 import SeasonPassSalePhaseControl from "./SeasonPassSalePhaseControl";
+import { activeSeasonPassOrderWhere, expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export const dynamic = "force-dynamic";
 
@@ -43,11 +44,12 @@ export default async function AdminMatchesPage(props: {
     : undefined;
 
   if (!competition) {
+    await expirePendingSeasonPassPurchases();
     const [purchaseSettings, seasonOrderGroups, seasonQuotas, availableVvipBarcodes] = await Promise.all([
       getTicketPurchaseSettings(),
       prisma.seasonPassOrder.groupBy({
         by: ["tierId", "salesChannel"],
-        where: { seasonLabel: SEASON_LABEL, status: { in: ["PENDING", "CONFIRMED"] } },
+        where: { seasonLabel: SEASON_LABEL, ...activeSeasonPassOrderWhere() },
         _count: { _all: true },
       }),
       prisma.seasonPassZoneQuota.findMany({ where: { seasonLabel: SEASON_LABEL } }),

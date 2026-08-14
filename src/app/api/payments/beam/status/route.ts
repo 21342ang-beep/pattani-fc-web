@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { expirePendingBookings } from "@/lib/booking-expiry";
+import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -24,12 +25,19 @@ export async function GET(request: Request) {
   if (!seasonPassCode || !/^[a-z0-9-]{8,100}$/i.test(seasonPassCode)) {
     return Response.json({ error: "ข้อมูลบัตรรายปีไม่ถูกต้อง" }, { status: 400 });
   }
+  await expirePendingSeasonPassPurchases({ purchaseCode: seasonPassCode, passCode: seasonPassCode });
   const purchase = await prisma.seasonPassPurchase.findUnique({
     where: { purchaseCode: seasonPassCode },
     select: { status: true },
   });
-  if (purchase) return Response.json({ confirmed: purchase.status === "CONFIRMED" });
+  if (purchase) return Response.json({
+    confirmed: purchase.status === "CONFIRMED",
+    expired: purchase.status === "CANCELLED",
+  });
   const order = await prisma.seasonPassOrder.findUnique({ where: { passCode: seasonPassCode }, select: { status: true } });
   if (!order) return Response.json({ error: "ไม่พบรายการสมัครบัตรรายปี" }, { status: 404 });
-  return Response.json({ confirmed: order.status === "CONFIRMED" });
+  return Response.json({
+    confirmed: order.status === "CONFIRMED",
+    expired: order.status === "CANCELLED",
+  });
 }

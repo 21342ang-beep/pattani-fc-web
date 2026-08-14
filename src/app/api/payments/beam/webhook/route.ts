@@ -2,6 +2,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { parseBeamPaymentReference, verifyBeamSignature } from "@/lib/beam-webhook";
 import { prisma } from "@/lib/prisma";
+import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export const runtime = "nodejs";
 
@@ -119,6 +120,12 @@ export async function POST(request: Request) {
         data: { status: "CANCELLED" },
       });
       if (cancelled.count > 0) revalidatePaymentViews("booking", reference.code);
+    } else if (reference?.kind === "season") {
+      const cancelled = await expirePendingSeasonPassPurchases({
+        purchaseCode: reference.code,
+        passCode: reference.code,
+      });
+      if (cancelled.count > 0) revalidatePaymentViews("season", reference.code);
     }
     return Response.json({ ok: true, processed: result > 0 });
   }
@@ -160,12 +167,24 @@ export async function POST(request: Request) {
   } else {
     const purchase = await prisma.seasonPassPurchase.findUnique({
       where: { purchaseCode: reference.code },
-      select: { id: true, totalBaht: true, status: true },
+      select: { id: true, totalBaht: true, status: true, paymentExpiresAt: true },
     });
-    if (purchase?.status === "PENDING" && purchase.totalBaht * 100 === payment.amount) {
+    if (
+      purchase?.status === "PENDING" &&
+      purchase.totalBaht * 100 === payment.amount &&
+      (!purchase.paymentExpiresAt || purchase.paymentExpiresAt >= payment.paidAt)
+    ) {
       const result = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`season-purchase:${purchase.id}`}))`;
         const updatedPurchase = await tx.seasonPassPurchase.updateMany({
-          where: { id: purchase.id, status: "PENDING" },
+          where: {
+            id: purchase.id,
+            status: "PENDING",
+            OR: [
+              { paymentExpiresAt: null },
+              { paymentExpiresAt: { gte: payment.paidAt } },
+            ],
+          },
           data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod },
         });
         if (updatedPurchase.count > 0) {

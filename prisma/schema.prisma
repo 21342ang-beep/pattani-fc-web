@@ -406,6 +406,8 @@ model SeasonPassPurchase {
   totalBaht       Int
   paymentMethod   String
   status          SeasonPassOrderStatus @default(PENDING)
+  // Nullable keeps orders created before timed checkout backward-compatible.
+  paymentExpiresAt DateTime?
   orders          SeasonPassOrder[]
   xenditPayments  XenditPayment[]
   beamPayments    BeamPayment[]
@@ -415,6 +417,7 @@ model SeasonPassPurchase {
   @@index([customerId])
   @@index([customerEmail])
   @@index([status])
+  @@index([status, paymentExpiresAt])
 }
 
 model SeasonPassOrder {

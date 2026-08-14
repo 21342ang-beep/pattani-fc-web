@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyCustomer } from "@/lib/customer-dal";
 import { getSeasonTier } from "@/lib/season-pass-tiers";
 import PaymentGateway from "../../[code]/PaymentGateway";
+import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function SeasonPassCheckoutPage({
 }) {
   const [{ code }, customer] = await Promise.all([params, verifyCustomer()]);
   if (!code || !/^[A-Z0-9-]{8,100}$/i.test(code)) notFound();
+  await expirePendingSeasonPassPurchases({ purchaseCode: code, passCode: code });
 
   const ownerWhere = {
     OR: [

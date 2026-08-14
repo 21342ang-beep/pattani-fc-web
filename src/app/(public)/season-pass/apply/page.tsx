@@ -6,6 +6,10 @@ import { readCustomerSession } from "@/lib/customer-session";
 import { SEASON_LABEL, getSeasonTier } from "@/lib/season-pass-tiers";
 import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
+import {
+  activeSeasonPassOrderWhere,
+  expirePendingSeasonPassPurchases,
+} from "@/lib/season-pass-expiry";
 import SeasonPassWizard, {
   type SeasonPassZoneOption,
   type ShippingProvince,
@@ -31,6 +35,7 @@ export default async function SeasonPassApplyPage(props: {
     // ต้องเป็นสมาชิกก่อนจอง — เข้าสู่ระบบ (หรือกดสมัครจากหน้า login) แล้วเด้งกลับมาต่อ
     redirect(`/member/login?returnTo=${encodeURIComponent(`/tickets/season/apply?tier=${tier.id}`)}`);
   }
+  await expirePendingSeasonPassPurchases();
   const [customer, quotas, soldGroups] = await Promise.all([
     prisma.customer.findUnique({
       where: { id: session.customerId },
@@ -52,7 +57,7 @@ export default async function SeasonPassApplyPage(props: {
       where: {
         seasonLabel: SEASON_LABEL,
         tierId: tier.id,
-        status: { in: ["PENDING", "CONFIRMED"] },
+        ...activeSeasonPassOrderWhere(),
       },
       _count: { _all: true },
     }),

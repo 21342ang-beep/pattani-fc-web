@@ -4,6 +4,7 @@ import { z } from "zod";
 import { BeamApiError, createBeamPromptPayCharge } from "@/lib/beam";
 import { expirePendingBookings } from "@/lib/booking-expiry";
 import { prisma } from "@/lib/prisma";
+import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 const bodySchema = z.object({
   bookingCode: z.string().trim().min(8).max(50).regex(/^[a-z0-9]+$/i).optional(),
@@ -95,10 +96,11 @@ async function createBookingPayment(request: Request, bookingCode: string) {
     referencePrefix: `booking_${booking.bookingCode}`,
     amount: booking.totalAmount,
   });
-  return finishCharge(request, payment, booking.totalAmount, `/tickets/${booking.bookingCode}`, booking.id);
+  return finishCharge(request, payment, booking.totalAmount, `/tickets/${booking.bookingCode}`, { bookingId: booking.id });
 }
 
 async function createSeasonPassPayment(request: Request, seasonPassCode: string) {
+  await expirePendingSeasonPassPurchases({ purchaseCode: seasonPassCode, passCode: seasonPassCode });
   const purchase = await prisma.seasonPassPurchase.findUnique({
     where: { purchaseCode: seasonPassCode },
     select: { id: true, purchaseCode: true, totalBaht: true, quantity: true, status: true },
@@ -114,7 +116,7 @@ async function createSeasonPassPayment(request: Request, seasonPassCode: string)
       amount,
     });
     const successPath = purchase.quantity > 1 ? "/member/bookings" : `/checkout/season/${encodeURIComponent(purchase.purchaseCode)}`;
-    return finishCharge(request, payment, amount, successPath);
+    return finishCharge(request, payment, amount, successPath, { seasonPassPurchaseId: purchase.id });
   }
 
   const order = await prisma.seasonPassOrder.findUnique({
@@ -138,7 +140,7 @@ async function finishCharge(
   payment: PaymentRow,
   amount: number,
   successPath: string,
-  bookingId?: string,
+  target?: { bookingId?: string; seasonPassPurchaseId?: string },
 ) {
   const ready = readyResponse(payment);
   if (ready) return ready;
@@ -160,15 +162,24 @@ async function finishCharge(
         SET "chargeId" = ${charge.chargeId}, "qrImageBase64" = ${charge.qrImageBase64},
             "expiresAt" = ${charge.expiresAt}, "status" = 'PENDING', "updatedAt" = NOW()
         WHERE "id" = ${payment.id}`);
-      if (!bookingId) return true;
-      const result = await tx.booking.updateMany({
-        where: {
-          id: bookingId,
-          status: "PENDING",
-          paymentExpiresAt: { gt: new Date() },
-        },
-        data: { paymentExpiresAt: charge.expiresAt },
-      });
+      if (!target?.bookingId && !target?.seasonPassPurchaseId) return true;
+      const result = target.bookingId
+        ? await tx.booking.updateMany({
+            where: {
+              id: target.bookingId,
+              status: "PENDING",
+              paymentExpiresAt: { gt: new Date() },
+            },
+            data: { paymentExpiresAt: charge.expiresAt },
+          })
+        : await tx.seasonPassPurchase.updateMany({
+            where: {
+              id: target.seasonPassPurchaseId!,
+              status: "PENDING",
+              paymentExpiresAt: { gt: new Date() },
+            },
+            data: { paymentExpiresAt: charge.expiresAt },
+          });
       if (result.count === 0) {
         await tx.$executeRaw(Prisma.sql`UPDATE "BeamPayment" SET "status" = 'EXPIRED', "updatedAt" = NOW()
           WHERE "id" = ${payment.id}`);

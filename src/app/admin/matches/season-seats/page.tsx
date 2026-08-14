@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { SEASON_LABEL, SEASON_TIERS } from "@/lib/season-pass-tiers";
 import SeasonPassZoneQuotaForm from "./SeasonPassZoneQuotaForm";
+import { activeSeasonPassOrderWhere, expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export const dynamic = "force-dynamic";
 
 export default async function SeasonPassZoneQuotasPage() {
   await verifyPermission("MATCHES");
+  await expirePendingSeasonPassPurchases();
   const tiers = SEASON_TIERS.filter((tier) => tier.inventory != null);
   const [quotas, soldGroups] = await Promise.all([
     prisma.seasonPassZoneQuota.findMany({ where: { seasonLabel: SEASON_LABEL } }),
@@ -15,7 +17,7 @@ export default async function SeasonPassZoneQuotasPage() {
       by: ["tierId", "seatZone"],
       where: {
         seasonLabel: SEASON_LABEL,
-        status: { in: ["PENDING", "CONFIRMED"] },
+        ...activeSeasonPassOrderWhere(),
       },
       _count: { _all: true },
     }),

@@ -12,6 +12,7 @@ import Link from "next/link";
 import SeasonPassStatusSelect from "./SeasonPassStatusSelect";
 import DeleteSeasonPassButton from "./DeleteSeasonPassButton";
 import DeleteAllSeasonPassOrdersButton from "./DeleteAllSeasonPassOrdersButton";
+import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "บัตรรายปี — Admin" };
@@ -27,6 +28,7 @@ export default async function AdminSeasonPassesPage(props: {
   searchParams: Promise<{ tier?: string }>;
 }) {
   await verifyPermission("SEASON_PASSES");
+  await expirePendingSeasonPassPurchases();
   const { tier: rawTier } = await props.searchParams;
   const saleTiers = SEASON_TIERS;
   const selectedTier = saleTiers.some((tier) => tier.id === rawTier)

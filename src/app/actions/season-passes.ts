@@ -25,6 +25,11 @@ import {
   calculateSeasonPassZoneRanges,
   formatSeasonPassSequence,
 } from "@/lib/season-pass-zone-ranges";
+import {
+  activeSeasonPassOrderWhere,
+  expirePendingSeasonPassPurchases,
+  newSeasonPassPaymentDeadline,
+} from "@/lib/season-pass-expiry";
 
 function revalidateSeatAvailability() {
   revalidatePath("/season-pass");
@@ -187,8 +192,12 @@ export async function createSeasonPassOrder(
     parsed.data.deliveryMethod === "SHIPPING"
       ? SEASON_PASS_SHIPPING_FEE_BAHT
       : 0;
+  const paymentExpiresAt = newSeasonPassPaymentDeadline();
 
   try {
+    // Release expired public holds before selecting inventory. Legacy and staff
+    // orders have no deadline and are intentionally left untouched.
+    await expirePendingSeasonPassPurchases();
     const result = await prisma.$transaction(async (tx) => {
       // Serialize sale-state changes with order creation. Once CLOSED/STAFF_ONLY commits,
       // no new public order can slip through using a stale pre-transaction check.
@@ -239,7 +248,7 @@ export async function createSeasonPassOrder(
             seasonLabel: SEASON_LABEL,
             tierId: parsed.data.tierId,
             seatZone: parsed.data.seatZone,
-            status: { in: ["PENDING", "CONFIRMED"] },
+            ...activeSeasonPassOrderWhere(),
           },
         });
         if (zoneSold + parsed.data.quantity > publicZoneLimit) {
@@ -281,6 +290,7 @@ export async function createSeasonPassOrder(
           totalBaht: tier.priceBaht * parsed.data.quantity + shippingFeeBaht,
           paymentMethod: parsed.data.paymentMethod,
           status: "PENDING",
+          paymentExpiresAt,
         },
       });
 
@@ -402,7 +412,7 @@ export async function updateSeasonPassStatus(
                 seasonLabel: order.seasonLabel,
                 tierId: order.tierId,
                 seatZone: order.seatZone,
-                status: { in: ["PENDING", "CONFIRMED"] },
+                ...activeSeasonPassOrderWhere(),
               },
             });
             if (active + newlyActiveCount > limit) throw new Error("ZONE_SOLD_OUT");
@@ -541,7 +551,7 @@ export async function updateSeasonPassOrder(
               seasonLabel: order.seasonLabel,
               tierId: order.tierId,
               seatZone: input.seatZone,
-              status: { in: ["PENDING", "CONFIRMED"] },
+              ...activeSeasonPassOrderWhere(),
             },
           });
           if (active >= limit) throw new Error("ZONE_SOLD_OUT");

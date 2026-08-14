@@ -58,19 +58,33 @@ export async function POST(request: Request) {
         });
       }
       if (payment.seasonPassPurchaseId) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`season-purchase:${payment.seasonPassPurchaseId}`}))`;
         const purchase = await tx.seasonPassPurchase.findUnique({
           where: { id: payment.seasonPassPurchaseId },
-          select: { totalBaht: true, status: true },
+          select: { totalBaht: true, status: true, paymentExpiresAt: true },
         });
-        if (purchase?.status === "PENDING" && purchase.totalBaht * 100 === payment.amount) {
-          await tx.seasonPassPurchase.update({
-            where: { id: payment.seasonPassPurchaseId },
+        if (
+          purchase?.status === "PENDING" &&
+          purchase.totalBaht * 100 === payment.amount &&
+          (!purchase.paymentExpiresAt || purchase.paymentExpiresAt > new Date())
+        ) {
+          const updated = await tx.seasonPassPurchase.updateMany({
+            where: {
+              id: payment.seasonPassPurchaseId,
+              status: "PENDING",
+              OR: [
+                { paymentExpiresAt: null },
+                { paymentExpiresAt: { gt: new Date() } },
+              ],
+            },
             data: { status: "CONFIRMED", paymentMethod: "XENDIT_PROMPTPAY" },
           });
-          await tx.seasonPassOrder.updateMany({
-            where: { purchaseId: payment.seasonPassPurchaseId, status: "PENDING" },
-            data: { status: "CONFIRMED", paymentMethod: "XENDIT_PROMPTPAY" },
-          });
+          if (updated.count > 0) {
+            await tx.seasonPassOrder.updateMany({
+              where: { purchaseId: payment.seasonPassPurchaseId, status: "PENDING" },
+              data: { status: "CONFIRMED", paymentMethod: "XENDIT_PROMPTPAY" },
+            });
+          }
         }
       }
     });

@@ -5,6 +5,7 @@ import { verifyCustomer } from "@/lib/customer-dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { getSeasonTier } from "@/lib/season-pass-tiers";
 import { getMemberTicketIds } from "@/lib/member-tickets";
+import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "ตั๋วของฉัน — Pattani FC" };
@@ -22,6 +23,7 @@ function statusOf(status: string) {
 
 export default async function MyTicketsPage() {
   const customer = await verifyCustomer();
+  await expirePendingSeasonPassPurchases();
   const ticketIds = await getMemberTicketIds(customer);
 
   const [bookings, seasonPasses] = await Promise.all([
