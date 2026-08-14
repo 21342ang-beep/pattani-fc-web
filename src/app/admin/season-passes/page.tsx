@@ -14,6 +14,7 @@ import DeleteSeasonPassButton from "./DeleteSeasonPassButton";
 import DeleteAllSeasonPassOrdersButton from "./DeleteAllSeasonPassOrdersButton";
 import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
+import { compareSeasonPassOrders } from "@/lib/season-pass-order-sort";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "บัตรรายปี — Admin" };
@@ -43,7 +44,10 @@ export default async function AdminSeasonPassesPage(props: {
     : undefined;
 
   const [orders, zoneQuotas, barcodeTotals] = await Promise.all([
-    prisma.seasonPassOrder.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.seasonPassOrder.findMany({
+      include: { barcode: { select: { barcode: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
     prisma.seasonPassZoneQuota.findMany({ where: { seasonLabel: SEASON_LABEL } }),
     prisma.seasonPassBarcode.groupBy({
       by: ["tierId"],
@@ -60,9 +64,10 @@ export default async function AdminSeasonPassesPage(props: {
     if (tierOrders) tierOrders.push(order);
   }
   const selectedTierOrders = ordersByTier.get(selectedTier) ?? [];
-  const displayedOrders = selectedZone
+  const filteredOrders = selectedZone
     ? selectedTierOrders.filter((order) => order.seatZone === selectedZone)
     : selectedTierOrders;
+  const displayedOrders = [...filteredOrders].sort(compareSeasonPassOrders);
   const barcodeTotalByTier = new Map(
     barcodeTotals.map((row) => [row.tierId, row._count._all]),
   );
