@@ -26,15 +26,21 @@ const statusColor: Record<string, string> = {
 };
 
 export default async function AdminSeasonPassesPage(props: {
-  searchParams: Promise<{ tier?: string }>;
+  searchParams: Promise<{ tier?: string; zone?: string }>;
 }) {
   await verifyPermission("SEASON_PASSES");
   await expirePendingSeasonPassPurchases();
-  const { tier: rawTier } = await props.searchParams;
+  const { tier: rawTier, zone: rawZone } = await props.searchParams;
   const saleTiers = SEASON_TIERS;
   const selectedTier = saleTiers.some((tier) => tier.id === rawTier)
     ? (rawTier as SeasonTierId)
     : saleTiers[0].id;
+  const selectedTierConfig = saleTiers.find((tier) => tier.id === selectedTier)!;
+  const selectedZone = selectedTierConfig.allowedSeatZones.some(
+    (seatZone) => seatZone === rawZone,
+  )
+    ? rawZone
+    : undefined;
 
   const [orders, zoneQuotas, barcodeTotals] = await Promise.all([
     prisma.seasonPassOrder.findMany({ orderBy: { createdAt: "desc" } }),
@@ -53,7 +59,10 @@ export default async function AdminSeasonPassesPage(props: {
     const tierOrders = ordersByTier.get(order.tierId as SeasonTierId);
     if (tierOrders) tierOrders.push(order);
   }
-  const displayedOrders = ordersByTier.get(selectedTier) ?? [];
+  const selectedTierOrders = ordersByTier.get(selectedTier) ?? [];
+  const displayedOrders = selectedZone
+    ? selectedTierOrders.filter((order) => order.seatZone === selectedZone)
+    : selectedTierOrders;
   const barcodeTotalByTier = new Map(
     barcodeTotals.map((row) => [row.tierId, row._count._all]),
   );
@@ -162,56 +171,77 @@ export default async function AdminSeasonPassesPage(props: {
               return { seatZone, remaining: Math.max(0, capacity - occupied) };
             });
             return (
-              <Link
+              <div
                 key={tier.id}
-                href={`/admin/season-passes?tier=${tier.id}`}
-                role="tab"
-                aria-selected={selectedTier === tier.id}
-                className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-700/30 ${selectedTier === tier.id ? "border-green-700 bg-green-50 ring-2 ring-green-700/20" : "border-green-100 bg-white"}`}
+                className={`flex h-full flex-col rounded-xl border p-4 shadow-sm transition ${selectedTier === tier.id ? "border-green-700 bg-green-50 ring-2 ring-green-700/20" : "border-green-100 bg-white"}`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold uppercase tracking-widest text-yellow-700 md:text-base">แพ็กเกจ ฿{tier.priceBaht.toLocaleString("th-TH")}</p>
-                    <p className="mt-1 text-base font-bold text-green-900 md:text-lg">{tier.badge}</p>
-                  </div>
-                  <div className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50/90 px-2.5 py-2 text-right shadow-sm">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">คงเหลือ</p>
-                    <div className={`mt-1 grid gap-x-3 gap-y-0.5 ${remainingByZone.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
-                      {remainingByZone.map(({ seatZone, remaining }) => (
-                        <span key={seatZone} className="flex items-baseline justify-between gap-2 whitespace-nowrap text-xs text-slate-600">
-                          <span>{seatZone}</span>
-                          <strong className="text-sm text-emerald-800">{remaining.toLocaleString("th-TH")}</strong>
-                        </span>
-                      ))}
+                <Link
+                  href={`/admin/season-passes?tier=${tier.id}`}
+                  role="tab"
+                  aria-selected={selectedTier === tier.id}
+                  className="block flex-1 rounded-lg transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-green-700/30"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold uppercase tracking-widest text-yellow-700 md:text-base">แพ็กเกจ ฿{tier.priceBaht.toLocaleString("th-TH")}</p>
+                      <p className="mt-1 text-base font-bold text-green-900 md:text-lg">{tier.badge}</p>
+                    </div>
+                    <div className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50/90 px-2.5 py-2 text-right shadow-sm">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">คงเหลือ</p>
+                      <div className={`mt-1 grid gap-x-3 gap-y-0.5 ${remainingByZone.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+                        {remainingByZone.map(({ seatZone, remaining }) => (
+                          <span key={seatZone} className="flex items-baseline justify-between gap-2 whitespace-nowrap text-xs text-slate-600">
+                            <span>{seatZone}</span>
+                            <strong className="text-sm text-emerald-800">{remaining.toLocaleString("th-TH")}</strong>
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-                {tier.id === "vvip-elite" && (
-                  <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
-                    จองผ่านทีมงานเท่านั้น
-                  </span>
-                )}
-                <p className="mt-3 text-3xl font-black text-green-900 md:text-4xl">{tierOrders.length.toLocaleString("th-TH")} <span className="text-base font-medium md:text-lg">รายการ</span></p>
-                <p className="mt-1 text-sm text-slate-600 md:text-base">ยืนยันแล้ว {confirmed.length} รายการ · ฿{revenue.toLocaleString("th-TH")}</p>
+                  {tier.id === "vvip-elite" && (
+                    <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                      จองผ่านทีมงานเท่านั้น
+                    </span>
+                  )}
+                  <p className="mt-3 text-3xl font-black text-green-900 md:text-4xl">{tierOrders.length.toLocaleString("th-TH")} <span className="text-base font-medium md:text-lg">รายการ</span></p>
+                  <p className="mt-1 text-sm text-slate-600 md:text-base">ยืนยันแล้ว {confirmed.length} รายการ · ฿{revenue.toLocaleString("th-TH")}</p>
+                </Link>
                 <div className="mt-3 flex flex-wrap gap-1.5" aria-label={`รายละเอียดโซนแพ็กเกจ ${tier.badge}`}>
                   {tier.allowedSeatZones.map((seatZone) => (
-                    <span
+                    <Link
                       key={seatZone}
-                      className="rounded-full border border-green-200 bg-white px-2.5 py-1 text-sm font-semibold text-green-900"
+                      href={`/admin/season-passes?tier=${tier.id}&zone=${encodeURIComponent(seatZone)}#bookings`}
+                      aria-current={selectedTier === tier.id && selectedZone === seatZone ? "page" : undefined}
+                      className={`rounded-full border px-2.5 py-1 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-green-700/30 ${selectedTier === tier.id && selectedZone === seatZone ? "border-green-800 bg-green-800 text-white" : "border-green-200 bg-white text-green-900 hover:border-green-600 hover:bg-green-100"}`}
                     >
                       {seatZone} · {(orderCountByZone.get(seatZone) ?? 0).toLocaleString("th-TH")}
-                    </span>
+                    </Link>
                   ))}
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>
       </section>
 
       {/* ตารางบัตร */}
-      <div className="overflow-x-auto rounded-lg border bg-white shadow-sm" role="tabpanel">
-        <table className="w-full min-w-[1300px] text-base md:text-lg">
+      <div id="bookings" className="scroll-mt-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-xl font-bold text-green-900 md:text-2xl">
+            รายละเอียดการจอง {selectedTierConfig.badge}
+            {selectedZone ? ` · โซน ${selectedZone}` : " · ทุกโซน"}
+          </h2>
+          {selectedZone && (
+            <Link
+              href={`/admin/season-passes?tier=${selectedTier}#bookings`}
+              className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-sm font-semibold text-green-900 hover:bg-green-50 md:text-base"
+            >
+              ดูทุกโซน
+            </Link>
+          )}
+        </div>
+        <div className="overflow-x-auto rounded-lg border bg-white shadow-sm" role="tabpanel">
+          <table className="w-full min-w-[1300px] text-base md:text-lg">
           <thead className="border-b bg-slate-50 text-sm uppercase md:text-base">
             <tr>
               <th className="px-3 py-2 text-left">รหัสบัตร</th>
@@ -370,7 +400,8 @@ export default async function AdminSeasonPassesPage(props: {
               })
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
     </div>
