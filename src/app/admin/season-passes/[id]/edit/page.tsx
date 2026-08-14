@@ -27,9 +27,15 @@ export default async function EditSeasonPassPage({
   const backHref = from === "staff"
     ? "/admin/season-passes/staff"
     : `/admin/season-passes?tier=${returnTier || order.tierId}`;
-  const vvipBarcodes = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE" && !order.barcode
+  const vvipBarcodes = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE"
     ? await prisma.seasonPassBarcode.findMany({
-        where: { tierId: order.tierId, seasonLabel: order.seasonLabel, isGenerated: true, orderId: null },
+        where: {
+          tierId: order.tierId,
+          seasonLabel: order.seasonLabel,
+          isGenerated: true,
+          orderId: null,
+          scans: { none: {} },
+        },
         orderBy: { barcode: "asc" },
         take: 500,
         select: { barcode: true },

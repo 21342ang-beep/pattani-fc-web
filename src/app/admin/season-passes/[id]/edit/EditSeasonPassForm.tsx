@@ -70,6 +70,9 @@ export default function EditSeasonPassForm({
   const errorFor = (field: string) => state && !state.ok ? state.fieldErrors?.[field]?.[0] : undefined;
   const isOfflineVvip = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
   const canDeferStaffZone = ["vvip-elite", "vip-advanced"].includes(order.tierId) && order.salesChannel === "OFFLINE";
+  const selectableVvipBarcodes = order.barcode
+    ? [order.barcode, ...vvipBarcodes.filter((barcode) => barcode !== order.barcode)]
+    : vvipBarcodes;
   const displayPassCode = order.passCode.startsWith("PENDING-") ? "รอระบบผูกบาร์โค้ด" : order.passCode;
   return (
     <form action={formAction} className="space-y-5 rounded-2xl border border-green-100 bg-white p-5 shadow-sm md:p-6">
@@ -88,19 +91,18 @@ export default function EditSeasonPassForm({
         </Field>
         {isOfflineVvip && (
           <Field label="บาร์โค้ด VVIP (ไม่บังคับ)" error={errorFor("barcode")}>
-            <input
+            <select
               name="barcode"
-              list={order.barcode ? undefined : "edit-vvip-barcodes"}
               defaultValue={order.barcode}
-              readOnly={Boolean(order.barcode)}
-              autoComplete="off"
-              placeholder="ยังไม่ระบุ — แก้ไขภายหลังได้"
               className={`${inputClass} font-mono uppercase`}
-            />
-            {!order.barcode && (
-              <datalist id="edit-vvip-barcodes">
-                {vvipBarcodes.map((barcode) => <option key={barcode} value={barcode} />)}
-              </datalist>
+            >
+              {!order.barcode && <option value="">ยังไม่ระบุ — แก้ไขภายหลังได้</option>}
+              {selectableVvipBarcodes.map((barcode) => <option key={barcode} value={barcode}>{barcode}</option>)}
+            </select>
+            {order.barcode && (
+              <span className="mt-1.5 block text-sm font-normal text-amber-700">
+                เมื่อเปลี่ยนเลข บาร์โค้ดเดิมจะถูกคืนกลับเข้าคลังส่วนกลางโดยอัตโนมัติ
+              </span>
             )}
           </Field>
         )}

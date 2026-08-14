@@ -501,6 +501,7 @@ export async function updateSeasonPassOrder(
   const input = parsed.data;
   try {
     await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`season-order-edit:${input.orderId}`}))`;
       const order = await tx.seasonPassOrder.findUnique({
         where: { id: input.orderId },
         include: { barcode: { select: { id: true, barcode: true } } },
@@ -559,10 +560,13 @@ export async function updateSeasonPassOrder(
       }
 
       let assignedBarcode = order.barcode;
-      if (isOfflineVvip && order.barcode && input.barcode && input.barcode !== order.barcode.barcode) {
-        throw new Error("BARCODE_LOCKED");
-      }
-      if (isOfflineVvip && !order.barcode && input.barcode) {
+      if (isOfflineVvip && input.barcode && input.barcode !== order.barcode?.barcode) {
+        if (order.barcode) {
+          const scanCount = await tx.seasonPassScan.count({
+            where: { barcodeId: order.barcode.id },
+          });
+          if (scanCount > 0) throw new Error("BARCODE_HAS_SCANS");
+        }
         const availableBarcode = await tx.seasonPassBarcode.findFirst({
           where: {
             barcode: input.barcode,
@@ -570,10 +574,21 @@ export async function updateSeasonPassOrder(
             seasonLabel: order.seasonLabel,
             isGenerated: true,
             orderId: null,
+            scans: { none: {} },
           },
           select: { id: true, barcode: true },
         });
         if (!availableBarcode) throw new Error("BARCODE_UNAVAILABLE");
+        if (order.barcode) {
+          await tx.seasonPassBarcode.update({
+            where: { id: order.barcode.id },
+            data: {
+              orderId: null,
+              assignedAt: null,
+              usesRemaining: SEASON_MATCHES,
+            },
+          });
+        }
         const claimed = await tx.seasonPassBarcode.updateMany({
           where: { id: availableBarcode.id, orderId: null, isGenerated: true },
           data: { orderId: order.id, assignedAt: new Date(), usesRemaining: SEASON_MATCHES },
@@ -674,7 +689,7 @@ export async function updateSeasonPassOrder(
     if (error instanceof Error && error.message === "SEAT_REQUIRED") return { ok: false, error: "แพ็กเกจ VVIP ต้องระบุหมายเลขที่นั่ง" };
     if (error instanceof Error && error.message === "ZONE_SOLD_OUT") return { ok: false, error: "โซนที่เลือกเต็มตามโควตาแล้ว" };
     if (error instanceof Error && error.message === "BARCODE_UNAVAILABLE") return { ok: false, error: "บาร์โค้ดนี้ไม่พร้อมใช้งานหรือถูกจองไปแล้ว" };
-    if (error instanceof Error && error.message === "BARCODE_LOCKED") return { ok: false, error: "บาร์โค้ดที่ผูกกับรายการแล้วไม่สามารถเปลี่ยนได้" };
+    if (error instanceof Error && error.message === "BARCODE_HAS_SCANS") return { ok: false, error: "ไม่สามารถเปลี่ยนบาร์โค้ดที่มีประวัติการสแกนแล้วได้ เพื่อป้องกันข้อมูลการใช้งานสูญหาย" };
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { ok: false, error: "หมายเลขที่นั่งนี้ถูกใช้งานแล้ว" };
     }
