@@ -13,6 +13,7 @@ import SeasonPassStatusSelect from "./SeasonPassStatusSelect";
 import DeleteSeasonPassButton from "./DeleteSeasonPassButton";
 import DeleteAllSeasonPassOrdersButton from "./DeleteAllSeasonPassOrdersButton";
 import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
+import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "บัตรรายปี — Admin" };
@@ -35,9 +36,15 @@ export default async function AdminSeasonPassesPage(props: {
     ? (rawTier as SeasonTierId)
     : saleTiers[0].id;
 
-  const orders = await prisma.seasonPassOrder.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  const [orders, zoneQuotas, barcodeTotals] = await Promise.all([
+    prisma.seasonPassOrder.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.seasonPassZoneQuota.findMany({ where: { seasonLabel: SEASON_LABEL } }),
+    prisma.seasonPassBarcode.groupBy({
+      by: ["tierId"],
+      where: { seasonLabel: SEASON_LABEL, isGenerated: true },
+      _count: { _all: true },
+    }),
+  ]);
 
   const tierById = new Map(SEASON_TIERS.map((t) => [t.id, t]));
   const ordersByTier = new Map<SeasonTierId, typeof orders>();
@@ -47,6 +54,9 @@ export default async function AdminSeasonPassesPage(props: {
     if (tierOrders) tierOrders.push(order);
   }
   const displayedOrders = ordersByTier.get(selectedTier) ?? [];
+  const barcodeTotalByTier = new Map(
+    barcodeTotals.map((row) => [row.tierId, row._count._all]),
+  );
 
   const summary = {
     total: orders.length,
@@ -128,6 +138,9 @@ export default async function AdminSeasonPassesPage(props: {
           {saleTiers.map((tier) => {
             const tierOrders = ordersByTier.get(tier.id) ?? [];
             const confirmed = tierOrders.filter((order) => order.status === "CONFIRMED");
+            const activeOrders = tierOrders.filter((order) =>
+              order.status === "PENDING" || order.status === "CONFIRMED",
+            );
             const revenue = confirmed.reduce((sum, order) => sum + order.priceBaht + order.shippingFeeBaht, 0);
             const orderCountByZone = new Map(
               tier.allowedSeatZones.map((seatZone) => [
@@ -135,6 +148,19 @@ export default async function AdminSeasonPassesPage(props: {
                 tierOrders.filter((order) => order.seatZone === seatZone).length,
               ]),
             );
+            const ranges = calculateSeasonPassZoneRanges(
+              tier.allowedSeatZones,
+              zoneQuotas.filter((quota) => quota.tierId === tier.id),
+            );
+            const generatedTotal = barcodeTotalByTier.get(tier.id) ?? 0;
+            const baseFallbackCapacity = Math.floor(generatedTotal / tier.allowedSeatZones.length);
+            const fallbackRemainder = generatedTotal % tier.allowedSeatZones.length;
+            const remainingByZone = tier.allowedSeatZones.map((seatZone, index) => {
+              const configuredCapacity = ranges.find((range) => range.seatZone === seatZone)?.publicSeatCount;
+              const capacity = configuredCapacity ?? baseFallbackCapacity + (index < fallbackRemainder ? 1 : 0);
+              const occupied = activeOrders.filter((order) => order.seatZone === seatZone).length;
+              return { seatZone, remaining: Math.max(0, capacity - occupied) };
+            });
             return (
               <Link
                 key={tier.id}
@@ -143,8 +169,23 @@ export default async function AdminSeasonPassesPage(props: {
                 aria-selected={selectedTier === tier.id}
                 className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-700/30 ${selectedTier === tier.id ? "border-green-700 bg-green-50 ring-2 ring-green-700/20" : "border-green-100 bg-white"}`}
               >
-                <p className="text-sm font-bold uppercase tracking-widest text-yellow-700 md:text-base">แพ็กเกจ ฿{tier.priceBaht.toLocaleString("th-TH")}</p>
-                <p className="mt-1 text-base font-bold text-green-900 md:text-lg">{tier.badge}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold uppercase tracking-widest text-yellow-700 md:text-base">แพ็กเกจ ฿{tier.priceBaht.toLocaleString("th-TH")}</p>
+                    <p className="mt-1 text-base font-bold text-green-900 md:text-lg">{tier.badge}</p>
+                  </div>
+                  <div className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50/90 px-2.5 py-2 text-right shadow-sm">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">คงเหลือ</p>
+                    <div className={`mt-1 grid gap-x-3 gap-y-0.5 ${remainingByZone.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+                      {remainingByZone.map(({ seatZone, remaining }) => (
+                        <span key={seatZone} className="flex items-baseline justify-between gap-2 whitespace-nowrap text-xs text-slate-600">
+                          <span>{seatZone}</span>
+                          <strong className="text-sm text-emerald-800">{remaining.toLocaleString("th-TH")}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
                 {tier.id === "vvip-elite" && (
                   <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
                     จองผ่านทีมงานเท่านั้น
