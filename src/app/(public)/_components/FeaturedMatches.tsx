@@ -125,7 +125,7 @@ export default function FeaturedMatches({
                         : ""
                     }
                   >
-                    <Link href={isOnSale ? "/tickets#matches" : `/matches/${m.id}`}>
+                    <Link href="/tickets#matches">
                       {isOnSale ? labels.book : labels.view}
                       <ArrowRight className="transition-transform group-hover:translate-x-0.5" />
                     </Link>

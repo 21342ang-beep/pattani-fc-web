@@ -27,7 +27,6 @@ export default async function MatchesListPage(props: {
   const zone = normalizedZone && ZONE_CODE_PATTERN.test(normalizedZone)
     ? normalizedZone
     : undefined;
-  const zoneQS = zone ? `?zone=${zone}` : "";
   const competition: CompetitionFilter = (ALLOWED_COMPETITIONS as readonly string[]).includes(competitionRaw ?? "")
     ? (competitionRaw as CompetitionFilter)
     : "all";
@@ -142,7 +141,7 @@ export default async function MatchesListPage(props: {
                       {t("ราคาแยกตามโซน", "Prices vary by zone")}
                     </div>
                     <Link
-                      href={`/matches/${m.id}${zoneQS}`}
+                      href="/tickets#matches"
                       className={`block w-full rounded-md px-4 py-3 text-center text-base font-semibold md:text-lg ${
                         isOnSale
                           ? "bg-slate-900 text-white hover:bg-slate-700"

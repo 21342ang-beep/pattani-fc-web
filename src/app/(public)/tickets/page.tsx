@@ -198,9 +198,11 @@ export default async function TicketsPage() {
         subtitle={t("เลือกโซนที่นั่งของคุณ — แต่ละโซนของ Rainbow Stadium มีบรรยากาศ ราคา และทัศนียภาพต่างกัน", "Choose your seating zone — each area of Rainbow Stadium offers a different atmosphere, price, and view")}
       />
 
+      <span id="matches" className="block scroll-mt-24" aria-hidden="true" />
+
       {/* 1) เลือกโซนที่นั่ง + แผนผังสนาม (อยู่บน) */}
       {onSaleMatches.length > 0 && (
-        <section id="matches" className="mx-auto max-w-6xl px-4 pt-12 md:pt-16 scroll-mt-24">
+        <section className="mx-auto max-w-6xl px-4 pt-12 md:pt-16">
           <div className="mb-6">
             <p className="text-base font-bold uppercase tracking-widest text-emerald-700 md:text-lg">{t("จองเลย", "Book now")}</p>
             <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl lg:text-6xl">{t("โปรแกรมที่เปิดจอง", "Matches on Sale")}</h2>

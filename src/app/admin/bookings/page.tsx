@@ -16,20 +16,95 @@ const statusColor: Record<string, string> = {
   REFUNDED: "bg-blue-100 text-blue-800",
 };
 
-export default async function AdminBookingsPage(props: { searchParams: Promise<{ price?: string; name?: string }> }) {
+export default async function AdminBookingsPage(props: { searchParams: Promise<{ price?: string; name?: string; matchId?: string; zone?: string }> }) {
   await verifyPermission("BOOKINGS");
-  const { price: rawPrice, name: rawName } = await props.searchParams;
+  const { price: rawPrice, name: rawName, matchId: rawMatchId, zone: rawZone } = await props.searchParams;
   const selectedPrice = rawPrice && /^\d+$/.test(rawPrice) ? Number(rawPrice) : null;
   const customerName = rawName?.trim().slice(0, 100) ?? "";
+  const selectedMatchId = rawMatchId && /^[a-z0-9_-]{1,50}$/i.test(rawMatchId) ? rawMatchId : null;
+  const selectedZone = rawZone?.trim().slice(0, 50) || null;
   await expirePendingBookings();
-  const allBookings = await prisma.booking.findMany({
-    where: customerName ? { customerName: { contains: customerName, mode: "insensitive" } } : undefined,
-    orderBy: { createdAt: "desc" },
-    include: { match: { select: { homeTeam: true, awayTeam: true, kickoffAt: true } } },
-    take: 100,
-  });
+  const customerFilter = customerName ? { customerName: { contains: customerName, mode: "insensitive" as const } } : undefined;
+  const [allBookings, dynamicZones] = await Promise.all([
+    prisma.booking.findMany({
+      where: customerFilter,
+      orderBy: { createdAt: "desc" },
+      include: {
+        match: {
+          select: {
+            homeTeam: true,
+            awayTeam: true,
+            kickoffAt: true,
+            ticketZones: { select: { code: true, name: true } },
+          },
+        },
+      },
+      take: 100,
+    }),
+    prisma.matchTicketZone.findMany({
+      select: {
+        matchId: true,
+        code: true,
+        name: true,
+        match: { select: { homeTeam: true, awayTeam: true, kickoffAt: true } },
+      },
+    }),
+  ]);
+  const dynamicBookingGroups = dynamicZones.length === 0
+    ? []
+    : await prisma.booking.groupBy({
+        by: ["matchId", "zone", "status"],
+        where: { zone: { not: null }, ...customerFilter },
+        _count: { _all: true },
+        _sum: { quantity: true, totalAmount: true },
+      });
   const priceGroups = new Map<number, { bookings: number; tickets: number }>();
   const awayZoneSummary = { bookings: 0, tickets: 0 };
+  const dynamicZoneGroups = new Map<string, {
+    matchId: string;
+    zoneCode: string;
+    zoneName: string;
+    matchLabel: string;
+    kickoffAt: Date | null;
+    bookings: number;
+    tickets: number;
+    confirmedBookings: number;
+    pendingBookings: number;
+    cancelledBookings: number;
+    confirmedAmount: number;
+  }>();
+  const dynamicZoneByKey = new Map(dynamicZones.map((zone) => [`${zone.matchId}:${zone.code}`, zone]));
+  for (const group of dynamicBookingGroups) {
+    if (!group.zone) continue;
+    const key = `${group.matchId}:${group.zone}`;
+    const dynamicZone = dynamicZoneByKey.get(key);
+    if (dynamicZone) {
+      const current = dynamicZoneGroups.get(key) ?? {
+        matchId: group.matchId,
+        zoneCode: dynamicZone.code,
+        zoneName: dynamicZone.name,
+        matchLabel: `${dynamicZone.match.homeTeam} vs ${dynamicZone.match.awayTeam}`,
+        kickoffAt: dynamicZone.match.kickoffAt,
+        bookings: 0,
+        tickets: 0,
+        confirmedBookings: 0,
+        pendingBookings: 0,
+        cancelledBookings: 0,
+        confirmedAmount: 0,
+      };
+      current.bookings += group._count._all;
+      current.tickets += group._sum.quantity ?? 0;
+      if (group.status === "CONFIRMED") {
+        current.confirmedBookings += group._count._all;
+        current.confirmedAmount += group._sum.totalAmount ?? 0;
+      } else if (group.status === "PENDING") {
+        current.pendingBookings += group._count._all;
+      } else {
+        current.cancelledBookings += group._count._all;
+      }
+      dynamicZoneGroups.set(key, current);
+    }
+  }
   for (const booking of allBookings) {
     if (booking.zone === "AWAY") {
       awayZoneSummary.bookings += 1;
@@ -42,10 +117,13 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     current.tickets += booking.quantity;
     priceGroups.set(price, current);
   }
-  const bookings = selectedPrice == null
-    ? allBookings
-    : allBookings.filter((booking) => booking.quantity > 0 && booking.totalAmount / booking.quantity === selectedPrice);
-  const filtersActive = selectedPrice != null || customerName !== "";
+  const bookings = allBookings.filter((booking) => {
+    if (selectedPrice != null && (booking.quantity <= 0 || booking.totalAmount / booking.quantity !== selectedPrice)) return false;
+    if (selectedMatchId && booking.matchId !== selectedMatchId) return false;
+    if (selectedZone && booking.zone !== selectedZone) return false;
+    return true;
+  });
+  const filtersActive = selectedPrice != null || customerName !== "" || selectedMatchId != null || selectedZone != null;
 
   return (
     <div>
@@ -69,6 +147,8 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
       </div>
       <form method="get" className="mb-6 flex flex-wrap items-end gap-2 rounded-xl border border-green-100 bg-white p-4 shadow-sm">
         {selectedPrice != null && <input type="hidden" name="price" value={selectedPrice} />}
+        {selectedMatchId && <input type="hidden" name="matchId" value={selectedMatchId} />}
+        {selectedZone && <input type="hidden" name="zone" value={selectedZone} />}
         <label className="min-w-64 flex-1">
           <span className="block text-base font-semibold text-green-900 md:text-lg">ค้นหาชื่อลูกค้า</span>
           <input
@@ -84,6 +164,54 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
         </button>
         {filtersActive && <Link href="/admin/bookings" className="rounded-md border border-slate-300 px-4 py-2.5 text-base font-medium text-slate-700 hover:bg-slate-50 md:text-lg">ล้างตัวกรอง</Link>}
       </form>
+      {dynamicZoneGroups.size > 0 && (
+        <div className="mb-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-bold text-green-900 md:text-3xl">การจองโซนขายเพิ่มเติมรายแมตช์</h2>
+              <p className="mt-1 text-sm text-slate-600 md:text-base">ยอดเงินนับเฉพาะรายการที่ยืนยันชำระแล้ว</p>
+            </div>
+            {(selectedMatchId || selectedZone) && (
+              <Link href={`/admin/bookings${customerName ? `?name=${encodeURIComponent(customerName)}` : ""}`} className="text-base font-medium text-green-800 hover:underline md:text-lg">
+                แสดงทุกโซน
+              </Link>
+            )}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[...dynamicZoneGroups.values()].map((summary) => {
+              const selected = selectedMatchId === summary.matchId && selectedZone === summary.zoneCode;
+              const query = new URLSearchParams({ matchId: summary.matchId, zone: summary.zoneCode });
+              if (customerName) query.set("name", customerName);
+              return (
+                <Link
+                  key={`${summary.matchId}:${summary.zoneCode}`}
+                  href={`/admin/bookings?${query.toString()}`}
+                  className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${selected ? "border-violet-500 bg-violet-50" : "border-violet-200 bg-white"}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-widest text-violet-700 md:text-base">โซน {summary.zoneCode}</p>
+                      <h3 className="mt-1 text-2xl font-black text-violet-950">{summary.zoneName}</h3>
+                    </div>
+                    <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-bold text-violet-800">{summary.tickets} ใบ</span>
+                  </div>
+                  <p className="mt-3 font-semibold text-slate-800">{summary.matchLabel}</p>
+                  <p className="mt-1 text-sm text-slate-500">{summary.kickoffAt ? formatDateTime(summary.kickoffAt) : "ยังไม่กำหนดวันแข่งขัน"}</p>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
+                    <div className="rounded-lg bg-amber-50 p-2 text-amber-800"><strong className="block text-xl">{summary.pendingBookings}</strong>รอชำระ</div>
+                    <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800"><strong className="block text-xl">{summary.confirmedBookings}</strong>ยืนยัน</div>
+                    <div className="rounded-lg bg-slate-100 p-2 text-slate-600"><strong className="block text-xl">{summary.cancelledBookings}</strong>ยกเลิก/คืนเงิน</div>
+                  </div>
+                  <div className="mt-4 flex items-end justify-between gap-3 border-t border-violet-100 pt-3">
+                    <span className="text-sm text-slate-600">ทั้งหมด {summary.bookings} รายการ</span>
+                    <span className="text-right"><span className="block text-xs text-slate-500">ยอดยืนยันแล้ว</span><strong className="text-xl text-green-800">{formatBaht(summary.confirmedAmount)}</strong></span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {priceGroups.size > 0 && (
         <div className="mb-6">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -116,6 +244,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
               <th className="px-3 py-2 text-left">รหัส</th>
               <th className="px-3 py-2 text-left">ลูกค้า</th>
               <th className="px-3 py-2 text-left">แมตช์</th>
+              <th className="px-3 py-2 text-left">โซน</th>
               <th className="px-3 py-2 text-right">จำนวน</th>
               <th className="px-3 py-2 text-right">ยอด</th>
               <th className="px-3 py-2 text-left">สถานะ</th>
@@ -137,6 +266,19 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                   <div className="text-slate-500">
                     {b.match.kickoffAt ? formatDateTime(b.match.kickoffAt) : "—"}
                   </div>
+                </td>
+                <td className="px-3 py-2">
+                  {(() => {
+                    const dynamicZone = b.zone ? b.match.ticketZones.find((zone) => zone.code === b.zone) : null;
+                    return dynamicZone ? (
+                      <div>
+                        <div className="font-semibold text-violet-900">{dynamicZone.name}</div>
+                        <div className="text-sm text-violet-600">โซน {dynamicZone.code}</div>
+                      </div>
+                    ) : (
+                      <span className="font-semibold text-slate-700">{b.zone ? `โซน ${b.zone}` : "—"}</span>
+                    );
+                  })()}
                 </td>
                 <td className="px-3 py-2 text-right">{b.quantity}</td>
                 <td className="px-3 py-2 text-right">{formatBaht(b.totalAmount)}</td>
@@ -162,7 +304,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
             ))}
             {bookings.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-6 text-center text-slate-500">
+                <td colSpan={9} className="p-6 text-center text-slate-500">
                   ยังไม่มีการจอง
                 </td>
               </tr>
