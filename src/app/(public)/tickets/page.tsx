@@ -12,6 +12,7 @@ import { getT } from "@/lib/i18n/server";
 import { intlLocale, localize } from "@/lib/i18n/text";
 import type { Locale } from "@/lib/i18n/dict";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
+import { activeBookingStatusWhere } from "@/lib/booking-expiry";
 
 export const metadata = { title: "จองตั๋วรายแมตช์ — Pattani FC" };
 
@@ -72,12 +73,37 @@ const MATCH_ZONE_MAP_DETAILS: Record<StadiumZoneCode, { gate: string; priceBaht:
 export default async function TicketsPage() {
   const [availableMatches, { locale }, purchaseSettings] = await Promise.all([prisma.match.findMany({
     where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
+    include: {
+      ticketZones: {
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
+    },
   }), getT(), getTicketPurchaseSettings()]);
   const onSaleMatches = availableMatches.filter(
     (match) => match.competitionType !== "LEAGUE" || purchaseSettings.leagueBookingOpen,
   );
   const t = (th: string, en: string) => localize(locale, th, en);
   const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
+  const dynamicBookingGroups = onSaleMatches.length > 0
+    ? await prisma.booking.groupBy({
+        by: ["matchId", "zone"],
+        where: { matchId: { in: onSaleMatches.map((match) => match.id) }, ...activeBookingStatusWhere() },
+        _sum: { quantity: true },
+      })
+    : [];
+  const dynamicZones = onSaleMatches.flatMap((match) => match.ticketZones.map((zone) => {
+    const booked = dynamicBookingGroups.find(
+      (group) => group.matchId === match.id && group.zone === zone.code,
+    )?._sum.quantity ?? 0;
+    return {
+      ...zone,
+      matchId: match.id,
+      matchLabel: `${match.homeTeam} vs ${match.awayTeam}`,
+      venue: match.venue,
+      remaining: Math.max(0, zone.capacity - booked),
+    };
+  }));
   const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
   const displayZones = STADIUM_ZONES.map((zone) => {
     const prices = onSaleMatches
@@ -177,6 +203,39 @@ export default async function TicketsPage() {
                 showBookingButton={false}
                 locale={locale}
               />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {dynamicZones.length > 0 && (
+        <section className="mx-auto max-w-6xl px-4 pt-12 md:pt-16">
+          <div className="mb-6">
+            <p className="text-base font-bold uppercase tracking-widest text-violet-700 md:text-lg">{t("โซนพิเศษ", "Special zones")}</p>
+            <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl">{t("ที่นั่งเพิ่มเติมรายแมตช์", "Match-specific seating")}</h2>
+            <p className="mt-2 text-lg text-slate-600 md:text-xl">{t("จำนวนและราคากำหนดตามสนามที่ใช้แข่งขันในแต่ละนัด", "Capacity and pricing follow each match venue")}</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {dynamicZones.map((zone) => (
+              <article key={zone.id} className="flex flex-col rounded-2xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-wider text-violet-700">{zone.code}</p>
+                    <h3 className="mt-1 text-2xl font-black text-green-950">{zone.name}</h3>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-violet-800">{(zone.price / 100).toLocaleString(intlLocale(locale))} {t("บาท", "THB")}</span>
+                </div>
+                <p className="mt-4 font-bold text-slate-800">{zone.matchLabel}</p>
+                <p className="mt-1 text-sm text-slate-600">{zone.venue ?? t("ยังไม่กำหนดสนาม", "Venue to be confirmed")}</p>
+                <p className="mt-3 text-base text-slate-600">{t("คงเหลือ", "Remaining")} <strong className="text-xl text-green-800">{zone.remaining.toLocaleString(intlLocale(locale))}</strong> / {zone.capacity.toLocaleString(intlLocale(locale))} {t("ที่นั่ง", "seats")}</p>
+                {zone.remaining > 0 ? (
+                  <Link href={`/matches/${zone.matchId}?zone=${encodeURIComponent(zone.code)}`} className="mt-5 rounded-lg bg-violet-700 px-4 py-3 text-center font-bold text-white hover:bg-violet-600">
+                    {t("จองโซนนี้", "Book this zone")}
+                  </Link>
+                ) : (
+                  <span className="mt-5 rounded-lg bg-slate-200 px-4 py-3 text-center font-bold text-slate-600">{t("ที่นั่งเต็มแล้ว", "Sold out")}</span>
+                )}
+              </article>
             ))}
           </div>
         </section>

@@ -9,11 +9,9 @@ import BookingForm from "./BookingForm";
 import { getStadiumZone, getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import SeasonPassAnnouncementModal from "../../_components/SeasonPassAnnouncementModal";
+import { activeBookingStatusWhere } from "@/lib/booking-expiry";
 
-// whitelist โซน — กัน XSS ผ่าน URL
-const ALLOWED_ZONES = [
-  "A", "B", "C", "D", "E", "F", "G", "I", "J", "AWAY",
-] as const;
+const ZONE_CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]{0,19}$/;
 
 export default async function MatchDetailPage(props: {
   params: Promise<{ id: string }>;
@@ -21,10 +19,10 @@ export default async function MatchDetailPage(props: {
 }) {
   const { id } = await props.params;
   const { zone: zoneRaw } = await props.searchParams;
-  const zone = (ALLOWED_ZONES as readonly string[]).includes(zoneRaw ?? "")
-    ? zoneRaw
+  const normalizedZone = zoneRaw?.trim().toUpperCase();
+  const zone = normalizedZone && ZONE_CODE_PATTERN.test(normalizedZone)
+    ? normalizedZone
     : undefined;
-  const selectedZone = getStadiumZone(zone);
 
   const [match, session, purchaseSettings] = await Promise.all([
     getMatchById(id),
@@ -33,15 +31,29 @@ export default async function MatchDetailPage(props: {
   ]);
   if (!match) notFound();
 
+  const dynamicZone = zone
+    ? match.ticketZones.find((item) => item.code === zone)
+    : undefined;
+  const legacyZone = getStadiumZone(zone);
+  const selectedZone = dynamicZone ?? legacyZone;
+
   const availabilityByMatch = await getSeatAvailabilityForMatches([match]);
-  const selectedAvailability = zone
+  const selectedAvailability = zone && legacyZone && !dynamicZone
     ? availabilityByMatch.get(match.id)?.[zone as StadiumZoneCode]
     : undefined;
-  const selectedPrice = zone
-    ? getZonePrice(match, zone as StadiumZoneCode)
+  const dynamicBooked = dynamicZone
+    ? await prisma.booking.aggregate({
+        where: { matchId: match.id, zone: dynamicZone.code, ...activeBookingStatusWhere() },
+        _sum: { quantity: true },
+      })
     : null;
-  const capacity = selectedAvailability?.capacity ?? null;
-  const remaining = selectedAvailability?.remaining ?? 0;
+  const selectedPrice = dynamicZone?.price ?? (zone && legacyZone
+    ? getZonePrice(match, zone as StadiumZoneCode)
+    : null);
+  const capacity = dynamicZone?.capacity ?? selectedAvailability?.capacity ?? null;
+  const remaining = dynamicZone
+    ? Math.max(0, dynamicZone.capacity - (dynamicBooked?._sum.quantity ?? 0))
+    : selectedAvailability?.remaining ?? 0;
   const canBook =
     match.status === "ON_SALE" &&
     (match.competitionType !== "LEAGUE" || purchaseSettings.leagueBookingOpen) &&
@@ -77,7 +89,7 @@ export default async function MatchDetailPage(props: {
         </h1>
         {zone && (
           <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-yellow-100 px-4 py-1.5 text-base font-bold text-yellow-900 md:text-lg">
-            โซนที่เลือก: {zone}
+            โซนที่เลือก: {dynamicZone?.name ?? zone}
           </p>
         )}
         <dl className="mt-5 grid gap-3 text-base md:text-lg">

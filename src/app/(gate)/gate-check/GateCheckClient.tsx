@@ -168,7 +168,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
             INACTIVE: "บัตรรายปีนี้ยังไม่พร้อมใช้งาน",
             UNREGISTERED: "บัตร VVIP 4,000 นี้ยังไม่ได้ลงทะเบียนการขายออฟไลน์",
             INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
-            LEAGUE_ONLY: "บัตรรายปีใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC",
+            MATCH_NOT_ELIGIBLE: "แมตช์นี้ไม่ได้เปิดสิทธิ์บัตรรายปี หรือไม่ใช่เกมเหย้าของ Pattani FC",
           };
           const state: ScanState = { kind: "invalid", reason: reasons[result.error] };
           setScanState(state);
@@ -180,7 +180,9 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
           bookingCode: code,
           customerName: result.customerName,
           quantity: 1,
-          seatNumbers: [`Season Pass · เหลือ ${result.usesRemaining}/15`],
+          seatNumbers: [result.competitionType === "CUP"
+            ? `Season Pass · บอลถ้วย (ไม่หักสิทธิ์ลีก) · ลีกเหลือ ${result.usesRemaining}/15`
+            : `Season Pass · ลีกเหลือ ${result.usesRemaining}/15`],
           scannedAt: null,
         };
         const state: ScanState = { kind: "ok", entry, at: new Date().toISOString() };

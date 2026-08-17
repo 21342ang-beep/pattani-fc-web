@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isPattaniHomeTeam } from "@/lib/season-pass-home-match";
 
 // validate input ทุก API → ป้องกัน invalid data / injection
 
@@ -47,12 +48,17 @@ const matchBaseSchema = z.object({
   // ราคาต่ำสุดของแมตช์ ใช้สำหรับการ์ดประชาสัมพันธ์และคำนวณจากราคารายโซนเท่านั้น
   pricePerSeat: z.number().int().positive().max(10_000_000).nullish(),
   competitionType: z.enum(["LEAGUE", "CUP"]).optional(),
+  competitionName: z.string().trim().max(150).nullish(),
+  competitionRound: z.string().trim().max(100).nullish(),
+  seasonPassEligible: z.boolean().optional(),
   description: z.string().trim().max(2000).optional(),
   status: z.enum(["SCHEDULED", "ON_SALE", "SOLD_OUT", "CANCELLED", "FINISHED"]).optional(),
 });
 
 // guard: ON_SALE ต้องมี field สำคัญครบ — กันลูกค้าจองตั๋วแมตช์ที่ยังไม่มีวัน/ราคา/ที่นั่ง
 type MatchShape = {
+  homeTeam?: string;
+  seasonPassEligible?: boolean;
   venue?: string | null;
   kickoffAt?: Date | null;
   totalSeats?: number | null;
@@ -79,6 +85,13 @@ type MatchShape = {
   status?: string;
 };
 function requireFullDataForOnSale(d: MatchShape, ctx: z.RefinementCtx) {
+  if (d.seasonPassEligible && (!d.homeTeam || !isPattaniHomeTeam(d.homeTeam))) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["seasonPassEligible"],
+      message: "เปิดสิทธิ์บัตรรายปีได้เฉพาะเมื่อทีมเหย้าเป็น Pattani FC เท่านั้น",
+    });
+  }
   if (d.status !== "ON_SALE") return;
   const missing: string[] = [];
   if (!d.venue) missing.push("สนาม");
@@ -132,7 +145,10 @@ export const matchUpdateSchema = matchBaseSchema
 
 export const bookingCreateSchema = z.object({
   matchId: z.string().min(1),
-  zone: z.enum(["A", "B", "C", "D", "E", "F", "G", "I", "J", "AWAY"]),
+  zone: z.string().trim().toUpperCase().regex(
+    /^[A-Z0-9][A-Z0-9-]{0,19}$/,
+    "รหัสโซนไม่ถูกต้อง",
+  ),
   customerName: z.string().trim().min(1).max(100),
   // optional — guest booking ไม่มีอีเมล, member ใช้ session email (ใส่จาก server)
   customerEmail: z.string().trim().toLowerCase().email().max(200).nullish(),

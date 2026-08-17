@@ -12,7 +12,13 @@ import {
 import DeleteAllSeasonPassScansButton from "./DeleteAllSeasonPassScansButton";
 import DeleteSeasonPassScanButton from "./DeleteSeasonPassScanButton";
 
-type MatchOption = { id: string; label: string };
+type MatchOption = {
+  id: string;
+  label: string;
+  competitionType: "LEAGUE" | "CUP";
+  competitionName: string | null;
+  competitionRound: string | null;
+};
 type TierSummary = { id: string; badge: string; orders: number; scans: number; unregistered?: number };
 type ScanHistoryItem = {
   id: string;
@@ -21,6 +27,8 @@ type ScanHistoryItem = {
   passCode: string;
   customerName: string;
   matchLabel: string;
+  competitionType: "LEAGUE" | "CUP";
+  competitionDetail: string | null;
 };
 type ScanRecord = Extract<ScanSeasonPassResult, { ok: true }> & { id: string; at: string; matchLabel: string };
 type PreviewRecord = Extract<LookupSeasonPassResult, { ok: true }> & { matchLabel: string };
@@ -34,7 +42,7 @@ function scanErrorMessage(error: ScanError) {
     INACTIVE: "บัตรรายปีนี้ยังไม่พร้อมใช้งาน",
     UNREGISTERED: "บัตร VVIP 4,000 นี้ยังไม่ได้ลงทะเบียนการขายออฟไลน์ กรุณาติดต่อผู้ดูแล",
     INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
-    LEAGUE_ONLY: "บัตรรายปีใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC",
+    MATCH_NOT_ELIGIBLE: "แมตช์นี้ไม่ได้เปิดสิทธิ์บัตรรายปี หรือไม่ใช่เกมเหย้าของ Pattani FC",
   }[error];
 }
 
@@ -48,6 +56,7 @@ export default function SeasonPassScanner({
   scanHistory: ScanHistoryItem[];
 }) {
   const [matchId, setMatchId] = useState(matches[0]?.id ?? "");
+  const [matchFilter, setMatchFilter] = useState<"ALL" | "LEAGUE" | "CUP">("ALL");
   const [matchMenuOpen, setMatchMenuOpen] = useState(false);
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [history, setHistory] = useState(scanHistory);
@@ -59,6 +68,9 @@ export default function SeasonPassScanner({
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const selectedMatch = matches.find((match) => match.id === matchId);
+  const filteredMatches = matchFilter === "ALL"
+    ? matches
+    : matches.filter((match) => match.competitionType === matchFilter);
   const selectedTier = summaries.find((tier) => tier.id === selectedTierId);
   const selectedHistory = selectedTierId ? history.filter((scan) => scan.tierId === selectedTierId) : [];
 
@@ -158,6 +170,18 @@ export default function SeasonPassScanner({
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <label className="block text-base font-semibold text-slate-800 md:text-lg">
             แมตช์ที่กำลังตรวจบัตร
+            <span className="mt-1.5 flex gap-1.5" role="group" aria-label="กรองประเภทการแข่งขัน">
+              {(["ALL", "LEAGUE", "CUP"] as const).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setMatchFilter(filter)}
+                  className={`rounded-full px-3 py-1 text-sm font-bold ${matchFilter === filter ? "bg-green-800 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                >
+                  {filter === "ALL" ? "ทั้งหมด" : filter === "LEAGUE" ? "บอลลีก" : "บอลถ้วย"}
+                </button>
+              ))}
+            </span>
             <div className="relative mt-1.5">
               <button
                 type="button"
@@ -171,7 +195,7 @@ export default function SeasonPassScanner({
               </button>
               {matchMenuOpen && (
                 <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
-                  {matches.map((match) => (
+                  {filteredMatches.map((match) => (
                     <button
                       key={match.id}
                       type="button"
@@ -183,9 +207,22 @@ export default function SeasonPassScanner({
                       }}
                       className={`block w-full px-3 py-3 text-left text-base hover:bg-green-50 md:text-lg ${match.id === matchId ? "bg-green-100 font-semibold text-green-900" : "text-slate-700"}`}
                     >
-                      {match.label}
+                      <span className="flex items-start gap-2">
+                        <CompetitionBadge type={match.competitionType} />
+                        <span>
+                          <span className="block">{match.label}</span>
+                          {(match.competitionName || match.competitionRound) && (
+                            <span className="mt-0.5 block text-sm font-normal text-slate-500">
+                              {[match.competitionName, match.competitionRound].filter(Boolean).join(" · ")}
+                            </span>
+                          )}
+                        </span>
+                      </span>
                     </button>
                   ))}
+                  {filteredMatches.length === 0 && (
+                    <p className="px-3 py-5 text-center text-sm text-slate-500">ยังไม่มีแมตช์ประเภทนี้ที่เปิดสิทธิ์บัตรรายปี</p>
+                  )}
                 </div>
               )}
             </div>
@@ -232,7 +269,10 @@ export default function SeasonPassScanner({
             <Info label="โซนที่นั่ง">{preview.seatZone}</Info>
             <Info label="รหัสบัตร"><span className="font-mono">{preview.passCode}</span></Info>
             <Info label="แมตช์">{preview.matchLabel}</Info>
-            <Info label="สิทธิ์คงเหลือ"><span className="font-bold">{preview.usesRemaining} แมตช์</span></Info>
+            <Info label="สิทธิ์บอลลีกคงเหลือ"><span className="font-bold">{preview.usesRemaining} แมตช์</span></Info>
+            {preview.competitionType === "CUP" && (
+              <Info label="การหักสิทธิ์"><span className="font-bold text-green-800">บอลถ้วย — ไม่หักสิทธิ์ลีก</span></Info>
+            )}
           </dl>
           <div className="mt-5 flex flex-col gap-3 border-t border-amber-200 pt-4 sm:flex-row">
             <button
@@ -263,7 +303,10 @@ export default function SeasonPassScanner({
             <Info label="ผู้ซื้อ">{latest.customerName}</Info><Info label="เบอร์โทร 4 ตัวท้าย"><span className="font-mono">•••• {latest.customerPhoneLast4}</span></Info>
             <Info label="แพ็กเกจ">{summaries.find((tier) => tier.id === latest.tierId)?.badge ?? latest.tierId}</Info><Info label="โซนที่นั่ง">{latest.seatZone}</Info>
             <Info label="รหัสบัตร"><span className="font-mono">{latest.passCode}</span></Info><Info label="แมตช์">{latest.matchLabel}</Info>
-            <Info label="สิทธิ์คงเหลือ"><span className="font-bold">{latest.usesRemaining} แมตช์</span></Info>
+            <Info label="สิทธิ์บอลลีกคงเหลือ"><span className="font-bold">{latest.usesRemaining} แมตช์</span></Info>
+            {latest.competitionType === "CUP" && (
+              <Info label="การหักสิทธิ์"><span className="font-bold text-green-800">บอลถ้วย — ไม่หักสิทธิ์ลีก</span></Info>
+            )}
           </dl>
           <div className="mt-4 border-t border-emerald-200 pt-3">
             <DeleteSeasonPassScanButton scanId={latest.scanId} onDeleted={() => setLatest(null)} />
@@ -276,7 +319,7 @@ export default function SeasonPassScanner({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-2xl font-bold text-green-900 md:text-3xl">ประวัติการใช้งานบัตรรายปี · {selectedTier.badge}</h2>
-              <p className="mt-1 text-base text-slate-600 md:text-lg">ลบรายการเพื่อทดสอบได้ โดยระบบจะคืนสิทธิ์ให้บัตร 1 แมตช์</p>
+              <p className="mt-1 text-base text-slate-600 md:text-lg">ลบรายการเพื่อทดสอบได้ · ระบบคืนสิทธิ์เฉพาะรายการบอลลีก ส่วนบอลถ้วยไม่เปลี่ยนโควตา</p>
             </div>
             <DeleteAllSeasonPassScansButton
               tierId={selectedTier.id}
@@ -298,7 +341,9 @@ export default function SeasonPassScanner({
                     <td className="px-3 py-2 text-slate-600">{new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(scan.scannedAt))}</td>
                     <td className="px-3 py-2 font-mono text-sm md:text-base">{scan.passCode}</td>
                     <td className="px-3 py-2">{scan.customerName}</td>
-                    <td className="px-3 py-2">{scan.matchLabel}</td>
+                    <td className="px-3 py-2">
+                      <span className="flex items-start gap-2"><CompetitionBadge type={scan.competitionType} /><span>{scan.matchLabel}{scan.competitionDetail ? <span className="block text-sm text-slate-500">{scan.competitionDetail}</span> : null}</span></span>
+                    </td>
                     <td className="px-3 py-2 text-right"><DeleteSeasonPassScanButton scanId={scan.id} onDeleted={() => setHistory((current) => current.filter((item) => item.id !== scan.id))} /></td>
                   </tr>
                 ))}
@@ -316,4 +361,12 @@ export default function SeasonPassScanner({
 
 function Info({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="flex gap-2"><dt className="text-slate-500">{label}</dt><dd className="font-medium text-slate-800">{children}</dd></div>;
+}
+
+function CompetitionBadge({ type }: { type: "LEAGUE" | "CUP" }) {
+  return (
+    <span className={`mt-0.5 inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${type === "CUP" ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-800"}`}>
+      {type === "CUP" ? "ถ้วย" : "ลีก"}
+    </span>
+  );
 }

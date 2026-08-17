@@ -174,6 +174,9 @@ async function parseFormToMatchInput(formData: FormData) {
     zoneAwayPrice,
     pricePerSeat: activePrices.length > 0 ? Math.min(...activePrices) : null,
     competitionType: (formData.get("competitionType") as string) || undefined,
+    competitionName: emptyToNull(formData.get("competitionName")),
+    competitionRound: emptyToNull(formData.get("competitionRound")),
+    seasonPassEligible: formData.get("seasonPassEligible") === "on",
     description: (formData.get("description") as string) || undefined,
     status: (formData.get("status") as string) || undefined,
   };
@@ -229,6 +232,7 @@ export async function createMatch(
   revalidatePath("/");
   revalidatePath("/tickets");
   revalidatePath("/matches");
+  revalidatePath("/admin/season-passes/check");
   revalidateTag("matches", { expire: 0 });
   redirect("/admin/matches");
 }
@@ -266,6 +270,7 @@ export async function updateMatch(
   revalidatePath("/");
   revalidatePath("/tickets");
   revalidatePath("/matches");
+  revalidatePath("/admin/season-passes/check");
   revalidateTag("matches", { expire: 0 });
   redirect("/admin/matches");
 }

@@ -43,6 +43,9 @@ type Match = {
   zoneJPrice: number | null;
   zoneAwayPrice: number | null;
   competitionType: string;
+  competitionName: string | null;
+  competitionRound: string | null;
+  seasonPassEligible: boolean;
   status: string;
   description: string | null;
 };
@@ -153,6 +156,36 @@ export default function MatchForm({
           <option value="CUP">บอลถ้วย</option>
         </select>
       </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="ชื่อรายการแข่งขัน"
+          name="competitionName"
+          defaultValue={initial?.competitionName ?? ""}
+          hint="เช่น Thai League 1 หรือ ช้าง เอฟเอ คัพ · เว้นว่างได้ถ้ายังไม่ทราบ"
+        />
+        <Field
+          label="รอบการแข่งขัน"
+          name="competitionRound"
+          defaultValue={initial?.competitionRound ?? ""}
+          hint="เช่น รอบ 32 ทีม หรือ รอบรองชนะเลิศ"
+        />
+      </div>
+      <label className="block rounded-lg border border-green-200 bg-green-50 p-4">
+        <span className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            name="seasonPassEligible"
+            defaultChecked={initial?.seasonPassEligible ?? false}
+            className="mt-1 size-5 rounded border-slate-300 text-green-800"
+          />
+          <span>
+            <span className="block text-base font-bold text-green-950 md:text-lg">อนุญาตให้ใช้บัตรรายปีในแมตช์นี้</span>
+            <span className="mt-1 block text-sm text-green-900 md:text-base">
+              เปิดได้เฉพาะเกมเหย้าของ Pattani FC เท่านั้น · ถ้าเป็นบอลถ้วย ระบบจะบันทึกการเข้าแต่ไม่หักสิทธิ์บอลลีก 15 นัด
+            </span>
+          </span>
+        </span>
+      </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           label="วันเวลาแข่ง"

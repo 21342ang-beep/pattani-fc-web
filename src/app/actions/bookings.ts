@@ -57,7 +57,15 @@ export async function createBooking(
   try {
     const booking = await prisma.$transaction(
       async (tx) => {
-        const match = await tx.match.findUnique({ where: { id: parsed.data.matchId } });
+        const match = await tx.match.findUnique({
+          where: { id: parsed.data.matchId },
+          include: {
+            ticketZones: {
+              where: { code: parsed.data.zone, isActive: true },
+              take: 1,
+            },
+          },
+        });
         if (!match) throw new Error("ไม่พบแมตช์ที่ต้องการ");
         if (match.competitionType === "LEAGUE" && !settings.leagueBookingOpen) {
           throw new Error("ขณะนี้ปิดการจองตั๋วบอลลีกชั่วคราว");
@@ -65,21 +73,28 @@ export async function createBooking(
         if (match.status !== "ON_SALE") throw new Error("แมตช์นี้ยังไม่เปิดจอง หรือปิดการจองแล้ว");
         // defense-in-depth — แมตช์ ON_SALE ควรมีข้อมูลครบเสมอ (validate ตอน save)
         // ถ้ามาถึงตรงนี้แล้ว field ขาด แสดงว่ามีข้อมูลผิดปกติ — refuse booking
-        const zone = getStadiumZone(parsed.data.zone);
-        if (!zone) {
+        const dynamicZone = match.ticketZones[0];
+        const legacyZone = getStadiumZone(parsed.data.zone);
+        if (!dynamicZone && !legacyZone) {
           throw new Error("ข้อมูลแมตช์ยังไม่สมบูรณ์ ไม่สามารถจองได้");
         }
 
-        const capacity = getZoneCapacity(match, parsed.data.zone);
+        const capacity = dynamicZone?.capacity ?? (legacyZone
+          ? getZoneCapacity(match, parsed.data.zone as Parameters<typeof getZoneCapacity>[1])
+          : null);
         if (capacity == null) {
           throw new Error("โซนนี้ยังไม่เปิดขายสำหรับแมตช์นี้");
         }
-        const price = getZonePrice(match, parsed.data.zone);
+        const price = dynamicZone?.price ?? (legacyZone
+          ? getZonePrice(match, parsed.data.zone as Parameters<typeof getZonePrice>[1])
+          : null);
         if (price == null || price <= 0) {
           throw new Error("โซนนี้ยังไม่ได้กำหนดราคา ไม่สามารถจองได้");
         }
 
-        const capacityScope = getZoneCapacityScope(match, parsed.data.zone);
+        const capacityScope = dynamicZone
+          ? [dynamicZone.code]
+          : getZoneCapacityScope(match, parsed.data.zone as Parameters<typeof getZoneCapacityScope>[1]);
         // Serialize capacity checks for this match so two simultaneous requests
         // cannot both claim the same final seats.
         await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${match.id}`}))`);

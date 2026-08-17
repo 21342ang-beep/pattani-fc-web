@@ -25,7 +25,15 @@ export const getMatchesByFilter = unstable_cache(
 // Match info เปลี่ยนไม่บ่อย (name, venue, price, totalSeats, status)
 // ที่นั่งเหลือแยก query (แคชสั้นกว่า)
 export const getMatchById = unstable_cache(
-  async (id: string) => prisma.match.findUnique({ where: { id } }),
+  async (id: string) => prisma.match.findUnique({
+    where: { id },
+    include: {
+      ticketZones: {
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
+    },
+  }),
   ["match-by-id"],
   { revalidate: 30, tags: ["matches"] }
 );

@@ -14,10 +14,7 @@ type Filter = (typeof ALLOWED_FILTERS)[number];
 const ALLOWED_COMPETITIONS = ["all", "league", "cup"] as const;
 type CompetitionFilter = (typeof ALLOWED_COMPETITIONS)[number];
 
-// whitelist โซน — กัน XSS ผ่าน URL ตอน thread ต่อไปยัง match detail
-const ALLOWED_ZONES = [
-  "A", "B", "C", "D", "E", "F", "G", "I", "J", "AWAY",
-] as const;
+const ZONE_CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]{0,19}$/;
 
 export default async function MatchesListPage(props: {
   searchParams: Promise<{ filter?: string; zone?: string; competition?: string }>;
@@ -26,8 +23,9 @@ export default async function MatchesListPage(props: {
   const filter: Filter = (ALLOWED_FILTERS as readonly string[]).includes(raw ?? "")
     ? (raw as Filter)
     : "all";
-  const zone = (ALLOWED_ZONES as readonly string[]).includes(zoneRaw ?? "")
-    ? zoneRaw
+  const normalizedZone = zoneRaw?.trim().toUpperCase();
+  const zone = normalizedZone && ZONE_CODE_PATTERN.test(normalizedZone)
+    ? normalizedZone
     : undefined;
   const zoneQS = zone ? `?zone=${zone}` : "";
   const competition: CompetitionFilter = (ALLOWED_COMPETITIONS as readonly string[]).includes(competitionRaw ?? "")

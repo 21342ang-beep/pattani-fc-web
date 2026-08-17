@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 import { SEASON_MATCHES, SEASON_TIERS } from "@/lib/season-pass-tiers";
-import { isPattaniHomeTeam } from "@/lib/season-pass-home-match";
+import { isSeasonPassEligibleMatch } from "@/lib/season-pass-home-match";
 import SeasonPassScanner from "./SeasonPassScanner";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +14,18 @@ export default async function SeasonPassCheckPage() {
 
   const [matches, orders, activeBarcodes, scans] = await Promise.all([
     prisma.match.findMany({
-      where: { competitionType: "LEAGUE" },
+      where: { seasonPassEligible: true },
       orderBy: { kickoffAt: "asc" },
-      select: { id: true, homeTeam: true, awayTeam: true, kickoffAt: true },
+      select: {
+        id: true,
+        homeTeam: true,
+        awayTeam: true,
+        kickoffAt: true,
+        competitionType: true,
+        competitionName: true,
+        competitionRound: true,
+        seasonPassEligible: true,
+      },
     }),
     prisma.seasonPassOrder.findMany({
       where: { status: { not: "CANCELLED" } },
@@ -32,7 +41,15 @@ export default async function SeasonPassCheckPage() {
       select: {
         id: true,
         scannedAt: true,
-        match: { select: { homeTeam: true, awayTeam: true } },
+        match: {
+          select: {
+            homeTeam: true,
+            awayTeam: true,
+            competitionType: true,
+            competitionName: true,
+            competitionRound: true,
+          },
+        },
         barcode: { select: { barcode: true, tierId: true, order: { select: { passCode: true, customerName: true } } } },
       },
     }),
@@ -59,7 +76,7 @@ export default async function SeasonPassCheckPage() {
         </Link>
         <h1 className="mt-1 text-3xl font-bold text-green-900 md:text-4xl">สแกนใช้งานบัตรรายปี</h1>
         <p className="text-base text-slate-600 md:text-lg">
-          ใช้ได้เฉพาะเกมเหย้าบอลลีกของ Pattani FC {SEASON_MATCHES} แมตช์เท่านั้น · บอลถ้วยและเกมเยือนไม่รวมสิทธิ์บัตรรายปี
+          บอลลีกหักสิทธิ์จากโควตา {SEASON_MATCHES} นัด · บอลถ้วยที่สโมสรเปิดสิทธิ์เป็นรายแมตช์จะไม่หักโควตาบอลลีก
         </p>
         <Link
           href="/admin/season-passes/staff"
@@ -71,11 +88,13 @@ export default async function SeasonPassCheckPage() {
 
       <SeasonPassScanner
         matches={matches
-          .filter((match) => isPattaniHomeTeam(match.homeTeam))
-          .slice(0, SEASON_MATCHES)
+          .filter(isSeasonPassEligibleMatch)
           .map((match) => ({
             id: match.id,
             label: `${match.homeTeam} vs ${match.awayTeam}${match.kickoffAt ? ` · ${formatDateTime(match.kickoffAt)}` : ""}`,
+            competitionType: match.competitionType,
+            competitionName: match.competitionName,
+            competitionRound: match.competitionRound,
           }))}
         summaries={summaries}
         scanHistory={scans.map((scan) => ({
@@ -85,6 +104,8 @@ export default async function SeasonPassCheckPage() {
           passCode: scan.barcode.order?.passCode ?? scan.barcode.barcode,
           customerName: scan.barcode.order?.customerName ?? "VVIP 4,000 · ใช้งานภายใน",
           matchLabel: `${scan.match.homeTeam} vs ${scan.match.awayTeam}`,
+          competitionType: scan.match.competitionType,
+          competitionDetail: [scan.match.competitionName, scan.match.competitionRound].filter(Boolean).join(" · ") || null,
         }))}
       />
     </div>

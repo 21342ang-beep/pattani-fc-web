@@ -175,8 +175,15 @@ export default async function AdminMatchesPage(props: {
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
                 <MatchDetail label="ประเภท">
-                  <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">
-                    {competitionLabel[m.competitionType] ?? m.competitionType}
+                  <span className="flex flex-wrap gap-1.5">
+                    <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">
+                      {competitionLabel[m.competitionType] ?? m.competitionType}
+                    </span>
+                    {m.seasonPassEligible && (
+                      <span className="inline-flex rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-bold text-green-800">
+                        ใช้บัตรรายปีได้
+                      </span>
+                    )}
                   </span>
                 </MatchDetail>
                 <MatchDetail label="วันและเวลา" className="col-span-2 sm:col-span-1 lg:col-span-2 xl:col-span-1">

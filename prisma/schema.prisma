@@ -111,51 +111,75 @@ enum AuthProvider {
 // admin บันทึก "ฉบับร่าง" ได้แม้ข้อมูลยังไม่ครบ
 // แต่ก่อนเปลี่ยนเป็น ON_SALE ระบบจะบังคับให้ครบทุก field (validate ที่ schema)
 model Match {
-  id              String           @id @default(cuid())
-  homeTeam        String
-  awayTeam        String
-  homeTeamLogo    String? // path เช่น /uploads/matches/<uuid>.png (validate ที่ Zod)
-  awayTeamLogo    String?
-  venue           String?
-  kickoffAt       DateTime?
-  totalSeats      Int?
-  zoneASeats      Int?
-  zoneBSeats      Int?
-  zoneCSeats      Int?
-  zoneDSeats      Int?
-  zoneESeats      Int?
-  zoneFSeats      Int?
-  zoneGSeats      Int?
-  zoneISeats      Int?
-  zoneJSeats      Int?
-  zone170Seats    Int?
-  zone150Seats    Int?
-  zone120Seats    Int?
-  zone100Seats    Int?
-  zoneAwaySeats   Int?
-  zoneAPrice      Int? // ราคาเป็นสตางค์ (เลี่ยง floating point)
-  zoneBPrice      Int?
-  zoneCPrice      Int?
-  zoneDPrice      Int?
-  zoneEPrice      Int?
-  zoneFPrice      Int?
-  zoneGPrice      Int?
-  zoneIPrice      Int?
-  zoneJPrice      Int?
-  zoneAwayPrice   Int?
-  pricePerSeat    Int? // ราคาเป็นสตางค์ (เลี่ยง floating point)
-  competitionType CompetitionType  @default(LEAGUE)
-  homeScore       Int?
-  awayScore       Int?
-  status          MatchStatus      @default(SCHEDULED)
-  description     String?
-  bookings        Booking[]
-  seasonPassScans SeasonPassScan[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                 String            @id @default(cuid())
+  homeTeam           String
+  awayTeam           String
+  homeTeamLogo       String? // path เช่น /uploads/matches/<uuid>.png (validate ที่ Zod)
+  awayTeamLogo       String?
+  venue              String?
+  kickoffAt          DateTime?
+  totalSeats         Int?
+  zoneASeats         Int?
+  zoneBSeats         Int?
+  zoneCSeats         Int?
+  zoneDSeats         Int?
+  zoneESeats         Int?
+  zoneFSeats         Int?
+  zoneGSeats         Int?
+  zoneISeats         Int?
+  zoneJSeats         Int?
+  zone170Seats       Int?
+  zone150Seats       Int?
+  zone120Seats       Int?
+  zone100Seats       Int?
+  zoneAwaySeats      Int?
+  zoneAPrice         Int? // ราคาเป็นสตางค์ (เลี่ยง floating point)
+  zoneBPrice         Int?
+  zoneCPrice         Int?
+  zoneDPrice         Int?
+  zoneEPrice         Int?
+  zoneFPrice         Int?
+  zoneGPrice         Int?
+  zoneIPrice         Int?
+  zoneJPrice         Int?
+  zoneAwayPrice      Int?
+  pricePerSeat       Int? // ราคาเป็นสตางค์ (เลี่ยง floating point)
+  competitionType    CompetitionType   @default(LEAGUE)
+  competitionName    String?
+  competitionRound   String?
+  seasonPassEligible Boolean           @default(false)
+  homeScore          Int?
+  awayScore          Int?
+  status             MatchStatus       @default(SCHEDULED)
+  description        String?
+  bookings           Booking[]
+  ticketZones        MatchTicketZone[]
+  seasonPassScans    SeasonPassScan[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   @@index([kickoffAt])
   @@index([status])
+  @@index([seasonPassEligible, kickoffAt])
+}
+
+// โซนจำหน่ายเพิ่มเติมรายแมตช์ เช่น VVIP/VIP ของสนามชั่วคราว
+// เก็บเป็นแถวข้อมูลแทนการเพิ่มคอลัมน์ใหม่ทุกครั้งที่เปลี่ยนสนามหรือชื่อโซน
+model MatchTicketZone {
+  id        String   @id @default(cuid())
+  matchId   String
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  code      String
+  name      String
+  capacity  Int
+  price     Int // สตางค์
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([matchId, code])
+  @@index([matchId, isActive, sortOrder])
 }
 
 model LeagueTeam {
@@ -396,23 +420,23 @@ enum ShopPaymentMethod {
 // customerId nullable = รองรับ guest checkout (member จะ link ผ่าน customerId)
 // deliveryMethod = SHIPPING → ต้องมี shipAddress; PICKUP → ต้องมี pickupLocation
 model SeasonPassPurchase {
-  id              String                @id @default(cuid())
-  purchaseCode    String                @unique
-  customerId      String?
-  customerEmail   String?
-  quantity        Int
-  subtotalBaht    Int
-  shippingFeeBaht Int                   @default(0)
-  totalBaht       Int
-  paymentMethod   String
-  status          SeasonPassOrderStatus @default(PENDING)
+  id               String                @id @default(cuid())
+  purchaseCode     String                @unique
+  customerId       String?
+  customerEmail    String?
+  quantity         Int
+  subtotalBaht     Int
+  shippingFeeBaht  Int                   @default(0)
+  totalBaht        Int
+  paymentMethod    String
+  status           SeasonPassOrderStatus @default(PENDING)
   // Nullable keeps orders created before timed checkout backward-compatible.
   paymentExpiresAt DateTime?
-  orders          SeasonPassOrder[]
-  xenditPayments  XenditPayment[]
-  beamPayments    BeamPayment[]
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  orders           SeasonPassOrder[]
+  xenditPayments   XenditPayment[]
+  beamPayments     BeamPayment[]
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
   @@index([customerId])
   @@index([customerEmail])

@@ -4,7 +4,10 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
-import { isPattaniHomeTeam } from "@/lib/season-pass-home-match";
+import {
+  isSeasonPassEligibleMatch,
+  seasonPassScanConsumesLeagueUse,
+} from "@/lib/season-pass-home-match";
 
 // Server actions สำหรับหน้า /gate-check (ระบบสแกนเข้างานที่ประตูสนาม)
 // ทุก action ต้องผ่าน verifyAdmin → ป้องกันคนนอกใช้
@@ -209,7 +212,7 @@ const seasonPassScanSchema = z.object({
   barcode: z.string().trim().regex(/^(PFC26-(4000|2500|2000|1500)-\d{4}|SP-[A-Z]+-[A-Z0-9]{8})$/i),
 });
 
-type SeasonPassScanError = "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "UNREGISTERED" | "INVALID" | "LEAGUE_ONLY";
+type SeasonPassScanError = "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "UNREGISTERED" | "INVALID" | "MATCH_NOT_ELIGIBLE";
 
 export type LookupSeasonPassResult =
   | {
@@ -221,6 +224,7 @@ export type LookupSeasonPassResult =
       seatZone: string;
       tierId: string;
       usesRemaining: number;
+      competitionType: "LEAGUE" | "CUP";
     }
   | { ok: false; error: SeasonPassScanError };
 
@@ -235,6 +239,7 @@ export type ScanSeasonPassResult =
       tierId: string;
       usesRemaining: number;
       scanId: string;
+      competitionType: "LEAGUE" | "CUP";
     }
   | { ok: false; error: SeasonPassScanError };
 
@@ -253,10 +258,10 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
   const barcode = parsed.data.barcode.toUpperCase();
   const match = await prisma.match.findUnique({
     where: { id: parsed.data.matchId },
-    select: { competitionType: true, homeTeam: true },
+    select: { competitionType: true, homeTeam: true, seasonPassEligible: true },
   });
-  if (!match || match.competitionType !== "LEAGUE" || !isPattaniHomeTeam(match.homeTeam)) {
-    return { ok: false, error: "LEAGUE_ONLY" };
+  if (!match || !isSeasonPassEligibleMatch(match)) {
+    return { ok: false, error: "MATCH_NOT_ELIGIBLE" };
   }
 
   const pass = await prisma.seasonPassBarcode.findUnique({
@@ -288,7 +293,9 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
     return { ok: false, error: "INACTIVE" };
   }
   if (pass.scans.length > 0) return { ok: false, error: "DUPLICATE" };
-  if (pass.usesRemaining <= 0) return { ok: false, error: "EXHAUSTED" };
+  if (seasonPassScanConsumesLeagueUse(match.competitionType) && pass.usesRemaining <= 0) {
+    return { ok: false, error: "EXHAUSTED" };
+  }
 
   return {
     ok: true,
@@ -299,6 +306,7 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
     seatZone: order.seatZone,
     tierId: pass.tierId,
     usesRemaining: pass.usesRemaining,
+    competitionType: match.competitionType,
   };
 }
 
@@ -312,10 +320,10 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
   const { barcode, matchId } = parsed.data;
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { competitionType: true, homeTeam: true },
+    select: { competitionType: true, homeTeam: true, seasonPassEligible: true },
   });
-  if (!match || match.competitionType !== "LEAGUE" || !isPattaniHomeTeam(match.homeTeam)) {
-    return { ok: false, error: "LEAGUE_ONLY" };
+  if (!match || !isSeasonPassEligibleMatch(match)) {
+    return { ok: false, error: "MATCH_NOT_ELIGIBLE" };
   }
   const pass = await prisma.seasonPassBarcode.findUnique({
     where: { barcode: barcode.toUpperCase() },
@@ -340,15 +348,18 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
   if (!order || order.status !== "CONFIRMED") {
     return { ok: false, error: "INACTIVE" };
   }
-  if (pass.usesRemaining <= 0) return { ok: false, error: "EXHAUSTED" };
+  const consumesLeagueUse = seasonPassScanConsumesLeagueUse(match.competitionType);
+  if (consumesLeagueUse && pass.usesRemaining <= 0) return { ok: false, error: "EXHAUSTED" };
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const consumed = await tx.seasonPassBarcode.updateMany({
-        where: { id: pass.id, usesRemaining: { gt: 0 } },
-        data: { usesRemaining: { decrement: 1 } },
-      });
-      if (consumed.count !== 1) throw new Error("EXHAUSTED");
+      if (consumesLeagueUse) {
+        const consumed = await tx.seasonPassBarcode.updateMany({
+          where: { id: pass.id, usesRemaining: { gt: 0 } },
+          data: { usesRemaining: { decrement: 1 } },
+        });
+        if (consumed.count !== 1) throw new Error("EXHAUSTED");
+      }
       const scan = await tx.seasonPassScan.create({
         data: { barcodeId: pass.id, matchId, scannedBy: user.id },
         select: { id: true, barcode: { select: { usesRemaining: true } } },
@@ -365,6 +376,7 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
       tierId: pass.tierId,
       usesRemaining: result.usesRemaining,
       scanId: result.scanId,
+      competitionType: match.competitionType,
     };
   } catch (error) {
     if (error instanceof Error && error.message === "EXHAUSTED") return { ok: false, error: "EXHAUSTED" };
@@ -374,7 +386,7 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
 }
 
 // ใช้สำหรับล้างรายการทดสอบจากหน้าผู้ดูแลบัตรรายปีเท่านั้น
-// เมื่อลบ scan จะคืนสิทธิ์ 1 แมตช์กลับให้บัตรใบนั้นเสมอ
+// เมื่อลบ scan จะคืนสิทธิ์เฉพาะรายการบอลลีก บอลถ้วยไม่เคยหักสิทธิ์จึงไม่คืนเพิ่ม
 export async function deleteSeasonPassScan(scanId: string): Promise<{ ok: true } | { error: string }> {
   await verifyPermission("SEASON_PASSES");
   if (!z.string().regex(/^[a-z0-9]+$/i).safeParse(scanId).success) {
@@ -385,14 +397,16 @@ export async function deleteSeasonPassScan(scanId: string): Promise<{ ok: true }
     await prisma.$transaction(async (tx) => {
       const scan = await tx.seasonPassScan.findUnique({
         where: { id: scanId },
-        select: { id: true, barcodeId: true },
+        select: { id: true, barcodeId: true, match: { select: { competitionType: true } } },
       });
       if (!scan) throw new Error("NOT_FOUND");
       await tx.seasonPassScan.delete({ where: { id: scan.id } });
-      await tx.seasonPassBarcode.update({
-        where: { id: scan.barcodeId },
-        data: { usesRemaining: { increment: 1 } },
-      });
+      if (seasonPassScanConsumesLeagueUse(scan.match.competitionType)) {
+        await tx.seasonPassBarcode.update({
+          where: { id: scan.barcodeId },
+          data: { usesRemaining: { increment: 1 } },
+        });
+      }
     });
     revalidatePath("/admin/season-passes/check");
     return { ok: true };
@@ -406,12 +420,15 @@ export async function deleteAllSeasonPassScans(): Promise<{ ok: true; deleted: n
 
   try {
     const deleted = await prisma.$transaction(async (tx) => {
-      const scans = await tx.seasonPassScan.findMany({ select: { id: true, barcodeId: true } });
+      const scans = await tx.seasonPassScan.findMany({
+        select: { id: true, barcodeId: true, match: { select: { competitionType: true } } },
+      });
       if (scans.length === 0) return 0;
 
       const scanIds = scans.map((scan) => scan.id);
       const restoredUses = new Map<string, number>();
       for (const scan of scans) {
+        if (!seasonPassScanConsumesLeagueUse(scan.match.competitionType)) continue;
         restoredUses.set(scan.barcodeId, (restoredUses.get(scan.barcodeId) ?? 0) + 1);
       }
 
@@ -440,13 +457,14 @@ export async function deleteSeasonPassScansByTier(tierId: string): Promise<{ ok:
     const deleted = await prisma.$transaction(async (tx) => {
       const scans = await tx.seasonPassScan.findMany({
         where: { barcode: { tierId } },
-        select: { id: true, barcodeId: true },
+        select: { id: true, barcodeId: true, match: { select: { competitionType: true } } },
       });
       if (scans.length === 0) return 0;
 
       const scanIds = scans.map((scan) => scan.id);
       const restoredUses = new Map<string, number>();
       for (const scan of scans) {
+        if (!seasonPassScanConsumesLeagueUse(scan.match.competitionType)) continue;
         restoredUses.set(scan.barcodeId, (restoredUses.get(scan.barcodeId) ?? 0) + 1);
       }
 
