@@ -18,7 +18,10 @@ export default async function SeasonPassCheckPage() {
       orderBy: { kickoffAt: "asc" },
       select: { id: true, homeTeam: true, awayTeam: true, kickoffAt: true },
     }),
-    prisma.seasonPassOrder.findMany({ select: { tierId: true, status: true } }),
+    prisma.seasonPassOrder.findMany({
+      where: { status: { not: "CANCELLED" } },
+      select: { tierId: true, status: true },
+    }),
     prisma.seasonPassBarcode.findMany({
       where: { isGenerated: true },
       select: { tierId: true, orderId: true },

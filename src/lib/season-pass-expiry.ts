@@ -3,7 +3,10 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-export const SEASON_PASS_RESERVATION_MS = 15 * 60 * 1000;
+// Hold a newly created online reservation only long enough for the customer to
+// continue to payment. Once Beam creates a QR, the payment route replaces this
+// deadline with the QR's own (longer) expiry time.
+export const SEASON_PASS_RESERVATION_MS = 2 * 60 * 1000;
 
 export function newSeasonPassPaymentDeadline(now = new Date()) {
   return new Date(now.getTime() + SEASON_PASS_RESERVATION_MS);
@@ -41,6 +44,18 @@ export async function expirePendingSeasonPassPurchases(input: {
   now?: Date;
 } = {}) {
   const now = input.now ?? new Date();
+  const qrCreationDeadline = new Date(now.getTime() - SEASON_PASS_RESERVATION_MS);
+  const deadlineWhere: Prisma.SeasonPassPurchaseWhereInput = {
+    OR: [
+      { paymentExpiresAt: null },
+      { paymentExpiresAt: { lte: now } },
+      {
+        createdAt: { lte: qrCreationDeadline },
+        beamPayments: { none: { qrImageBase64: { not: null } } },
+        xenditPayments: { none: { qrString: { not: null } } },
+      },
+    ],
+  };
   const targetWhere: Prisma.SeasonPassPurchaseWhereInput = input.purchaseCode && input.passCode
     ? {
         OR: [
@@ -65,10 +80,7 @@ export async function expirePendingSeasonPassPurchases(input: {
           ],
         },
       },
-      OR: [
-        { paymentExpiresAt: null },
-        { paymentExpiresAt: { lte: now } },
-      ],
+      ...deadlineWhere,
       beamPayments: { none: { status: "SUCCEEDED" } },
       xenditPayments: { none: { status: "SUCCEEDED" } },
       ...targetWhere,
@@ -93,10 +105,7 @@ export async function expirePendingSeasonPassPurchases(input: {
               ],
             },
           },
-          OR: [
-            { paymentExpiresAt: null },
-            { paymentExpiresAt: { lte: now } },
-          ],
+          ...deadlineWhere,
           // Re-check payment evidence after acquiring the same purchase lock
           // used by the webhook. Paid customers must never be cancelled.
           beamPayments: { none: { status: "SUCCEEDED" } },

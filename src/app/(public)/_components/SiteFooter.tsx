@@ -40,7 +40,7 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
                 alt="UNI-X"
                 width={1187}
                 height={303}
-                className="h-auto w-36 object-contain sm:w-44 lg:w-52"
+                className="h-auto w-28 object-contain sm:w-36 lg:w-44"
               />
             </Link>
             <p className="mx-auto mt-7 max-w-3xl text-lg leading-relaxed text-green-100/80 sm:text-xl lg:text-2xl">

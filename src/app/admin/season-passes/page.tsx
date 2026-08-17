@@ -15,6 +15,7 @@ import DeleteAllSeasonPassOrdersButton from "./DeleteAllSeasonPassOrdersButton";
 import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
 import { compareSeasonPassOrders } from "@/lib/season-pass-order-sort";
+import SeasonPassExpiryRefresh from "./SeasonPassExpiryRefresh";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "บัตรรายปี — Admin" };
@@ -45,6 +46,7 @@ export default async function AdminSeasonPassesPage(props: {
 
   const [orders, zoneQuotas, barcodeTotals] = await Promise.all([
     prisma.seasonPassOrder.findMany({
+      where: { status: { not: "CANCELLED" } },
       include: { barcode: { select: { barcode: true } } },
       orderBy: { createdAt: "desc" },
     }),
@@ -83,6 +85,7 @@ export default async function AdminSeasonPassesPage(props: {
 
   return (
     <div>
+      <SeasonPassExpiryRefresh />
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-green-900 md:text-4xl">

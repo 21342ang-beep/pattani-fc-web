@@ -17,7 +17,11 @@ export async function GET(request: Request) {
   if (!tier) return new Response("Invalid season-pass tier", { status: 400 });
 
   const orders = await prisma.seasonPassOrder.findMany({
-    where: { tierId: tier.id, seasonLabel: SEASON_LABEL },
+    where: {
+      tierId: tier.id,
+      seasonLabel: SEASON_LABEL,
+      status: { not: "CANCELLED" },
+    },
     orderBy: [{ createdAt: "asc" }, { passCode: "asc" }],
   });
 

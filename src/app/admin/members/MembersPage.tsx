@@ -351,7 +351,15 @@ export default async function MembersPage(props: {
                     {member.lastLoginAt ? formatDateTime(member.lastLoginAt) : "ยังไม่เคยเข้าใช้"}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <DeleteMemberButton memberId={member.id} memberName={member.name} />
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        href={`/admin/members/${member.id}/edit`}
+                        className="text-xs font-semibold text-green-700 hover:text-green-900 hover:underline"
+                      >
+                        แก้ไข
+                      </Link>
+                      <DeleteMemberButton memberId={member.id} memberName={member.name} />
+                    </div>
                   </td>
                 </tr>
               );

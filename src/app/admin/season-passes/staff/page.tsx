@@ -29,7 +29,11 @@ export default async function StaffSeasonPassPage() {
       select: { barcode: true },
     }),
     prisma.seasonPassOrder.findMany({
-      where: { seasonLabel: SEASON_LABEL, salesChannel: "OFFLINE" },
+      where: {
+        seasonLabel: SEASON_LABEL,
+        salesChannel: "OFFLINE",
+        status: { not: "CANCELLED" },
+      },
       orderBy: { soldAt: "desc" },
       take: 100,
       select: {

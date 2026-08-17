@@ -11,6 +11,11 @@ const ADMIN_PREFIX = "/admin";
 const MEMBER_PREFIX = "/member";
 const LOGIN_PATH = "/login";
 const MEMBER_LOGIN_PATH = "/member/login";
+const MEMBER_FORGOT_PASSWORD_PATH = "/member/forgot-password";
+const PUBLIC_MEMBER_PATHS = new Set([
+  MEMBER_LOGIN_PATH,
+  MEMBER_FORGOT_PASSWORD_PATH,
+]);
 
 const encodedKey = new TextEncoder().encode(process.env.SESSION_SECRET);
 
@@ -36,7 +41,7 @@ export default async function proxy(req: NextRequest) {
     adminSession?.role === "ADMIN" || adminSession?.role === "SUPER_ADMIN";
 
   // /member ต้องเป็น customer เท่านั้น
-  if (path.startsWith(MEMBER_PREFIX) && path !== MEMBER_LOGIN_PATH) {
+  if (path.startsWith(MEMBER_PREFIX) && !PUBLIC_MEMBER_PATHS.has(path)) {
     const customerSession = await verify(
       req.cookies.get("customer_session")?.value
     );
