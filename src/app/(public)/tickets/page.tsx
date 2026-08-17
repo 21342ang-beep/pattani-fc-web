@@ -32,6 +32,17 @@ type StadiumZone = {
   color: ZoneColor;
   note?: string;
 };
+type DynamicTicketZone = {
+  id: string;
+  code: string;
+  name: string;
+  price: number;
+  capacity: number;
+  remaining: number;
+  matchId: string;
+  matchLabel: string;
+  venue: string | null;
+};
 const STADIUM_ZONES: StadiumZone[] = [
   { code: "A", label: "อัฒจันทร์เหนือ · A", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
   { code: "B", label: "อัฒจันทร์เหนือ · B", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
@@ -208,39 +219,6 @@ export default async function TicketsPage() {
         </section>
       )}
 
-      {dynamicZones.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 pt-12 md:pt-16">
-          <div className="mb-6">
-            <p className="text-base font-bold uppercase tracking-widest text-violet-700 md:text-lg">{t("โซนพิเศษ", "Special zones")}</p>
-            <h2 className="mt-2 text-4xl font-black text-green-900 md:text-5xl">{t("ที่นั่งเพิ่มเติมรายแมตช์", "Match-specific seating")}</h2>
-            <p className="mt-2 text-lg text-slate-600 md:text-xl">{t("จำนวนและราคากำหนดตามสนามที่ใช้แข่งขันในแต่ละนัด", "Capacity and pricing follow each match venue")}</p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {dynamicZones.map((zone) => (
-              <article key={zone.id} className="flex flex-col rounded-2xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-black uppercase tracking-wider text-violet-700">{zone.code}</p>
-                    <h3 className="mt-1 text-2xl font-black text-green-950">{zone.name}</h3>
-                  </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-violet-800">{(zone.price / 100).toLocaleString(intlLocale(locale))} {t("บาท", "THB")}</span>
-                </div>
-                <p className="mt-4 font-bold text-slate-800">{zone.matchLabel}</p>
-                <p className="mt-1 text-sm text-slate-600">{zone.venue ?? t("ยังไม่กำหนดสนาม", "Venue to be confirmed")}</p>
-                <p className="mt-3 text-base text-slate-600">{t("คงเหลือ", "Remaining")} <strong className="text-xl text-green-800">{zone.remaining.toLocaleString(intlLocale(locale))}</strong> / {zone.capacity.toLocaleString(intlLocale(locale))} {t("ที่นั่ง", "seats")}</p>
-                {zone.remaining > 0 ? (
-                  <Link href={`/matches/${zone.matchId}?zone=${encodeURIComponent(zone.code)}`} className="mt-5 rounded-lg bg-violet-700 px-4 py-3 text-center font-bold text-white hover:bg-violet-600">
-                    {t("จองโซนนี้", "Book this zone")}
-                  </Link>
-                ) : (
-                  <span className="mt-5 rounded-lg bg-slate-200 px-4 py-3 text-center font-bold text-slate-600">{t("ที่นั่งเต็มแล้ว", "Sold out")}</span>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
       <section className="mx-auto max-w-6xl px-4 pt-12 md:pt-16">
         <div className="mb-6 text-center">
           <p className="inline-flex items-center gap-2 text-lg font-bold uppercase tracking-widest text-yellow-600 md:text-xl">
@@ -282,6 +260,21 @@ export default async function TicketsPage() {
               >
                 <ZoneCard zone={z} locale={locale} />
               </Link>
+            </li>
+          ))}
+          {dynamicZones.map((zone) => (
+            <li key={zone.id}>
+              {zone.remaining > 0 ? (
+                <Link
+                  href={`/matches/${zone.matchId}?zone=${encodeURIComponent(zone.code)}`}
+                  className="block h-full rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2"
+                  aria-label={`${t("ซื้อบัตร", "Buy ticket")} ${zone.name} · ${zone.matchLabel}`}
+                >
+                  <DynamicZoneCard zone={zone} locale={locale} />
+                </Link>
+              ) : (
+                <DynamicZoneCard zone={zone} locale={locale} />
+              )}
             </li>
           ))}
         </ul>
@@ -445,6 +438,42 @@ function ZoneCard({ zone, locale }: { zone: StadiumZone; locale: Locale }) {
             <Users className="size-4" /> {locale === "th" ? zone.note : locale === "ms" ? "Untuk penyokong pelawat sahaja" : "Away fans only"}
           </span>
         )}
+      </div>
+    </div>
+  );
+}
+
+function DynamicZoneCard({ zone, locale }: { zone: DynamicTicketZone; locale: Locale }) {
+  const t = (th: string, en: string) => localize(locale, th, en);
+  const numberLocale = intlLocale(locale);
+  const soldOut = zone.remaining === 0;
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl border-2 border-violet-500 bg-violet-50/60 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="bg-violet-700 px-4 pb-5 pt-4 text-white">
+        <span className="text-xl font-bold uppercase tracking-widest opacity-80 md:text-2xl">
+          {t("โซน", "Zone")}
+        </span>
+        <span className="mt-1 block break-words text-4xl font-black leading-none md:text-5xl">
+          {zone.code}
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col px-4 pb-5 pt-4">
+        <span className="text-xl font-bold leading-tight text-slate-700">{zone.name}</span>
+        <span className="mt-3 text-3xl font-black text-violet-700">
+          {(zone.price / 100).toLocaleString(numberLocale)}
+          <span className="ml-1 text-base font-medium text-slate-500">{t("บาท", "THB")}</span>
+        </span>
+        <span className="mt-3 text-xl font-semibold leading-tight text-slate-500 md:text-2xl">
+          {soldOut
+            ? t("ที่นั่งเต็มแล้ว", "Sold out")
+            : `${t("คงเหลือ", "Remaining")} ${zone.remaining.toLocaleString(numberLocale)} ${t("ที่นั่ง", "seats")}`}
+        </span>
+        <span className="mt-2 text-sm font-semibold leading-snug text-slate-600">{zone.matchLabel}</span>
+        {zone.venue && <span className="mt-1 text-xs text-slate-500">{zone.venue}</span>}
+        <span className={`mt-auto rounded-full px-4 py-2.5 text-base font-black ${soldOut ? "bg-slate-200 text-slate-500" : "bg-violet-700 text-white"}`}>
+          {soldOut ? t("ปิดรับจอง", "Unavailable") : t("ซื้อบัตร", "Buy ticket")}
+        </span>
       </div>
     </div>
   );
