@@ -56,11 +56,13 @@ type DynamicZoneTheme = {
   header: string;
   headerText: string;
   price: string;
-  button: string;
 };
+type ZoneCardItem =
+  | { kind: "dynamic"; zone: DynamicTicketZone; sourceOrder: number }
+  | { kind: "standard"; zone: StadiumZone; sourceOrder: number };
 const STADIUM_ZONES: StadiumZone[] = [
-  { code: "A", label: "อัฒจันทร์เหนือ · A", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "gold" },
-  { code: "B", label: "อัฒจันทร์เหนือ · B", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "gold" },
+  { code: "A", label: "อัฒจันทร์เหนือ · A", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
+  { code: "B", label: "อัฒจันทร์เหนือ · B", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
   { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
   { code: "D", label: "อัฒจันทร์ฝั่งตะวันออก · D", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
   { code: "E", label: "อัฒจันทร์ใต้ · E", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
@@ -170,6 +172,39 @@ export default async function TicketsPage() {
       seasonReserved: availabilityByZone[zone.code].seasonReserved,
       sharedCapacity: availabilityByZone[zone.code].sharedCapacity,
     };
+  });
+  const standardZoneOrder = new Map<string, number>(
+    displayZones.map((zone, index) => [zone.code, index]),
+  );
+  const zoneCards: ZoneCardItem[] = [
+    ...dynamicZones.map((zone, sourceOrder) => ({ kind: "dynamic" as const, zone, sourceOrder })),
+    ...displayZones.map((zone, sourceOrder) => ({ kind: "standard" as const, zone, sourceOrder })),
+  ];
+  zoneCards.sort((left, right) => {
+    const getPosition = (item: ZoneCardItem): [number, number, number] => {
+      if (item.kind === "standard") {
+        return [item.sourceOrder + 1, 1, item.sourceOrder];
+      }
+
+      const buttonLabel = getMatchTicketZoneButtonLabel(item.zone);
+      const identity = `${buttonLabel} ${item.zone.code} ${item.zone.name}`.toUpperCase();
+      if (identity.includes("VVIP")) return [0, 0, item.sourceOrder];
+
+      const matchingStandardOrder = standardZoneOrder.get(buttonLabel);
+      if (matchingStandardOrder != null) {
+        return [matchingStandardOrder + 1, 0, item.sourceOrder];
+      }
+
+      // Keep any other back-office-defined special zones near the front while
+      // preserving their configured query order.
+      return [0, 1, item.sourceOrder];
+    };
+
+    const leftPosition = getPosition(left);
+    const rightPosition = getPosition(right);
+    return leftPosition[0] - rightPosition[0]
+      || leftPosition[1] - rightPosition[1]
+      || leftPosition[2] - rightPosition[2];
   });
   const modelZones: StadiumModelZone[] = displayZones.map((zone) => {
     const label = locale === "th"
@@ -310,29 +345,28 @@ export default async function TicketsPage() {
           {t("ตรวจสอบตำแหน่งและราคาจากแผนผังด้านบน แล้วกดที่โซนเพื่อเลือกแมตช์", "Check the location and price on the plan above, then select a zone to choose a match")}
         </p>
         <ul id="zones" className="grid scroll-mt-24 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-          {dynamicZones.map((zone) => (
-            <li key={zone.id}>
-              {zone.remaining > 0 ? (
+          {zoneCards.map((item) => item.kind === "dynamic" ? (
+            <li key={`dynamic-${item.zone.id}`}>
+              {item.zone.remaining > 0 ? (
                 <Link
-                  href={`/matches/${zone.matchId}?zone=${encodeURIComponent(zone.code)}`}
+                  href={`/matches/${item.zone.matchId}?zone=${encodeURIComponent(item.zone.code)}`}
                   className="block h-full rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2"
-                  aria-label={`${t("ซื้อบัตร", "Buy ticket")} ${zone.name} · ${zone.matchLabel}`}
+                  aria-label={`${t("ซื้อบัตร", "Buy ticket")} ${item.zone.name} · ${item.zone.matchLabel}`}
                 >
-                  <DynamicZoneCard zone={zone} locale={locale} />
+                  <DynamicZoneCard zone={item.zone} locale={locale} />
                 </Link>
               ) : (
-                <DynamicZoneCard zone={zone} locale={locale} />
+                <DynamicZoneCard zone={item.zone} locale={locale} />
               )}
             </li>
-          ))}
-          {displayZones.map((z) => (
-            <li key={z.code}>
+          ) : (
+            <li key={`standard-${item.zone.code}`}>
               <Link
-                href={`/matches?zone=${z.code}`}
-                className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 rounded-2xl"
-                aria-label={`${t("เลือกโซน", "Choose zone")} ${z.code}`}
+                href={`/matches?zone=${item.zone.code}`}
+                className="block h-full rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2"
+                aria-label={`${t("เลือกโซน", "Choose zone")} ${item.zone.code}`}
               >
-                <ZoneCard zone={z} locale={locale} />
+                <ZoneCard zone={item.zone} locale={locale} />
               </Link>
             </li>
           ))}
@@ -512,7 +546,6 @@ function ZoneCard({ zone, locale }: { zone: StadiumZone; locale: Locale }) {
 function DynamicZoneCard({ zone, locale }: { zone: DynamicTicketZone; locale: Locale }) {
   const t = (th: string, en: string) => localize(locale, th, en);
   const numberLocale = intlLocale(locale);
-  const soldOut = zone.remaining === 0;
   const theme = getDynamicZoneTheme(zone);
   const buttonLabel = getMatchTicketZoneButtonLabel(zone);
   const buttonLabelSize = buttonLabel.length > 8
@@ -523,7 +556,7 @@ function DynamicZoneCard({ zone, locale }: { zone: DynamicTicketZone; locale: Lo
 
   return (
     <div className={`flex h-full flex-col overflow-hidden rounded-2xl border-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${theme.wrap}`}>
-      <div className={`px-4 pb-5 pt-4 ${theme.header}`}>
+      <div className={`px-5 pb-5 pt-4 ${theme.header}`}>
         <span className={`text-xl font-bold uppercase tracking-widest opacity-80 md:text-2xl ${theme.headerText}`}>
           {t("โซน", "Zone")}
         </span>
@@ -531,21 +564,17 @@ function DynamicZoneCard({ zone, locale }: { zone: DynamicTicketZone; locale: Lo
           {buttonLabel}
         </span>
       </div>
-      <div className="flex flex-1 flex-col px-4 pb-5 pt-4">
+      <div className="flex flex-1 flex-col px-5 pb-5 pt-4">
         <span className="text-xl font-bold leading-tight text-slate-700">{zone.name}</span>
         <span className={`mt-3 text-3xl font-black ${theme.price}`}>
           {(zone.price / 100).toLocaleString(numberLocale)}
           <span className="ml-1 text-base font-medium text-slate-500">{t("บาท", "THB")}</span>
         </span>
         <span className="mt-3 text-xl font-semibold leading-tight text-slate-500 md:text-2xl">
-          {soldOut
-            ? t("ที่นั่งเต็มแล้ว", "Sold out")
-            : `${t("คงเหลือ", "Remaining")} ${zone.remaining.toLocaleString(numberLocale)} ${t("ที่นั่ง", "seats")}`}
+          {t("คงเหลือ", "Remaining")} {zone.remaining.toLocaleString(numberLocale)} {t("ที่นั่ง", "seats")}
         </span>
-        <span className="mt-2 text-sm font-semibold leading-snug text-slate-600">{zone.matchLabel}</span>
-        {zone.venue && <span className="mt-1 text-xs text-slate-500">{zone.venue}</span>}
-        <span className={`mt-auto rounded-full px-4 py-2.5 text-base font-black ${soldOut ? "bg-slate-200 text-slate-500" : theme.button}`}>
-          {soldOut ? t("ปิดรับจอง", "Unavailable") : t("ซื้อบัตร", "Buy ticket")}
+        <span className="mt-1 text-base font-medium text-slate-500 md:text-lg">
+          {t("จาก", "of")} {zone.capacity.toLocaleString(numberLocale)} {t("ที่นั่ง", "seats")}
         </span>
       </div>
     </div>
@@ -561,7 +590,6 @@ function getDynamicZoneTheme(zone: Pick<DynamicTicketZone, "code" | "name">): Dy
       header: "bg-slate-900",
       headerText: "text-[#E6BD3A]",
       price: "text-amber-700",
-      button: "bg-slate-900 text-[#F4D35E]",
     };
   }
 
@@ -571,7 +599,6 @@ function getDynamicZoneTheme(zone: Pick<DynamicTicketZone, "code" | "name">): Dy
       header: "bg-[#B9983E]",
       headerText: "text-slate-950",
       price: "text-[#8A6818]",
-      button: "bg-[#B9983E] text-slate-950",
     };
   }
 
@@ -580,6 +607,5 @@ function getDynamicZoneTheme(zone: Pick<DynamicTicketZone, "code" | "name">): Dy
     header: "bg-violet-700",
     headerText: "text-white",
     price: "text-violet-700",
-    button: "bg-violet-700 text-white",
   };
 }
