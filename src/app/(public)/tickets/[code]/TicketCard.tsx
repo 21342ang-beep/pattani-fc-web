@@ -60,7 +60,9 @@ const GATE_BY_ZONE: Record<string, string> = {
   E: "E",
   F: "F1 / F2",
   G: "G",
-  I: "I",
+  H: "H",
+  // Transitional fallback for a ticket opened before the I → H data migration.
+  I: "H",
   J: "J",
   AWAY: "H",
 };

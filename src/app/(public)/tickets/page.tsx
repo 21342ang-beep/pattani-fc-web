@@ -19,6 +19,7 @@ import { intlLocale, localize } from "@/lib/i18n/text";
 import type { Locale } from "@/lib/i18n/dict";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import { activeBookingStatusWhere } from "@/lib/booking-expiry";
+import { getMatchTicketZoneButtonLabel } from "@/lib/match-ticket-zone-label";
 
 export const metadata = { title: "จองตั๋วรายแมตช์ — Pattani FC" };
 
@@ -41,6 +42,7 @@ type StadiumZone = {
 type DynamicTicketZone = {
   id: string;
   code: string;
+  buttonLabel: string | null;
   name: string;
   price: number;
   capacity: number;
@@ -48,6 +50,13 @@ type DynamicTicketZone = {
   matchId: string;
   matchLabel: string;
   venue: string | null;
+};
+type DynamicZoneTheme = {
+  wrap: string;
+  header: string;
+  headerText: string;
+  price: string;
+  button: string;
 };
 const STADIUM_ZONES: StadiumZone[] = [
   { code: "A", label: "อัฒจันทร์เหนือ · A", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
@@ -57,7 +66,7 @@ const STADIUM_ZONES: StadiumZone[] = [
   { code: "E", label: "อัฒจันทร์ใต้ · E", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
   { code: "F", label: "อัฒจันทร์ใต้ · F", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
   { code: "G", label: "อัฒจันทร์ใต้ · G", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
-  { code: "I", label: "อัฒจันทร์ฝั่งตะวันตก · I", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
+  { code: "H", label: "อัฒจันทร์ฝั่งตะวันตก · H", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
   { code: "J", label: "อัฒจันทร์ฝั่งตะวันตก · J", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
   { code: "AWAY", label: "ทีมเยือน", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "purple", note: "สำหรับแฟนทีมเยือนเท่านั้น" },
 ];
@@ -65,13 +74,13 @@ const STADIUM_ZONES: StadiumZone[] = [
 const ENGLISH_ZONE_LABELS: Record<StadiumZoneCode, string> = {
   A: "North Stand · A", B: "North Stand · B", C: "East Stand · C",
   D: "East Stand · D", E: "South Stand · E", F: "South Stand · F",
-  G: "South Stand · G", I: "West Stand · I", J: "West Stand · J", AWAY: "Away Fans",
+  G: "South Stand · G", H: "West Stand · H", J: "West Stand · J", AWAY: "Away Fans",
 };
 
 const MALAY_ZONE_LABELS: Record<StadiumZoneCode, string> = {
   A: "Tempat Duduk Utara · A", B: "Tempat Duduk Utara · B", C: "Tempat Duduk Timur · C",
   D: "Tempat Duduk Timur · D", E: "Tempat Duduk Selatan · E", F: "Tempat Duduk Selatan · F",
-  G: "Tempat Duduk Selatan · G", I: "Tempat Duduk Barat · I", J: "Tempat Duduk Barat · J", AWAY: "Penyokong Pelawat",
+  G: "Tempat Duduk Selatan · G", H: "Tempat Duduk Barat · H", J: "Tempat Duduk Barat · J", AWAY: "Penyokong Pelawat",
 };
 
 // Keep the previous 3D/2D implementation ready for reuse, but do not render it
@@ -86,7 +95,7 @@ const MATCH_ZONE_MAP_DETAILS: Record<StadiumZoneCode, { gate: string; priceBaht:
   E: { gate: "E", priceBaht: 120, color: ["เหลือง", "Yellow", "Kuning"] },
   F: { gate: "F1 / F2", priceBaht: 150, color: ["ฟ้า", "Blue", "Biru"] },
   G: { gate: "G", priceBaht: 120, color: ["เหลือง", "Yellow", "Kuning"] },
-  I: { gate: "I", priceBaht: 100, color: ["ส้ม", "Orange", "Jingga"] },
+  H: { gate: "H", priceBaht: 100, color: ["ส้ม", "Orange", "Jingga"] },
   J: { gate: "J", priceBaht: 120, color: ["เหลือง", "Yellow", "Kuning"] },
   AWAY: { gate: "H", priceBaht: 200, color: ["ม่วง", "Purple", "Ungu"] },
 };
@@ -497,20 +506,21 @@ function DynamicZoneCard({ zone, locale }: { zone: DynamicTicketZone; locale: Lo
   const t = (th: string, en: string) => localize(locale, th, en);
   const numberLocale = intlLocale(locale);
   const soldOut = zone.remaining === 0;
+  const theme = getDynamicZoneTheme(zone);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-2xl border-2 border-violet-500 bg-violet-50/60 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="bg-violet-700 px-4 pb-5 pt-4 text-white">
-        <span className="text-xl font-bold uppercase tracking-widest opacity-80 md:text-2xl">
+    <div className={`flex h-full flex-col overflow-hidden rounded-2xl border-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${theme.wrap}`}>
+      <div className={`px-4 pb-5 pt-4 ${theme.header}`}>
+        <span className={`text-xl font-bold uppercase tracking-widest opacity-80 md:text-2xl ${theme.headerText}`}>
           {t("โซน", "Zone")}
         </span>
-        <span className="mt-1 block break-words text-4xl font-black leading-none md:text-5xl">
-          {zone.code}
+        <span className={`mt-1 block break-words text-4xl font-black leading-none md:text-5xl ${theme.headerText}`}>
+          {getMatchTicketZoneButtonLabel(zone)}
         </span>
       </div>
       <div className="flex flex-1 flex-col px-4 pb-5 pt-4">
         <span className="text-xl font-bold leading-tight text-slate-700">{zone.name}</span>
-        <span className="mt-3 text-3xl font-black text-violet-700">
+        <span className={`mt-3 text-3xl font-black ${theme.price}`}>
           {(zone.price / 100).toLocaleString(numberLocale)}
           <span className="ml-1 text-base font-medium text-slate-500">{t("บาท", "THB")}</span>
         </span>
@@ -521,10 +531,42 @@ function DynamicZoneCard({ zone, locale }: { zone: DynamicTicketZone; locale: Lo
         </span>
         <span className="mt-2 text-sm font-semibold leading-snug text-slate-600">{zone.matchLabel}</span>
         {zone.venue && <span className="mt-1 text-xs text-slate-500">{zone.venue}</span>}
-        <span className={`mt-auto rounded-full px-4 py-2.5 text-base font-black ${soldOut ? "bg-slate-200 text-slate-500" : "bg-violet-700 text-white"}`}>
+        <span className={`mt-auto rounded-full px-4 py-2.5 text-base font-black ${soldOut ? "bg-slate-200 text-slate-500" : theme.button}`}>
           {soldOut ? t("ปิดรับจอง", "Unavailable") : t("ซื้อบัตร", "Buy ticket")}
         </span>
       </div>
     </div>
   );
+}
+
+function getDynamicZoneTheme(zone: Pick<DynamicTicketZone, "code" | "name">): DynamicZoneTheme {
+  const identity = `${zone.code} ${zone.name}`.toUpperCase();
+
+  if (identity.includes("VVIP")) {
+    return {
+      wrap: "border-slate-900 bg-amber-50/50",
+      header: "bg-slate-900",
+      headerText: "text-[#E6BD3A]",
+      price: "text-amber-700",
+      button: "bg-slate-900 text-[#F4D35E]",
+    };
+  }
+
+  if (identity.includes("VIP-A") || identity.includes("VIP-B") || /(?:ZONE|โซน)\s*[AB]\s*170/.test(identity)) {
+    return {
+      wrap: "border-[#B9983E] bg-amber-50/60",
+      header: "bg-[#B9983E]",
+      headerText: "text-slate-950",
+      price: "text-[#8A6818]",
+      button: "bg-[#B9983E] text-slate-950",
+    };
+  }
+
+  return {
+    wrap: "border-violet-500 bg-violet-50/60",
+    header: "bg-violet-700",
+    headerText: "text-white",
+    price: "text-violet-700",
+    button: "bg-violet-700 text-white",
+  };
 }

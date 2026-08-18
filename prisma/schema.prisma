@@ -182,17 +182,18 @@ model MatchZoneLabel {
 // โซนจำหน่ายเพิ่มเติมรายแมตช์ เช่น VVIP/VIP ของสนามชั่วคราว
 // เก็บเป็นแถวข้อมูลแทนการเพิ่มคอลัมน์ใหม่ทุกครั้งที่เปลี่ยนสนามหรือชื่อโซน
 model MatchTicketZone {
-  id        String   @id @default(cuid())
-  matchId   String
-  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  code      String
-  name      String
-  capacity  Int
-  price     Int // สตางค์
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  matchId     String
+  match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  code        String
+  buttonLabel String?
+  name        String
+  capacity    Int
+  price       Int // สตางค์
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([matchId, code])
   @@index([matchId, isActive, sortOrder])

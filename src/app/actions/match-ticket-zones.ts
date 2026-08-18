@@ -13,6 +13,10 @@ const zoneSchema = z.object({
     /^[A-Z0-9][A-Z0-9-]{0,19}$/,
     "รหัสโซนใช้ได้เฉพาะ A-Z, 0-9 และขีดกลาง ไม่เกิน 20 ตัว",
   ),
+  buttonLabel: z.string().trim().toUpperCase().regex(
+    /^[A-Z]$/,
+    "ตัวอักษรบนปุ่มต้องเป็น A-Z เพียง 1 ตัว",
+  ),
   name: z.string().trim().min(1, "กรุณากรอกชื่อโซน").max(80),
   capacity: z.number().int().nonnegative().max(200000),
   priceBaht: z.number().positive().max(100000),
@@ -21,6 +25,7 @@ const zoneSchema = z.object({
 
 const zonesSchema = z.array(zoneSchema).max(30).superRefine((zones, context) => {
   const seen = new Set<string>();
+  const seenButtonLabels = new Set<string>();
   zones.forEach((zone, index) => {
     if (seen.has(zone.code)) {
       context.addIssue({
@@ -30,6 +35,14 @@ const zonesSchema = z.array(zoneSchema).max(30).superRefine((zones, context) => 
       });
     }
     seen.add(zone.code);
+    if (seenButtonLabels.has(zone.buttonLabel)) {
+      context.addIssue({
+        code: "custom",
+        path: [index, "buttonLabel"],
+        message: `ตัวอักษรบนปุ่ม ${zone.buttonLabel} ซ้ำกัน`,
+      });
+    }
+    seenButtonLabels.add(zone.buttonLabel);
   });
 });
 
@@ -117,6 +130,7 @@ export async function saveMatchTicketZones(
         create: {
           matchId,
           code: zone.code,
+          buttonLabel: zone.buttonLabel,
           name: zone.name,
           capacity: zone.capacity,
           price: Math.round(zone.priceBaht * 100),
@@ -124,6 +138,7 @@ export async function saveMatchTicketZones(
           isActive: zone.isActive,
         },
         update: {
+          buttonLabel: zone.buttonLabel,
           name: zone.name,
           capacity: zone.capacity,
           price: Math.round(zone.priceBaht * 100),

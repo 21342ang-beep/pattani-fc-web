@@ -6,7 +6,7 @@ export const STADIUM_ZONES = {
   E: { label: "อัฒจันทร์ใต้ · E" },
   F: { label: "อัฒจันทร์ใต้ · F" },
   G: { label: "อัฒจันทร์ใต้ · G" },
-  I: { label: "อัฒจันทร์ฝั่งตะวันตก · I" },
+  H: { label: "อัฒจันทร์ฝั่งตะวันตก · H" },
   J: { label: "อัฒจันทร์ฝั่งตะวันตก · J" },
   AWAY: { label: "ทีมเยือน" },
 } as const;
@@ -31,7 +31,9 @@ export const MATCH_ZONE_CAPACITY_FIELDS = {
   E: "zoneESeats",
   F: "zoneFSeats",
   G: "zoneGSeats",
-  I: "zoneISeats",
+  // Keep the legacy database column name so the public zone-code correction
+  // does not require a risky physical column rename.
+  H: "zoneISeats",
   J: "zoneJSeats",
   AWAY: "zoneAwaySeats",
 } as const satisfies Record<StadiumZoneCode, string>;
@@ -44,7 +46,7 @@ export const MATCH_ZONE_PRICE_FIELDS = {
   E: "zoneEPrice",
   F: "zoneFPrice",
   G: "zoneGPrice",
-  I: "zoneIPrice",
+  H: "zoneIPrice",
   J: "zoneJPrice",
   AWAY: "zoneAwayPrice",
 } as const satisfies Record<StadiumZoneCode, string>;
@@ -70,7 +72,7 @@ const LEGACY_ZONE_PRICE_GROUPS: Record<StadiumZoneCode, ZonePriceGroup> = {
   E: 120,
   F: 150,
   G: 120,
-  I: 100,
+  H: 100,
   J: 120,
   AWAY: 200,
 };

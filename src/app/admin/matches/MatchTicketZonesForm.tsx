@@ -2,10 +2,12 @@
 
 import { useActionState, useState } from "react";
 import type { MatchTicketZoneFormState } from "@/app/actions/match-ticket-zones";
+import { getMatchTicketZoneButtonLabel } from "@/lib/match-ticket-zone-label";
 
 type ZoneRow = {
   key: string;
   code: string;
+  buttonLabel: string;
   name: string;
   capacity: string;
   priceBaht: string;
@@ -21,6 +23,7 @@ export default function MatchTicketZonesForm({
   initialZones: Array<{
     id: string;
     code: string;
+    buttonLabel: string | null;
     name: string;
     capacity: number;
     price: number;
@@ -33,6 +36,7 @@ export default function MatchTicketZonesForm({
   const [zones, setZones] = useState<ZoneRow[]>(() => initialZones.map((zone) => ({
     key: zone.id,
     code: zone.code,
+    buttonLabel: getMatchTicketZoneButtonLabel(zone),
     name: zone.name,
     capacity: String(zone.capacity),
     priceBaht: String(zone.price / 100),
@@ -42,6 +46,7 @@ export default function MatchTicketZonesForm({
 
   const serialized = JSON.stringify(zones.map((zone) => ({
     code: zone.code.trim().toUpperCase(),
+    buttonLabel: zone.buttonLabel.trim().toUpperCase(),
     name: zone.name.trim(),
     capacity: Number(zone.capacity),
     priceBaht: Number(zone.priceBaht),
@@ -53,11 +58,13 @@ export default function MatchTicketZonesForm({
   }
 
   function addZone() {
-    const key = `new-${nextKey}`;
+    const uniquePart = `${Date.now().toString(36)}-${nextKey}`.toUpperCase();
+    const key = `new-${uniquePart}`;
     setNextKey((value) => value + 1);
     setZones((current) => [...current, {
       key,
-      code: "",
+      code: `EXTRA-${uniquePart}`,
+      buttonLabel: "",
       name: "",
       capacity: "",
       priceBaht: "",
@@ -73,7 +80,7 @@ export default function MatchTicketZonesForm({
         <div>
           <h2 className="text-xl font-bold text-violet-950 md:text-2xl">โซนขายเพิ่มเติมรายแมตช์</h2>
           <p className="mt-1 max-w-3xl text-sm text-slate-600 md:text-base">
-            ใช้สำหรับ VVIP, VIP หรือโซนพิเศษของสนามอื่น โดยเพิ่มชื่อได้เอง ไม่ผูกกับโค้ดระบบ
+            ใช้สำหรับ VVIP, VIP หรือโซนพิเศษของสนามอื่น โดยกำหนดตัวอักษรบนปุ่มได้ 1 ตัว ส่วนรหัสระบบจะจัดการแยกเพื่อไม่ให้ชนกับโซนหลัก
           </p>
         </div>
         <button type="button" onClick={addZone} className="rounded-lg bg-violet-700 px-4 py-2.5 font-bold text-white hover:bg-violet-600">
@@ -90,7 +97,15 @@ export default function MatchTicketZonesForm({
           <fieldset key={zone.key} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <legend className="px-1 text-sm font-bold text-slate-600">โซนเพิ่มเติม #{index + 1}</legend>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[0.8fr_1.5fr_1fr_1fr_auto] lg:items-end">
-              <ZoneField label="รหัสโซน" hint="เช่น VVIP-A" value={zone.code} onChange={(value) => updateZone(zone.key, { code: value.toUpperCase() })} />
+              <ZoneField
+                label="ตัวอักษรบนปุ่ม"
+                hint="A-Z เพียง 1 ตัว เช่น A"
+                value={zone.buttonLabel}
+                maxLength={1}
+                pattern="[A-Za-z]"
+                required
+                onChange={(value) => updateZone(zone.key, { buttonLabel: value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 1) })}
+              />
               <ZoneField label="ชื่อที่แสดง" hint="เช่น VVIP ฝั่งประธาน" value={zone.name} onChange={(value) => updateZone(zone.key, { name: value })} />
               <ZoneField label="จำนวนเปิดขาย" type="number" min="0" value={zone.capacity} onChange={(value) => updateZone(zone.key, { capacity: value })} />
               <ZoneField label="ราคา/ใบ (บาท)" type="number" min="0.01" step="0.01" value={zone.priceBaht} onChange={(value) => updateZone(zone.key, { priceBaht: value })} />
@@ -134,6 +149,9 @@ function ZoneField({
   type = "text",
   min,
   step,
+  maxLength,
+  pattern,
+  required = false,
   value,
   onChange,
 }: {
@@ -142,13 +160,16 @@ function ZoneField({
   type?: string;
   min?: string;
   step?: string;
+  maxLength?: number;
+  pattern?: string;
+  required?: boolean;
   value: string;
   onChange: (value: string) => void;
 }) {
   return (
     <label className="block text-sm font-semibold text-slate-700 md:text-base">
       {label}
-      <input type={type} min={min} step={step} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2.5 font-normal" />
+      <input type={type} min={min} step={step} maxLength={maxLength} pattern={pattern} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2.5 font-normal" />
       {hint && <span className="mt-1 block text-xs font-normal text-slate-500">{hint}</span>}
     </label>
   );
