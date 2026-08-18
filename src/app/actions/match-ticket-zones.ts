@@ -7,16 +7,20 @@ import { activeBookingStatusWhere, expirePendingBookings } from "@/lib/booking-e
 import { verifyPermission } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { STADIUM_ZONE_CODES } from "@/lib/stadium-zones";
+import { MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH } from "@/lib/match-ticket-zone-label";
 
 const zoneSchema = z.object({
   code: z.string().trim().toUpperCase().regex(
     /^[A-Z0-9][A-Z0-9-]{0,19}$/,
     "รหัสโซนใช้ได้เฉพาะ A-Z, 0-9 และขีดกลาง ไม่เกิน 20 ตัว",
   ),
-  buttonLabel: z.string().trim().toUpperCase().regex(
-    /^[A-Z]$/,
-    "ตัวอักษรบนปุ่มต้องเป็น A-Z เพียง 1 ตัว",
-  ),
+  buttonLabel: z.string().trim().toUpperCase()
+    .min(1, "กรุณากรอกตัวอักษรบนปุ่มอย่างน้อย 1 ตัว")
+    .max(
+      MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH,
+      `ตัวอักษรบนปุ่มต้องไม่เกิน ${MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH} ตัว`,
+    )
+    .regex(/^[A-Z]+$/, "ตัวอักษรบนปุ่มใช้ได้เฉพาะ A-Z"),
   name: z.string().trim().min(1, "กรุณากรอกชื่อโซน").max(80),
   capacity: z.number().int().nonnegative().max(200000),
   priceBaht: z.number().positive().max(100000),
@@ -39,7 +43,7 @@ const zonesSchema = z.array(zoneSchema).max(30).superRefine((zones, context) => 
       context.addIssue({
         code: "custom",
         path: [index, "buttonLabel"],
-        message: `ตัวอักษรบนปุ่ม ${zone.buttonLabel} ซ้ำกัน`,
+        message: `ข้อความบนปุ่ม ${zone.buttonLabel} ซ้ำกัน`,
       });
     }
     seenButtonLabels.add(zone.buttonLabel);

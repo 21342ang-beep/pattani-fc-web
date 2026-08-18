@@ -1,4 +1,6 @@
-const SINGLE_ZONE_LETTER = /^[A-Z]$/;
+const ZONE_BUTTON_LABEL = /^[A-Z]+$/;
+
+export const MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH = 12;
 
 export function getMatchTicketZoneButtonLabel({
   buttonLabel,
@@ -10,7 +12,13 @@ export function getMatchTicketZoneButtonLabel({
   name: string;
 }) {
   const explicitLabel = buttonLabel?.trim().toUpperCase();
-  if (explicitLabel && SINGLE_ZONE_LETTER.test(explicitLabel)) return explicitLabel;
+  if (
+    explicitLabel &&
+    explicitLabel.length <= MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH &&
+    ZONE_BUTTON_LABEL.test(explicitLabel)
+  ) {
+    return explicitLabel;
+  }
 
   const normalizedCode = code.trim().toUpperCase();
   const normalizedName = name.trim().toUpperCase();

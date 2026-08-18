@@ -26,7 +26,7 @@ export const metadata = { title: "จองตั๋วรายแมตช์ 
 // โซนที่นั่ง Rainbow Stadium — ราคาต่อใบ (บาท) ตามแผนผังสนามจริง
 // สี (zoneColor) อิงจากสีบล็อกในแผนผังสนาม stadium-zones-2026-27.png
 // AWAY = สำหรับแฟนทีมเยือนเท่านั้น
-type ZoneColor = "yellow" | "orange" | "red" | "green" | "blue" | "purple";
+type ZoneColor = "yellow" | "gold" | "orange" | "red" | "green" | "blue" | "purple";
 type StadiumZone = {
   code: StadiumZoneCode;
   label: string;
@@ -59,8 +59,8 @@ type DynamicZoneTheme = {
   button: string;
 };
 const STADIUM_ZONES: StadiumZone[] = [
-  { code: "A", label: "อัฒจันทร์เหนือ · A", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
-  { code: "B", label: "อัฒจันทร์เหนือ · B", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "blue" },
+  { code: "A", label: "อัฒจันทร์เหนือ · A", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "gold" },
+  { code: "B", label: "อัฒจันทร์เหนือ · B", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "gold" },
   { code: "C", label: "อัฒจันทร์ฝั่งตะวันออก · C", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
   { code: "D", label: "อัฒจันทร์ฝั่งตะวันออก · D", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "orange" },
   { code: "E", label: "อัฒจันทร์ใต้ · E", minPriceBaht: null, maxPriceBaht: null, capacity: null, remaining: 0, seasonReserved: 0, sharedCapacity: false, color: "yellow" },
@@ -310,17 +310,6 @@ export default async function TicketsPage() {
           {t("ตรวจสอบตำแหน่งและราคาจากแผนผังด้านบน แล้วกดที่โซนเพื่อเลือกแมตช์", "Check the location and price on the plan above, then select a zone to choose a match")}
         </p>
         <ul id="zones" className="grid scroll-mt-24 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-          {displayZones.map((z) => (
-            <li key={z.code}>
-              <Link
-                href={`/matches?zone=${z.code}`}
-                className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 rounded-2xl"
-                aria-label={`${t("เลือกโซน", "Choose zone")} ${z.code}`}
-              >
-                <ZoneCard zone={z} locale={locale} />
-              </Link>
-            </li>
-          ))}
           {dynamicZones.map((zone) => (
             <li key={zone.id}>
               {zone.remaining > 0 ? (
@@ -334,6 +323,17 @@ export default async function TicketsPage() {
               ) : (
                 <DynamicZoneCard zone={zone} locale={locale} />
               )}
+            </li>
+          ))}
+          {displayZones.map((z) => (
+            <li key={z.code}>
+              <Link
+                href={`/matches?zone=${z.code}`}
+                className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 rounded-2xl"
+                aria-label={`${t("เลือกโซน", "Choose zone")} ${z.code}`}
+              >
+                <ZoneCard zone={z} locale={locale} />
+              </Link>
             </li>
           ))}
         </ul>
@@ -409,6 +409,13 @@ const ZONE_COLORS: Record<
     headerText: "text-green-950",
     price: "text-yellow-700",
     pill: "bg-yellow-400 text-green-950",
+  },
+  gold: {
+    wrap: "border-[#B9983E] bg-amber-50/60",
+    header: "bg-[#B9983E]",
+    headerText: "text-slate-950",
+    price: "text-[#8A6818]",
+    pill: "bg-[#B9983E] text-slate-950",
   },
   orange: {
     wrap: "border-orange-400 bg-orange-50/50",
@@ -507,6 +514,12 @@ function DynamicZoneCard({ zone, locale }: { zone: DynamicTicketZone; locale: Lo
   const numberLocale = intlLocale(locale);
   const soldOut = zone.remaining === 0;
   const theme = getDynamicZoneTheme(zone);
+  const buttonLabel = getMatchTicketZoneButtonLabel(zone);
+  const buttonLabelSize = buttonLabel.length > 8
+    ? "text-2xl md:text-3xl"
+    : buttonLabel.length > 4
+      ? "text-3xl md:text-4xl"
+      : "text-4xl md:text-5xl";
 
   return (
     <div className={`flex h-full flex-col overflow-hidden rounded-2xl border-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${theme.wrap}`}>
@@ -514,8 +527,8 @@ function DynamicZoneCard({ zone, locale }: { zone: DynamicTicketZone; locale: Lo
         <span className={`text-xl font-bold uppercase tracking-widest opacity-80 md:text-2xl ${theme.headerText}`}>
           {t("โซน", "Zone")}
         </span>
-        <span className={`mt-1 block break-words text-4xl font-black leading-none md:text-5xl ${theme.headerText}`}>
-          {getMatchTicketZoneButtonLabel(zone)}
+        <span className={`mt-1 block break-words font-black leading-none ${buttonLabelSize} ${theme.headerText}`}>
+          {buttonLabel}
         </span>
       </div>
       <div className="flex flex-1 flex-col px-4 pb-5 pt-4">

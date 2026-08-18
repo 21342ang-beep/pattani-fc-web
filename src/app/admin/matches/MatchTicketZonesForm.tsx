@@ -2,7 +2,10 @@
 
 import { useActionState, useState } from "react";
 import type { MatchTicketZoneFormState } from "@/app/actions/match-ticket-zones";
-import { getMatchTicketZoneButtonLabel } from "@/lib/match-ticket-zone-label";
+import {
+  getMatchTicketZoneButtonLabel,
+  MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH,
+} from "@/lib/match-ticket-zone-label";
 
 type ZoneRow = {
   key: string;
@@ -80,7 +83,7 @@ export default function MatchTicketZonesForm({
         <div>
           <h2 className="text-xl font-bold text-violet-950 md:text-2xl">โซนขายเพิ่มเติมรายแมตช์</h2>
           <p className="mt-1 max-w-3xl text-sm text-slate-600 md:text-base">
-            ใช้สำหรับ VVIP, VIP หรือโซนพิเศษของสนามอื่น โดยกำหนดตัวอักษรบนปุ่มได้ 1 ตัว ส่วนรหัสระบบจะจัดการแยกเพื่อไม่ให้ชนกับโซนหลัก
+            ใช้สำหรับ VVIP, VIP หรือโซนพิเศษของสนามอื่น โดยกำหนดตัวอักษรบนปุ่มได้ 1–{MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH} ตัว ส่วนรหัสระบบจะจัดการแยกเพื่อไม่ให้ชนกับโซนหลัก
           </p>
         </div>
         <button type="button" onClick={addZone} className="rounded-lg bg-violet-700 px-4 py-2.5 font-bold text-white hover:bg-violet-600">
@@ -99,12 +102,17 @@ export default function MatchTicketZonesForm({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[0.8fr_1.5fr_1fr_1fr_auto] lg:items-end">
               <ZoneField
                 label="ตัวอักษรบนปุ่ม"
-                hint="A-Z เพียง 1 ตัว เช่น A"
+                hint={`A-Z จำนวน 1–${MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH} ตัว เช่น A, VIP หรือ VVIP`}
                 value={zone.buttonLabel}
-                maxLength={1}
-                pattern="[A-Za-z]"
+                maxLength={MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH}
+                pattern="[A-Za-z]+"
                 required
-                onChange={(value) => updateZone(zone.key, { buttonLabel: value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 1) })}
+                onChange={(value) => updateZone(zone.key, {
+                  buttonLabel: value
+                    .toUpperCase()
+                    .replace(/[^A-Z]/g, "")
+                    .slice(0, MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH),
+                })}
               />
               <ZoneField label="ชื่อที่แสดง" hint="เช่น VVIP ฝั่งประธาน" value={zone.name} onChange={(value) => updateZone(zone.key, { name: value })} />
               <ZoneField label="จำนวนเปิดขาย" type="number" min="0" value={zone.capacity} onChange={(value) => updateZone(zone.key, { capacity: value })} />
