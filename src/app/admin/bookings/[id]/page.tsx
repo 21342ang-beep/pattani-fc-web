@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { verifyPermission } from "@/lib/dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import BookingStatusSelect from "../BookingStatusSelect";
+import DeleteBookingButton from "../DeleteBookingButton";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +39,22 @@ export default async function AdminBookingDetailPage({ params }: { params: Promi
         <Link href="/admin/bookings" className="font-medium text-green-800 hover:underline">← กลับหน้าการจอง</Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold text-green-900">รายการ {booking.bookingCode}</h1>
-          {booking.status !== "CANCELLED" && booking.status !== "REFUNDED" && (
-            <Link href={`/admin/bookings/${booking.id}/edit`} className="rounded-lg bg-green-800 px-4 py-2.5 font-bold text-yellow-300 hover:bg-green-900">แก้ไขข้อมูล</Link>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+              สถานะ
+              <BookingStatusSelect bookingId={booking.id} currentStatus={booking.status} />
+            </label>
+            {booking.status !== "CANCELLED" && booking.status !== "REFUNDED" && (
+              <Link href={`/admin/bookings/${booking.id}/edit`} className="rounded-lg bg-green-800 px-4 py-2.5 font-bold text-yellow-300 hover:bg-green-900">แก้ไขข้อมูล</Link>
+            )}
+            <DeleteBookingButton
+              bookingId={booking.id}
+              bookingCode={booking.bookingCode}
+              status={booking.status}
+              redirectTo="/admin/bookings"
+              detailView
+            />
+          </div>
         </div>
       </header>
 

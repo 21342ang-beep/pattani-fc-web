@@ -70,7 +70,7 @@ export default function StaffMatchBookingForm({ matches }: { matches: MatchOptio
           </select>
         </Field>
         <Field label="จำนวนบัตร" error={errorFor("quantity")}>
-          <input name="quantity" type="number" min={1} max={Math.min(20, selectedZone?.remaining ?? 20)} value={quantity} disabled={pending} onChange={(event) => setQuantity(Number(event.target.value))} className={inputClass} />
+          <input name="quantity" type="number" min={1} max={selectedZone?.remaining} value={quantity} disabled={pending} onChange={(event) => setQuantity(Number(event.target.value))} className={inputClass} />
         </Field>
 
         <Field label="ชื่อลูกค้า" error={errorFor("customerName")}>

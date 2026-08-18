@@ -16,7 +16,6 @@ import {
 } from "@/lib/stadium-zones";
 
 const HOLD_MINUTES = [15, 30, 60, 240, 1440] as const;
-const STAFF_BOOKING_MAX_QUANTITY = 20;
 
 const staffBookingSchema = z.object({
   requestId: z.string().uuid(),
@@ -25,7 +24,7 @@ const staffBookingSchema = z.object({
   customerName: z.string().trim().min(2, "กรุณากรอกชื่อลูกค้า").max(100),
   customerPhone: z.string().trim().regex(/^[0-9+\-\s()]{6,20}$/, "เบอร์โทรศัพท์ไม่ถูกต้อง"),
   customerEmail: z.union([z.string().trim().toLowerCase().email("อีเมลไม่ถูกต้อง").max(200), z.literal("")]),
-  quantity: z.number().int().min(1).max(STAFF_BOOKING_MAX_QUANTITY),
+  quantity: z.number().int().positive(),
   paymentChoice: z.enum(["PAY_LATER", "OFFLINE_CASH", "OFFLINE_TRANSFER"]),
   holdMinutes: z.number().int().refine(
     (value): value is (typeof HOLD_MINUTES)[number] => HOLD_MINUTES.includes(value as (typeof HOLD_MINUTES)[number]),
