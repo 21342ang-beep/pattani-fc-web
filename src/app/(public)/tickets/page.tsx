@@ -4,7 +4,8 @@ import { MapPin, Users } from "lucide-react";
 import PageHero from "../_components/PageHero";
 import OnSaleMatchBoard from "../_components/OnSaleMatchBoard";
 import SeasonPassAnnouncementModal from "../_components/SeasonPassAnnouncementModal";
-import StadiumModelViewer, { type StadiumModelZone } from "./_components/StadiumModelViewer";
+import type { StadiumModelZone } from "./_components/StadiumModelViewer";
+import StadiumModelViewer from "./_components/StadiumModelViewer";
 import { prisma } from "@/lib/prisma";
 import { aggregateZoneAvailability, getSeatAvailabilityForMatches } from "@/lib/seat-availability";
 import { getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
@@ -67,6 +68,10 @@ const MALAY_ZONE_LABELS: Record<StadiumZoneCode, string> = {
   D: "Tempat Duduk Timur · D", E: "Tempat Duduk Selatan · E", F: "Tempat Duduk Selatan · F",
   G: "Tempat Duduk Selatan · G", I: "Tempat Duduk Barat · I", J: "Tempat Duduk Barat · J", AWAY: "Penyokong Pelawat",
 };
+
+// Keep the previous 3D/2D implementation ready for reuse, but do not render it
+// while the Tinnasulanon Stadium match-ticket plan is active.
+const SHOW_LEGACY_STADIUM_VIEWS = false;
 
 const MATCH_ZONE_MAP_DETAILS: Record<StadiumZoneCode, { gate: string; priceBaht: number; color: [string, string, string] }> = {
   A: { gate: "A", priceBaht: 150, color: ["ฟ้า", "Blue", "Biru"] },
@@ -195,7 +200,7 @@ export default async function TicketsPage() {
 
       <PageHero
         title={t("จองตั๋วรายแมตช์", "Match Tickets")}
-        subtitle={t("เลือกโซนที่นั่งของคุณ — แต่ละโซนของ Rainbow Stadium มีบรรยากาศ ราคา และทัศนียภาพต่างกัน", "Choose your seating zone — each area of Rainbow Stadium offers a different atmosphere, price, and view")}
+        subtitle={t("เลือกโซนที่นั่งและตรวจสอบราคาจากแผนผังสนามกีฬาติณสูลานนท์", "Choose your seating zone and check prices on the Tinnasulanon Stadium plan")}
       />
 
       <span id="matches" className="block scroll-mt-24" aria-hidden="true" />
@@ -231,10 +236,11 @@ export default async function TicketsPage() {
             {t("เลือกโซนที่นั่งของคุณ", "Choose Your Seating Zone")}
           </h2>
           <p className="mt-3 text-lg text-slate-600 md:text-xl lg:text-2xl">
-            {t("Rainbow Stadium · ปัตตานี — ความจุ 10,700 ที่นั่ง · ราคาเป็นไปตามแต่ละแมตช์", "Rainbow Stadium · Pattani — Capacity 10,700 · Prices vary by match")}
+            {t("สนามกีฬาติณสูลานนท์ · สงขลา — แผนผังและราคาบัตรรายแมตช์", "Tinnasulanon Stadium · Songkhla — Match-ticket seating plan and prices")}
           </p>
         </div>
 
+        {SHOW_LEGACY_STADIUM_VIEWS && <>
         <StadiumModelViewer
           title={t("สนามปัตตานีแบบ 3 มิติ", "Pattani Stadium in 3D")}
           description={t("สำรวจมุมมองรอบสนามก่อนเลือกโซนที่นั่ง", "Explore the stadium before choosing your seating zone")}
@@ -248,9 +254,25 @@ export default async function TicketsPage() {
         <p className="mt-5 text-center text-xl leading-relaxed text-slate-500 md:text-2xl lg:text-3xl">
           {t("ดูมุมมองที่คุณต้องการก่อน แล้วเลือกโซนจากตารางด้านล่าง", "Review the stadium view, then choose a zone below")}
         </p>
+        </>}
+
+        <figure className="mx-auto mt-8 w-full max-w-6xl md:mt-10">
+          <Image
+            src="/tinnasulanon-stadium-zones-match-2026-27.png"
+            alt={t("แผนผังโซนที่นั่งและราคาบัตรรายแมตช์ สนามกีฬาติณสูลานนท์", "Tinnasulanon Stadium match-ticket seating zones and prices")}
+            width={1553}
+            height={1058}
+            fetchPriority="high"
+            sizes="(min-width: 1280px) 1152px, (min-width: 768px) calc(100vw - 4rem), calc(100vw - 2rem)"
+            className="h-auto w-full object-contain"
+          />
+          <figcaption className="px-3 pb-3 pt-2 text-center text-base font-medium text-slate-600 md:text-lg">
+            {t("แผนผังบัตรรายแมตช์ · สนามกีฬาติณสูลานนท์", "Match-ticket plan · Tinnasulanon Stadium")}
+          </figcaption>
+        </figure>
 
         <p className="mb-10 mt-14 text-center text-xl font-medium leading-relaxed text-slate-500 md:text-2xl lg:text-3xl">
-          {t("สีของแต่ละโซนตรงกับสนาม 3 มิติด้านบน — กดที่โซนเพื่อเลือกแมตช์", "Zone colors match the 3D stadium above — select a zone to choose a match")}
+          {t("ตรวจสอบตำแหน่งและราคาจากแผนผังด้านบน แล้วกดที่โซนเพื่อเลือกแมตช์", "Check the location and price on the plan above, then select a zone to choose a match")}
         </p>
         <ul id="zones" className="grid scroll-mt-24 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
           {displayZones.map((z) => (
@@ -281,7 +303,7 @@ export default async function TicketsPage() {
           ))}
         </ul>
 
-        <figure className="mx-auto mb-10 mt-10 w-full max-w-5xl md:mb-12 md:mt-12">
+        {SHOW_LEGACY_STADIUM_VIEWS && <figure className="mx-auto mb-10 mt-10 w-full max-w-5xl md:mb-12 md:mt-12">
           <Image
             src="/stadium-zones-match-2026-27-v6.png"
             alt={t("แผนผังโซนที่นั่งและราคาบัตรรายแมตช์", "Match ticket seating zones and prices")}
@@ -290,7 +312,7 @@ export default async function TicketsPage() {
             sizes="(min-width: 1280px) 1024px, (min-width: 768px) calc(100vw - 4rem), calc(100vw - 2rem)"
             className="h-auto w-full object-contain"
           />
-        </figure>
+        </figure>}
 
         <p className="mt-6 text-center text-lg leading-relaxed text-slate-500 md:text-xl lg:text-2xl">
           {t("* ราคาข้างต้นเป็นราคามาตรฐาน อาจปรับตามแมตช์/คู่แข่ง — การเลือกที่นั่งจริงจะเปิดในขั้นตอนถัดไป", "* Standard prices may vary by match or opponent. Seat selection opens in the next step.")}

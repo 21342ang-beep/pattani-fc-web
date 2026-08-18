@@ -10,24 +10,40 @@ type MatchOption = {
   label: string;
   kickoffLabel: string;
   venue: string | null;
-  zones: { code: string; name: string; price: number; remaining: number }[];
+  zones: {
+    code: string;
+    name: string;
+    price: number;
+    remaining: number;
+    available: boolean;
+    unavailableReason: string;
+  }[];
 };
+
+function firstAvailableZone(match: MatchOption | undefined) {
+  return match?.zones.find((zone) => zone.available);
+}
 
 export default function StaffMatchBookingForm({ matches }: { matches: MatchOption[] }) {
   const [state, formAction, pending] = useActionState<StaffBookingState, FormData>(createStaffBooking, undefined);
   const [matchId, setMatchId] = useState(matches[0]?.id ?? "");
-  const [zoneCode, setZoneCode] = useState(matches[0]?.zones[0]?.code ?? "");
+  const [zoneCode, setZoneCode] = useState(firstAvailableZone(matches[0])?.code ?? "");
   const [quantity, setQuantity] = useState(1);
   const [paymentChoice, setPaymentChoice] = useState("PAY_LATER");
   const [requestId, setRequestId] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const selectedMatch = useMemo(() => matches.find((match) => match.id === matchId) ?? matches[0], [matchId, matches]);
-  const selectedZone = useMemo(() => selectedMatch?.zones.find((zone) => zone.code === zoneCode) ?? selectedMatch?.zones[0], [selectedMatch, zoneCode]);
+  const selectedZone = useMemo(
+    () => selectedMatch?.zones.find((zone) => zone.code === zoneCode && zone.available) ?? firstAvailableZone(selectedMatch),
+    [selectedMatch, zoneCode],
+  );
 
   useEffect(() => setRequestId(crypto.randomUUID()), []);
   useEffect(() => {
-    if (!selectedMatch?.zones.some((zone) => zone.code === zoneCode)) setZoneCode(selectedMatch?.zones[0]?.code ?? "");
+    if (!selectedMatch?.zones.some((zone) => zone.code === zoneCode && zone.available)) {
+      setZoneCode(firstAvailableZone(selectedMatch)?.code ?? "");
+    }
   }, [selectedMatch, zoneCode]);
   useEffect(() => {
     if (!state?.ok) return;
@@ -65,7 +81,9 @@ export default function StaffMatchBookingForm({ matches }: { matches: MatchOptio
         <Field label="โซน" error={errorFor("zone")}>
           <select name="zone" value={selectedZone?.code ?? ""} disabled={pending} onChange={(event) => setZoneCode(event.target.value)} className={inputClass}>
             {selectedMatch?.zones.map((zone) => (
-              <option key={zone.code} value={zone.code} disabled={zone.remaining === 0}>{zone.name} · เหลือ {zone.remaining.toLocaleString("th-TH")} · {formatBaht(zone.price)}</option>
+              <option key={zone.name} value={zone.code} disabled={!zone.available}>
+                {zone.name} · ราคา {formatBaht(zone.price)} · {zone.available ? `เหลือ ${zone.remaining.toLocaleString("th-TH")}` : zone.unavailableReason}
+              </option>
             ))}
           </select>
         </Field>
@@ -120,7 +138,7 @@ export default function StaffMatchBookingForm({ matches }: { matches: MatchOptio
       </label>
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">ระบบจะตรวจราคา จำนวนที่นั่ง รายการซ้ำ และสิทธิ์ผู้ใช้งานอีกครั้งที่เซิร์ฟเวอร์ รายการรับเงินแล้วจะยืนยันและตัดที่นั่งทันที</div>
-      <button type="submit" disabled={pending || !requestId || !selectedZone || selectedZone.remaining === 0} className="rounded-lg bg-green-800 px-5 py-3 text-lg font-bold text-yellow-300 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-50">
+      <button type="submit" disabled={pending || !requestId || !selectedZone?.available || selectedZone.remaining === 0} className="rounded-lg bg-green-800 px-5 py-3 text-lg font-bold text-yellow-300 hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-50">
         {pending ? "กำลังตรวจสอบและบันทึก..." : "ยืนยันการจองโดยทีมงาน"}
       </button>
     </form>

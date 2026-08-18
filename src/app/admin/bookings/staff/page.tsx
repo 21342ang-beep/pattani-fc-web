@@ -16,6 +16,22 @@ import StaffMatchBookingForm from "./StaffMatchBookingForm";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "จองตั๋วรายแมตช์โดยทีมงาน — Admin" };
 
+const STAFF_ZONE_CATALOG = [
+  { codes: ["VVIP"], name: "Zone VVIP", price: 20_000, dynamicOnly: true },
+  { codes: ["A-170", "A170"], name: "Zone A 170", price: 17_000, dynamicOnly: true },
+  { codes: ["A-150", "A150", "A"], name: "Zone A 150", price: 15_000 },
+  { codes: ["B-170", "B170"], name: "Zone B 170", price: 17_000, dynamicOnly: true },
+  { codes: ["B-150", "B150", "B"], name: "Zone B 150", price: 15_000 },
+  { codes: ["C"], name: "Zone C", price: 12_000 },
+  { codes: ["D"], name: "Zone D", price: 10_000 },
+  { codes: ["E"], name: "Zone E", price: 12_000 },
+  { codes: ["F"], name: "Zone F", price: 15_000 },
+  { codes: ["G"], name: "Zone G", price: 12_000 },
+  { codes: ["H", "I"], name: "Zone H", price: 10_000 },
+  { codes: ["J"], name: "Zone J", price: 12_000 },
+  { codes: ["AWAY"], name: "Zone AWAY", price: 20_000 },
+] as const;
+
 export default async function StaffMatchBookingPage() {
   await verifyPermission("BOOKINGS");
   const matches = (await prisma.match.findMany({
@@ -48,14 +64,40 @@ export default async function StaffMatchBookingPage() {
       price: zone.price,
       remaining: Math.max(0, zone.capacity - (booked.get(`${match.id}:${zone.code}`) ?? 0)),
     }));
+    const legacyByCode = new Map(legacyZones.map((zone) => [zone.code, zone]));
+    const dynamicByCode = new Map(dynamicZones.map((zone) => [zone.code.toUpperCase(), zone]));
+    const zones = STAFF_ZONE_CATALOG.map((catalogZone) => {
+      const dynamicZone = catalogZone.codes
+        .map((code) => dynamicByCode.get(code))
+        .find((zone) => zone != null);
+      const legacyZone = "dynamicOnly" in catalogZone && catalogZone.dynamicOnly
+        ? undefined
+        : catalogZone.codes
+            .map((code) => legacyByCode.get(code as keyof typeof STADIUM_ZONES))
+            .find((zone) => zone != null);
+      const configuredZone = dynamicZone ?? legacyZone;
+      const priceMatches = configuredZone?.price === catalogZone.price;
+      return {
+        code: configuredZone?.code ?? catalogZone.codes[0],
+        name: catalogZone.name,
+        price: catalogZone.price,
+        remaining: priceMatches ? configuredZone.remaining : 0,
+        available: Boolean(priceMatches && configuredZone.remaining > 0),
+        unavailableReason: configuredZone
+          ? priceMatches
+            ? "บัตรหมด"
+            : "ราคาที่ตั้งไว้ยังไม่ตรง"
+          : "ยังไม่กำหนดจำนวนที่นั่ง",
+      };
+    });
     return {
       id: match.id,
       label: `${match.homeTeam} vs ${match.awayTeam}`,
       kickoffLabel: match.kickoffAt ? formatDateTime(match.kickoffAt) : "ยังไม่กำหนดวันแข่งขัน",
       venue: match.venue,
-      zones: [...legacyZones, ...dynamicZones],
+      zones,
     };
-  }).filter((match) => match.zones.length > 0);
+  }).filter((match) => match.zones.some((zone) => zone.available));
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
