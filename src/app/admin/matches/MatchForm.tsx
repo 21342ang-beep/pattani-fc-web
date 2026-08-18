@@ -42,6 +42,7 @@ type Match = {
   zoneIPrice: number | null;
   zoneJPrice: number | null;
   zoneAwayPrice: number | null;
+  zoneLabels: { code: string; label: string }[];
   competitionType: string;
   competitionName: string | null;
   competitionRound: string | null;
@@ -218,6 +219,7 @@ export default function MatchForm({
           {STADIUM_ZONE_CODES.map((code) => {
             const field = MATCH_ZONE_CAPACITY_FIELDS[code];
             const priceField = MATCH_ZONE_PRICE_FIELDS[code];
+            const savedLabel = initial?.zoneLabels.find((item) => item.code === code)?.label;
             return (
               <div key={code} className="rounded-md border bg-white p-3">
                 <p className="mb-3 text-base font-bold text-slate-900 md:text-lg">โซน {code}</p>
@@ -239,7 +241,15 @@ export default function MatchForm({
                     defaultValue={initial?.[priceField] != null ? (initial[priceField] / 100).toString() : ""}
                   />
                 </div>
-                <p className="mt-2 text-sm text-slate-500 md:text-base">{STADIUM_ZONES[code].label}</p>
+                <div className="mt-3">
+                  <Field
+                    label="ชื่อที่แสดงในรายการจอง"
+                    name={`zoneLabel_${code}`}
+                    defaultValue={savedLabel ?? STADIUM_ZONES[code].label}
+                    required
+                    maxLength={80}
+                  />
+                </div>
               </div>
             );
           })}
@@ -307,6 +317,7 @@ function Field({
   readOnly,
   min,
   step,
+  maxLength,
 }: {
   label: string;
   name: string;
@@ -319,6 +330,7 @@ function Field({
   readOnly?: boolean;
   min?: number;
   step?: string;
+  maxLength?: number;
 }) {
   return (
     <div>
@@ -332,6 +344,7 @@ function Field({
         readOnly={readOnly}
         min={min}
         step={step}
+        maxLength={maxLength}
         className="mt-1 w-full rounded-md border px-3 py-2.5 text-base md:text-lg"
       />
       {hint && <p className="mt-1 text-sm text-slate-500 md:text-base">{hint}</p>}

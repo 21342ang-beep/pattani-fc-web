@@ -3,9 +3,10 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { matchCreateSchema, matchUpdateSchema } from "@/lib/validations";
+import { matchCreateSchema, matchUpdateSchema, matchZoneLabelsSchema } from "@/lib/validations";
 import { getAdminUser, hasPermission, verifyPermission } from "@/lib/dal";
 import { saveTeamLogo, deleteTeamLogo, UploadError } from "@/lib/upload";
+import { STADIUM_ZONE_CODES } from "@/lib/stadium-zones";
 
 export type MatchFormState = {
   error?: string;
@@ -100,6 +101,10 @@ async function parseFormToMatchInput(formData: FormData) {
   const zoneIPrice = bahtToSatangOrNull(formData.get("zoneIPrice"));
   const zoneJPrice = bahtToSatangOrNull(formData.get("zoneJPrice"));
   const zoneAwayPrice = bahtToSatangOrNull(formData.get("zoneAwayPrice"));
+  const zoneLabels = STADIUM_ZONE_CODES.map((code) => ({
+    code,
+    label: formData.get(`zoneLabel_${code}`),
+  }));
   const homeZoneCapacities = [
     zoneASeats,
     zoneBSeats,
@@ -190,7 +195,7 @@ async function parseFormToMatchInput(formData: FormData) {
     (x): x is string => typeof x === "string"
   );
 
-  return { data, rollback, commitDelete };
+  return { data, zoneLabels, rollback, commitDelete };
 }
 
 async function rollbackUploads(paths: string[]) {
@@ -214,13 +219,23 @@ export async function createMatch(
   }
 
   const parsed = matchCreateSchema.safeParse(parsedForm.data);
+  const parsedLabels = matchZoneLabelsSchema.safeParse(parsedForm.zoneLabels);
   if (!parsed.success) {
     await rollbackUploads(parsedForm.rollback);
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
+  if (!parsedLabels.success) {
+    await rollbackUploads(parsedForm.rollback);
+    return { fieldErrors: { zoneLabels: [parsedLabels.error.issues[0]?.message ?? "ชื่อโซนไม่ถูกต้อง"] } };
+  }
 
   try {
-    await prisma.match.create({ data: parsed.data });
+    await prisma.match.create({
+      data: {
+        ...parsed.data,
+        zoneLabels: { create: parsedLabels.data },
+      },
+    });
   } catch (e) {
     await rollbackUploads(parsedForm.rollback);
     throw e;
@@ -253,13 +268,30 @@ export async function updateMatch(
   }
 
   const parsed = matchUpdateSchema.safeParse(parsedForm.data);
+  const parsedLabels = matchZoneLabelsSchema.safeParse(parsedForm.zoneLabels);
   if (!parsed.success) {
     await rollbackUploads(parsedForm.rollback);
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
+  if (!parsedLabels.success) {
+    await rollbackUploads(parsedForm.rollback);
+    return { fieldErrors: { zoneLabels: [parsedLabels.error.issues[0]?.message ?? "ชื่อโซนไม่ถูกต้อง"] } };
+  }
 
   try {
-    await prisma.match.update({ where: { id: matchId }, data: parsed.data });
+    await prisma.match.update({
+      where: { id: matchId },
+      data: {
+        ...parsed.data,
+        zoneLabels: {
+          upsert: parsedLabels.data.map(({ code, label }) => ({
+            where: { matchId_code: { matchId, code } },
+            create: { code, label },
+            update: { label },
+          })),
+        },
+      },
+    });
   } catch (e) {
     await rollbackUploads(parsedForm.rollback);
     throw e;

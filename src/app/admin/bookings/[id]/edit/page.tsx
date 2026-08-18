@@ -5,9 +5,9 @@ import { formatBaht } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import {
   getZoneCapacity,
+  getMatchZoneLabel,
   getZonePrice,
   STADIUM_ZONE_CODES,
-  STADIUM_ZONES,
 } from "@/lib/stadium-zones";
 import BookingEditForm from "./BookingEditForm";
 
@@ -21,7 +21,12 @@ export default async function AdminBookingEditPage({ params }: { params: Promise
   const booking = await prisma.booking.findUnique({
     where: { id },
     include: {
-      match: { include: { ticketZones: { where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } } },
+      match: {
+        include: {
+          ticketZones: { where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+          zoneLabels: { select: { code: true, label: true } },
+        },
+      },
       _count: { select: { xenditPayments: true, beamPayments: true } },
     },
   });
@@ -37,7 +42,7 @@ export default async function AdminBookingEditPage({ params }: { params: Promise
     const capacity = getZoneCapacity(booking.match, code);
     const price = getZonePrice(booking.match, code);
     return capacity != null && capacity > 0 && price != null && price > 0
-      ? [{ code, name: STADIUM_ZONES[code].label, price }]
+      ? [{ code, name: getMatchZoneLabel(booking.match.zoneLabels, code), price }]
       : [];
   });
   const dynamicZones = booking.match.ticketZones.map((zone) => ({ code: zone.code, name: zone.name, price: zone.price }));

@@ -7,8 +7,8 @@ import { isPattaniHomeTeam } from "@/lib/season-pass-home-match";
 import {
   getZoneCapacity,
   getZoneCapacityScope,
+  getMatchZoneLabel,
   getZonePrice,
-  STADIUM_ZONES,
   STADIUM_ZONE_CODES,
 } from "@/lib/stadium-zones";
 import StaffMatchBookingForm from "./StaffMatchBookingForm";
@@ -21,7 +21,10 @@ export default async function StaffMatchBookingPage() {
   const matches = (await prisma.match.findMany({
     where: { status: "ON_SALE" },
     orderBy: [{ kickoffAt: "asc" }, { createdAt: "asc" }],
-    include: { ticketZones: { where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
+    include: {
+      ticketZones: { where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      zoneLabels: { select: { code: true, label: true } },
+    },
   })).filter((match) => isPattaniHomeTeam(match.homeTeam));
 
   const matchIds = matches.map((match) => match.id);
@@ -40,7 +43,7 @@ export default async function StaffMatchBookingPage() {
       if (capacity == null || capacity <= 0 || price == null || price <= 0) return [];
       const scope = getZoneCapacityScope(match, code);
       const used = scope.reduce((sum, item) => sum + (booked.get(`${match.id}:${item}`) ?? 0), 0);
-      return [{ code, name: STADIUM_ZONES[code].label, price, remaining: Math.max(0, capacity - used) }];
+      return [{ code, name: getMatchZoneLabel(match.zoneLabels, code), price, remaining: Math.max(0, capacity - used) }];
     });
     const dynamicZones = match.ticketZones.map((zone) => ({
       code: zone.code,

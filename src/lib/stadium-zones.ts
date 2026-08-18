@@ -14,6 +14,15 @@ export const STADIUM_ZONES = {
 export type StadiumZoneCode = keyof typeof STADIUM_ZONES;
 export const STADIUM_ZONE_CODES = Object.keys(STADIUM_ZONES) as StadiumZoneCode[];
 
+export type MatchZoneLabel = { code: string; label: string };
+
+export function getMatchZoneLabel(
+  labels: readonly MatchZoneLabel[] | null | undefined,
+  code: StadiumZoneCode,
+) {
+  return labels?.find((item) => item.code === code)?.label ?? STADIUM_ZONES[code].label;
+}
+
 export const MATCH_ZONE_CAPACITY_FIELDS = {
   A: "zoneASeats",
   B: "zoneBSeats",

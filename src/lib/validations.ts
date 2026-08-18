@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isPattaniHomeTeam } from "@/lib/season-pass-home-match";
+import { STADIUM_ZONE_CODES } from "@/lib/stadium-zones";
 
 // validate input ทุก API → ป้องกัน invalid data / injection
 
@@ -142,6 +143,14 @@ export const matchCreateSchema = matchBaseSchema.superRefine(
 export const matchUpdateSchema = matchBaseSchema
   .partial()
   .superRefine(requireFullDataForOnSale);
+
+export const matchZoneLabelsSchema = z.array(z.object({
+  code: z.string().refine(
+    (value) => (STADIUM_ZONE_CODES as readonly string[]).includes(value),
+    "รหัสโซนไม่ถูกต้อง",
+  ),
+  label: z.string().trim().min(1, "กรุณากรอกชื่อที่แสดงของโซน").max(80),
+})).length(STADIUM_ZONE_CODES.length);
 
 export const bookingCreateSchema = z.object({
   matchId: z.string().min(1),

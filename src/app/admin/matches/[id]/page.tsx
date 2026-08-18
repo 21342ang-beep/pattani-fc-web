@@ -16,7 +16,10 @@ export default async function EditMatchPage(props: { params: Promise<{ id: strin
   const { id } = await props.params;
   const match = await prisma.match.findUnique({
     where: { id },
-    include: { ticketZones: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
+    include: {
+      ticketZones: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      zoneLabels: { orderBy: { createdAt: "asc" } },
+    },
   });
   if (!match) notFound();
   const bookingGroups = await prisma.booking.groupBy({
