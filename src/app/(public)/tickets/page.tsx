@@ -8,7 +8,12 @@ import type { StadiumModelZone } from "./_components/StadiumModelViewer";
 import StadiumModelViewer from "./_components/StadiumModelViewer";
 import { prisma } from "@/lib/prisma";
 import { aggregateZoneAvailability, getSeatAvailabilityForMatches } from "@/lib/seat-availability";
-import { getZonePrice, type StadiumZoneCode } from "@/lib/stadium-zones";
+import {
+  getMatchZoneLabel,
+  getZoneCapacity,
+  getZonePrice,
+  type StadiumZoneCode,
+} from "@/lib/stadium-zones";
 import { getT } from "@/lib/i18n/server";
 import { intlLocale, localize } from "@/lib/i18n/text";
 import type { Locale } from "@/lib/i18n/dict";
@@ -87,18 +92,33 @@ const MATCH_ZONE_MAP_DETAILS: Record<StadiumZoneCode, { gate: string; priceBaht:
 };
 
 export default async function TicketsPage() {
-  const [availableMatches, { locale }, purchaseSettings] = await Promise.all([prisma.match.findMany({
-    where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
-    include: {
-      ticketZones: {
-        where: { isActive: true },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  const now = new Date();
+  const [availableMatches, upcomingLabelMatch, { locale }, purchaseSettings] = await Promise.all([
+    prisma.match.findMany({
+      where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" },
+      include: {
+        ticketZones: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
+        zoneLabels: { select: { code: true, label: true } },
       },
-    },
-  }), getT(), getTicketPurchaseSettings()]);
+    }),
+    prisma.match.findFirst({
+      where: { status: "SCHEDULED", kickoffAt: { gte: now } },
+      orderBy: [{ kickoffAt: "asc" }, { createdAt: "asc" }],
+      include: { zoneLabels: { select: { code: true, label: true } } },
+    }),
+    getT(),
+    getTicketPurchaseSettings(),
+  ]);
   const onSaleMatches = availableMatches.filter(
     (match) => match.competitionType !== "LEAGUE" || purchaseSettings.leagueBookingOpen,
   );
+  const zoneLabelMatches = [
+    ...onSaleMatches,
+    ...(upcomingLabelMatch ? [upcomingLabelMatch] : []),
+  ];
   const t = (th: string, en: string) => localize(locale, th, en);
   const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
   const dynamicBookingGroups = onSaleMatches.length > 0
@@ -122,12 +142,18 @@ export default async function TicketsPage() {
   }));
   const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
   const displayZones = STADIUM_ZONES.map((zone) => {
+    const labelMatch = zoneLabelMatches.find((match) => {
+      const capacity = getZoneCapacity(match, zone.code);
+      const price = getZonePrice(match, zone.code);
+      return capacity != null && capacity > 0 && price != null && price > 0;
+    }) ?? zoneLabelMatches[0];
     const prices = onSaleMatches
       .map((match) => getZonePrice(match, zone.code))
       .filter((price): price is number => price != null && price > 0)
       .map((price) => price / 100);
     return {
       ...zone,
+      label: labelMatch ? getMatchZoneLabel(labelMatch.zoneLabels, zone.code) : zone.label,
       minPriceBaht: prices.length > 0 ? Math.min(...prices) : null,
       maxPriceBaht: prices.length > 0 ? Math.max(...prices) : null,
       capacity: availabilityByZone[zone.code].capacity,
