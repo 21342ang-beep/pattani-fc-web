@@ -24,7 +24,10 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
   const selectedMatchId = rawMatchId && /^[a-z0-9_-]{1,50}$/i.test(rawMatchId) ? rawMatchId : null;
   const selectedZone = rawZone?.trim().slice(0, 50) || null;
   await expirePendingBookings();
-  const customerFilter = customerName ? { customerName: { contains: customerName, mode: "insensitive" as const } } : undefined;
+  const customerFilter = {
+    status: { not: "CANCELLED" as const },
+    ...(customerName ? { customerName: { contains: customerName, mode: "insensitive" as const } } : {}),
+  };
   const [allBookings, dynamicZones] = await Promise.all([
     prisma.booking.findMany({
       where: customerFilter,
@@ -58,6 +61,11 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
         _count: { _all: true },
         _sum: { quantity: true, totalAmount: true },
       });
+  const sellerIds = [...new Set(allBookings.map((booking) => booking.soldById).filter((id): id is string => Boolean(id)))];
+  const sellers = sellerIds.length > 0
+    ? await prisma.user.findMany({ where: { id: { in: sellerIds } }, select: { id: true, name: true, email: true } })
+    : [];
+  const sellerById = new Map(sellers.map((seller) => [seller.id, seller.name || seller.email]));
   const priceGroups = new Map<number, { bookings: number; tickets: number }>();
   const awayZoneSummary = { bookings: 0, tickets: 0 };
   const dynamicZoneGroups = new Map<string, {
@@ -130,6 +138,12 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
       <div className="mb-6 flex items-center justify-between gap-3">
         <h1 className="text-3xl font-bold text-green-900 md:text-4xl">การจอง</h1>
         <div className="flex items-center gap-2">
+          <Link
+            href="/admin/bookings/staff"
+            className="rounded-md bg-green-800 px-3 py-2 text-base font-bold text-yellow-300 hover:bg-green-900 md:text-lg"
+          >
+            + จองโดยทีมงาน
+          </Link>
           <Link
             href="/admin/bookings/check"
             className="rounded-md border border-green-200 bg-white px-3 py-2 text-base font-medium text-green-900 hover:bg-green-50 md:text-lg"
@@ -238,7 +252,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
         </div>
       </div>
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
-        <table className="w-full min-w-[1050px] text-base md:text-lg">
+        <table className="w-full min-w-[1250px] text-base md:text-lg">
           <thead className="border-b bg-slate-50 text-sm uppercase md:text-base">
             <tr>
               <th className="px-3 py-2 text-left">รหัส</th>
@@ -247,6 +261,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
               <th className="px-3 py-2 text-left">โซน</th>
               <th className="px-3 py-2 text-right">จำนวน</th>
               <th className="px-3 py-2 text-right">ยอด</th>
+              <th className="px-3 py-2 text-left">ช่องทาง / รับเงิน</th>
               <th className="px-3 py-2 text-left">สถานะ</th>
               <th className="px-3 py-2 text-left">วันที่</th>
               <th className="px-3 py-2 text-right">การจัดการ</th>
@@ -282,6 +297,23 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                 </td>
                 <td className="px-3 py-2 text-right">{b.quantity}</td>
                 <td className="px-3 py-2 text-right">{formatBaht(b.totalAmount)}</td>
+                <td className="px-3 py-2 text-sm md:text-base">
+                  {b.salesChannel === "STAFF" ? (
+                    <div className="space-y-1">
+                      <span className="inline-flex rounded-full bg-violet-100 px-2 py-0.5 font-bold text-violet-800">ทีมงาน</span>
+                      <div className="text-slate-700">
+                        {b.paymentMethod === "OFFLINE_CASH" ? "เงินสด" : b.paymentMethod === "OFFLINE_TRANSFER" ? "โอนเงิน" : "รอชำระ"}
+                      </div>
+                      {b.offlineReceiptNo && <div className="text-xs text-slate-500">อ้างอิง: {b.offlineReceiptNo}</div>}
+                      <div className="text-xs text-slate-500">โดย {b.soldById ? sellerById.get(b.soldById) ?? "บัญชีเดิม" : "—"}</div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 font-bold text-sky-800">เว็บไซต์</span>
+                      {b.paymentMethod && <div className="text-xs text-slate-500">{b.paymentMethod}</div>}
+                    </div>
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
                     <span className={`rounded px-2 py-0.5 text-sm ${statusColor[b.status]}`}>
@@ -294,17 +326,27 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                   {formatDateTime(b.createdAt)}
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <DeleteBookingButton
-                    bookingId={b.id}
-                    bookingCode={b.bookingCode}
-                    status={b.status}
-                  />
+                  <div className="flex items-center justify-end gap-2">
+                    {b.status !== "CANCELLED" && b.status !== "REFUNDED" && (
+                      <Link href={`/admin/bookings/${b.id}/edit`} className="whitespace-nowrap text-sm font-semibold text-violet-700 hover:underline md:text-base">
+                        แก้ไข
+                      </Link>
+                    )}
+                    <Link href={`/admin/bookings/${b.id}`} className="whitespace-nowrap text-sm font-semibold text-green-800 hover:underline md:text-base">
+                      รายละเอียด/ประวัติ
+                    </Link>
+                    <DeleteBookingButton
+                      bookingId={b.id}
+                      bookingCode={b.bookingCode}
+                      status={b.status}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}
             {bookings.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-6 text-center text-slate-500">
+                <td colSpan={10} className="p-6 text-center text-slate-500">
                   ยังไม่มีการจอง
                 </td>
               </tr>

@@ -164,17 +164,73 @@ export async function updateBookingStatus(
   bookingId: string,
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "REFUNDED"
 ): Promise<{ ok: true } | { error: string }> {
-  await verifyPermission("BOOKINGS");
+  const user = await verifyPermission("BOOKINGS");
+  if (!/^[a-z0-9]+$/i.test(bookingId) || !["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED"].includes(status)) {
+    return { error: "ข้อมูลสถานะไม่ถูกต้อง" };
+  }
   try {
-    const booking = await prisma.booking.update({ where: { id: bookingId }, data: { status } });
+    const result = await prisma.$transaction(async (tx) => {
+      const current = await tx.booking.findUnique({ where: { id: bookingId } });
+      if (!current) throw new Error("BOOKING_NOT_FOUND");
+      if (current.status === status) return { booking: current, expired: false };
+      if (current.status === "REFUNDED") throw new Error("REFUNDED_IS_FINAL");
+      if (current.status === "CANCELLED") throw new Error("CANCELLED_IS_FINAL");
+      if (current.status === "CONFIRMED" && status !== "REFUNDED") throw new Error("CONFIRMED_REQUIRES_REFUND");
+      if (current.status === "PENDING" && !["CONFIRMED", "CANCELLED"].includes(status)) throw new Error("INVALID_TRANSITION");
+      const now = new Date();
+      if (status === "CONFIRMED" && current.paymentExpiresAt && current.paymentExpiresAt <= now) {
+        const cancelled = await tx.booking.update({ where: { id: current.id }, data: { status: "CANCELLED" } });
+        await tx.bookingAuditLog.create({
+          data: {
+            bookingId: current.id,
+            bookingCode: current.bookingCode,
+            action: "STATUS_CHANGED",
+            actorId: user.id,
+            actorLabel: user.name || user.email,
+            previousStatus: current.status,
+            nextStatus: "CANCELLED",
+            details: { reason: "payment_expired_during_manual_confirmation" },
+          },
+        });
+        return { booking: cancelled, expired: true };
+      }
+      const updated = await tx.booking.update({
+        where: { id: current.id },
+        data: {
+          status,
+          ...(status === "CONFIRMED" ? { paidAt: current.paidAt ?? now, paymentExpiresAt: null } : {}),
+        },
+      });
+      await tx.bookingAuditLog.create({
+        data: {
+          bookingId: current.id,
+          bookingCode: current.bookingCode,
+          action: "STATUS_CHANGED",
+          actorId: user.id,
+          actorLabel: user.name || user.email,
+          previousStatus: current.status,
+          nextStatus: status,
+        },
+      });
+      return { booking: updated, expired: false };
+    });
+    const booking = result.booking;
     revalidatePath("/admin/bookings");
     revalidatePath("/");
     revalidatePath("/tickets");
     revalidatePath(`/matches/${booking.matchId}`);
     revalidateTag("bookings", { expire: 0 });
+    if (result.expired) return { error: "รายการนี้หมดเวลาชำระแล้วและถูกยกเลิก ไม่สามารถยืนยันย้อนหลังได้" };
     return { ok: true };
-  } catch {
-    return { error: "อัปเดตไม่สำเร็จ" };
+  } catch (error) {
+    const messages: Record<string, string> = {
+      BOOKING_NOT_FOUND: "ไม่พบรายการจอง",
+      REFUNDED_IS_FINAL: "รายการคืนเงินแล้วไม่สามารถเปลี่ยนสถานะได้",
+      CANCELLED_IS_FINAL: "รายการยกเลิกแล้วไม่สามารถเปิดกลับได้ กรุณาสร้างรายการใหม่เพื่อให้ระบบตรวจที่นั่งอีกครั้ง",
+      CONFIRMED_REQUIRES_REFUND: "รายการยืนยันรับเงินแล้วต้องเปลี่ยนเป็น REFUNDED เท่านั้น ห้ามยกเลิกข้ามขั้นตอน",
+      INVALID_TRANSITION: "ไม่สามารถเปลี่ยนสถานะตามลำดับนี้ได้",
+    };
+    return { error: error instanceof Error && messages[error.message] ? messages[error.message] : "อัปเดตไม่สำเร็จ" };
   }
 }
 
@@ -183,19 +239,39 @@ export async function updateBookingStatus(
 export async function deleteBooking(
   bookingId: string
 ): Promise<{ ok: true } | { error: string }> {
-  await verifyPermission("BOOKINGS");
+  const user = await verifyPermission("BOOKINGS");
   if (typeof bookingId !== "string" || !/^[a-z0-9]+$/i.test(bookingId)) {
     return { error: "รหัสไม่ถูกต้อง" };
   }
   try {
-    const booking = await prisma.booking.delete({ where: { id: bookingId } });
+    const booking = await prisma.$transaction(async (tx) => {
+      const current = await tx.booking.findUnique({ where: { id: bookingId } });
+      if (!current) throw new Error("BOOKING_NOT_FOUND");
+      if (current.status !== "CANCELLED") throw new Error("DELETE_CANCELLED_ONLY");
+      await tx.bookingAuditLog.create({
+        data: {
+          bookingId: current.id,
+          bookingCode: current.bookingCode,
+          action: "DELETED",
+          actorId: user.id,
+          actorLabel: user.name || user.email,
+          previousStatus: current.status,
+          details: { salesChannel: current.salesChannel },
+        },
+      });
+      await tx.booking.delete({ where: { id: current.id } });
+      return current;
+    });
     revalidatePath("/admin/bookings");
     revalidatePath("/");
     revalidatePath("/tickets");
     revalidatePath(`/matches/${booking.matchId}`);
     revalidateTag("bookings", { expire: 0 });
     return { ok: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "DELETE_CANCELLED_ONLY") {
+      return { error: "ลบได้เฉพาะรายการที่ยกเลิกแล้วเท่านั้น รายการรับเงินต้องเก็บไว้เป็นหลักฐาน" };
+    }
     return { error: "ลบไม่สำเร็จ" };
   }
 }
@@ -204,9 +280,25 @@ export async function deleteBooking(
 export async function deleteAllBookings(): Promise<
   { ok: true; deleted: number } | { error: string }
 > {
-  await verifyPermission("BOOKINGS");
+  const user = await verifyPermission("BOOKINGS");
   try {
-    const result = await prisma.booking.deleteMany();
+    const result = await prisma.$transaction(async (tx) => {
+      const cancelled = await tx.booking.findMany({ where: { status: "CANCELLED" }, select: { id: true, bookingCode: true, salesChannel: true } });
+      if (cancelled.length > 0) {
+        await tx.bookingAuditLog.createMany({
+          data: cancelled.map((booking) => ({
+            bookingId: booking.id,
+            bookingCode: booking.bookingCode,
+            action: "DELETED" as const,
+            actorId: user.id,
+            actorLabel: user.name || user.email,
+            previousStatus: "CANCELLED" as const,
+            details: { salesChannel: booking.salesChannel, bulkDelete: true },
+          })),
+        });
+      }
+      return tx.booking.deleteMany({ where: { status: "CANCELLED" } });
+    });
     revalidatePath("/admin/bookings");
     revalidatePath("/");
     revalidatePath("/tickets");

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getAdminUser, hasPermission } from "@/lib/dal";
+import { expirePendingBookings } from "@/lib/booking-expiry";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,10 @@ export async function GET() {
     return new Response("Forbidden", { status: 403 });
   }
 
+  await expirePendingBookings();
+
   const bookings = await prisma.booking.findMany({
+    where: { status: { not: "CANCELLED" } },
     orderBy: { createdAt: "desc" },
     include: {
       match: { select: { homeTeam: true, awayTeam: true, kickoffAt: true } },
@@ -38,6 +42,11 @@ export async function GET() {
     "kickoffAt",
     "quantity",
     "totalAmountBaht",
+    "salesChannel",
+    "paymentMethod",
+    "offlineReceiptNo",
+    "soldById",
+    "soldAt",
     "notes",
   ];
 
@@ -54,6 +63,11 @@ export async function GET() {
       b.match.kickoffAt?.toISOString() ?? "",
       b.quantity,
       (b.totalAmount / 100).toFixed(2),
+      b.salesChannel,
+      b.paymentMethod,
+      b.offlineReceiptNo,
+      b.soldById,
+      b.soldAt?.toISOString() ?? "",
       b.notes ?? "",
     ]
       .map(csvEscape)

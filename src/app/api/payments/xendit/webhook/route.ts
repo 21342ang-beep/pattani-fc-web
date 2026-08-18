@@ -47,7 +47,13 @@ export async function POST(request: Request) {
         WHERE "id" = ${payment.id}`);
       if (payment.bookingId) {
         await tx.booking.updateMany({
-          where: { id: payment.bookingId, status: "PENDING", totalAmount: payment.amount },
+          where: {
+            id: payment.bookingId,
+            status: { in: ["PENDING", "CANCELLED"] },
+            salesChannel: "ONLINE",
+            paidAt: null,
+            totalAmount: payment.amount,
+          },
           data: { status: "CONFIRMED", paymentMethod: "XENDIT_PROMPTPAY", paidAt: new Date(), seatNumbers: [] },
         });
       }

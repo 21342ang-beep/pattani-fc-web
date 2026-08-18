@@ -1,0 +1,1 @@
+ALTER TYPE "BookingAuditAction" ADD VALUE 'DETAILS_UPDATED';

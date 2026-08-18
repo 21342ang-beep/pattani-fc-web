@@ -154,7 +154,9 @@ export async function POST(request: Request) {
       return tx.booking.updateMany({
         where: {
           id: booking.id,
-          status: "PENDING",
+          status: { in: ["PENDING", "CANCELLED"] },
+          salesChannel: "ONLINE",
+          paidAt: null,
           totalAmount: payment.amount,
           // Accept a delayed webhook only when Beam says payment happened
           // before the exact QR deadline stored on the booking.

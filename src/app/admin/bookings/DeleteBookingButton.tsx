@@ -16,12 +16,11 @@ export default function DeleteBookingButton({
   const [pending, start] = useTransition();
   const router = useRouter();
 
-  // เตือนเพิ่มถ้าเป็นรายการที่ confirmed/paid → กันลบผิด
   const codeHint = bookingCode.slice(0, 8);
-  const warning =
-    status === "CONFIRMED"
-      ? `รายการนี้สถานะ "ยืนยันแล้ว" — ยืนยันลบ ${codeHint} ?\n\nลบแล้วกู้คืนไม่ได้`
-      : `ยืนยันลบรายการจอง ${codeHint} ?\n\nลบแล้วกู้คืนไม่ได้`;
+  if (status !== "CANCELLED") {
+    return <span className="text-xs text-slate-400">เก็บเป็นหลักฐาน</span>;
+  }
+  const warning = `ยืนยันลบรายการที่ยกเลิกแล้ว ${codeHint} ?\n\nประวัติผู้ดำเนินการจะยังถูกเก็บใน audit log`;
 
   return (
     <button

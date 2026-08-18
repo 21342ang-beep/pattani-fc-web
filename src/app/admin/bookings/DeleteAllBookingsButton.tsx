@@ -14,7 +14,7 @@ export default function DeleteAllBookingsButton() {
       disabled={pending}
       onClick={() => {
         const confirmed = confirm(
-          "ยืนยันลบข้อมูลการจองทั้งหมดเพื่อทดสอบระบบ?\n\nข้อมูลที่ลบแล้วกู้คืนไม่ได้",
+          "ยืนยันลบรายการที่มีสถานะ CANCELLED ทั้งหมด?\n\nรายการรอชำระ ยืนยัน และคืนเงินจะไม่ถูกลบ และประวัติ audit จะยังอยู่",
         );
         if (!confirmed) return;
         start(async () => {
@@ -23,13 +23,13 @@ export default function DeleteAllBookingsButton() {
             alert(result.error);
             return;
           }
-          alert(`ลบข้อมูลการจองแล้ว ${result.deleted} รายการ`);
+          alert(`ลบรายการที่ยกเลิกแล้ว ${result.deleted} รายการ`);
           router.refresh();
         });
       }}
       className="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {pending ? "กำลังลบ..." : "ลบการจองทั้งหมด"}
+      {pending ? "กำลังลบ..." : "ลบรายการยกเลิกทั้งหมด"}
     </button>
   );
 }

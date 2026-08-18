@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { BeamApiError, createBeamPromptPayCharge } from "@/lib/beam";
-import { expirePendingBookings } from "@/lib/booking-expiry";
+import { BOOKING_RESERVATION_MS, expirePendingBookings } from "@/lib/booking-expiry";
 import { prisma } from "@/lib/prisma";
 import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
@@ -146,7 +146,7 @@ async function finishCharge(
   if (ready) return ready;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-  const expiryTime = new Date(Date.now() + 15 * 60 * 1000);
+  const expiryTime = new Date(Date.now() + (target?.bookingId ? BOOKING_RESERVATION_MS : 15 * 60 * 1000));
   try {
     const charge = await createBeamPromptPayCharge({
       referenceId: payment.referenceId,

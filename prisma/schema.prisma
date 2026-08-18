@@ -220,6 +220,11 @@ model Booking {
   totalAmount      Int // ราคารวม (สตางค์)
   status           BookingStatus     @default(PENDING)
   paymentMethod    String? // "PROMPTPAY" | "MOBILE_BANKING" | "CREDIT_CARD"
+  salesChannel     BookingSalesChannel @default(ONLINE)
+  staffRequestId   String?             @unique
+  offlineReceiptNo String?
+  soldAt           DateTime?
+  soldById         String?
   paidAt           DateTime?
   paymentExpiresAt DateTime? // deadline for holding seats while payment is pending
   seatNumbers      String[] // ที่นั่งที่ออกให้ เช่น ["A-101","A-102"]
@@ -229,6 +234,7 @@ model Booking {
   scannedAt        DateTime?
   scannedBy        String? // userId ของ admin ที่กด scan (เก็บไว้ audit)
   gateScans        BookingGateScan[]
+  auditLogs        BookingAuditLog[]
   xenditPayments   XenditPayment[]
   beamPayments     BeamPayment[]
   createdAt        DateTime          @default(now())
@@ -238,9 +244,41 @@ model Booking {
   @@index([matchId, zone])
   @@index([status])
   @@index([status, paymentExpiresAt])
+  @@index([salesChannel, createdAt])
+  @@index([soldById])
   @@index([customerEmail])
   @@index([customerPhone])
   @@index([scannedAt])
+}
+
+enum BookingSalesChannel {
+  ONLINE
+  STAFF
+}
+
+model BookingAuditLog {
+  id             String             @id @default(cuid())
+  bookingId      String?
+  booking        Booking?           @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  bookingCode    String
+  action         BookingAuditAction
+  actorId        String
+  actorLabel     String
+  previousStatus BookingStatus?
+  nextStatus     BookingStatus?
+  details        Json?
+  createdAt      DateTime           @default(now())
+
+  @@index([bookingId, createdAt])
+  @@index([bookingCode, createdAt])
+  @@index([actorId, createdAt])
+}
+
+enum BookingAuditAction {
+  STAFF_CREATED
+  DETAILS_UPDATED
+  STATUS_CHANGED
+  DELETED
 }
 
 // Payment request ที่สร้างกับ Xendit แยกออกจาก Booking เพื่อเก็บ reference
