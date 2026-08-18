@@ -229,6 +229,7 @@ export async function createMatch(
   // DB save สำเร็จแล้วค่อยลบไฟล์เก่า (atomicity)
   await rollbackUploads(parsedForm.commitDelete);
   revalidatePath("/admin/matches");
+  revalidatePath("/admin/bookings/staff");
   revalidatePath("/");
   revalidatePath("/tickets");
   revalidatePath("/matches");
@@ -267,6 +268,7 @@ export async function updateMatch(
   await rollbackUploads(parsedForm.commitDelete);
   revalidatePath("/admin/matches");
   revalidatePath(`/admin/matches/${matchId}`);
+  revalidatePath("/admin/bookings/staff");
   revalidatePath("/");
   revalidatePath("/tickets");
   revalidatePath("/matches");
@@ -292,6 +294,7 @@ export async function deleteMatch(matchId: string): Promise<{ ok: true } | { err
     if (m?.homeTeamLogo) await deleteTeamLogo(m.homeTeamLogo);
     if (m?.awayTeamLogo) await deleteTeamLogo(m.awayTeamLogo);
     revalidatePath("/admin/matches");
+    revalidatePath("/admin/bookings/staff");
     revalidatePath("/");
     revalidatePath("/tickets");
     revalidateTag("matches", { expire: 0 });

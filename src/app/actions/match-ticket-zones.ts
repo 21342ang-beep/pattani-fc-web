@@ -149,6 +149,7 @@ export async function saveMatchTicketZones(
 
   revalidatePath(`/admin/matches/${matchId}`);
   revalidatePath("/admin/matches");
+  revalidatePath("/admin/bookings/staff");
   revalidatePath("/tickets");
   revalidatePath("/matches");
   revalidatePath(`/matches/${matchId}`);
