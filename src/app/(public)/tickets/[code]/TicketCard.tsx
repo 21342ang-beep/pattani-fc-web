@@ -11,6 +11,7 @@ type Props = {
     quantity: number;
     zone: string | null;
     unitPrice: string;
+    totalPrice: string;
     paymentMethod: string;
     paidAt: string;
     match: {
@@ -313,6 +314,12 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
                 <p className="text-[8px] text-white/40">
                   {METHOD_LABEL[booking.paymentMethod] ?? booking.paymentMethod}
                 </p>
+              </div>
+
+              <div className="rounded-lg bg-white/5 px-3 py-2 text-[11px]">
+                <StubRow label="จำนวน" value={`${booking.quantity.toLocaleString("th-TH")} ใบ`} />
+                <StubRow label="ราคาต่อใบ" value={booking.unitPrice} />
+                <StubRow label="ราคารวม" value={booking.totalPrice} />
               </div>
 
               <div className="border-y border-white/10 py-2 text-[11px]">

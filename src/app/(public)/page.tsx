@@ -12,6 +12,8 @@ import { getT } from "@/lib/i18n/server";
 import { intlLocale } from "@/lib/i18n/text";
 import {
   aggregateZoneAvailability,
+  getActiveTicketCountForMatches,
+  getDynamicZoneAvailabilityForMatches,
   getSeatAvailabilityForMatches,
   summarizeSeatAvailability,
 } from "@/lib/seat-availability";
@@ -35,7 +37,16 @@ export default async function HomePage() {
       orderBy: { kickoffAt: "asc" },
       take: 4,
     }),
-    prisma.match.findMany({ where: { status: "ON_SALE" }, orderBy: { kickoffAt: "asc" } }),
+    prisma.match.findMany({
+      where: { status: "ON_SALE" },
+      orderBy: { kickoffAt: "asc" },
+      include: {
+        ticketZones: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
+      },
+    }),
     cms.findGlobal({ slug: "home-page", overrideAccess: true }),
     cms.find({
       collection: "players",
@@ -58,10 +69,21 @@ export default async function HomePage() {
       : match,
   );
   const numberLocale = intlLocale(locale);
-  const availabilityByMatch = await getSeatAvailabilityForMatches(onSaleMatches);
+  const [availabilityByMatch, dynamicZoneAvailability, totalReserved] = await Promise.all([
+    getSeatAvailabilityForMatches(onSaleMatches),
+    getDynamicZoneAvailabilityForMatches(onSaleMatches),
+    getActiveTicketCountForMatches(onSaleMatches),
+  ]);
   const availabilityByZone = aggregateZoneAvailability(availabilityByMatch);
   const seatSummary = summarizeSeatAvailability(availabilityByMatch);
-  const totalReserved = seatSummary.matchBooked;
+  const dynamicSummary = dynamicZoneAvailability.reduce(
+    (summary, zone) => ({
+      matchBooked: summary.matchBooked + zone.matchBooked,
+      remaining: summary.remaining + zone.remaining,
+    }),
+    { matchBooked: 0, remaining: 0 },
+  );
+  const totalRemaining = seatSummary.remaining + dynamicSummary.remaining;
   const homePlayers = playersResult.docs as unknown as HomePlayer[];
   const mainboardSlides = [
     ...(Array.isArray(homePage.mainboardSlides) ? homePage.mainboardSlides : []),
@@ -105,10 +127,15 @@ export default async function HomePage() {
                 value: totalReserved.toLocaleString(numberLocale),
                 highlight: true,
               },
-              { label: dict.home.remaining, value: seatSummary.remaining.toLocaleString(numberLocale) },
+              { label: dict.home.remaining, value: totalRemaining.toLocaleString(numberLocale) },
             ]}
           />
-          <HomeZoneAvailability availability={availabilityByZone} locale={locale} labels={dict.home} />
+          <HomeZoneAvailability
+            availability={availabilityByZone}
+            dynamicZones={dynamicZoneAvailability}
+            locale={locale}
+            labels={dict.home}
+          />
         </section>
 
         <HomePlayers players={homePlayers} labels={dict.home} />

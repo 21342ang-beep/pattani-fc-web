@@ -86,6 +86,7 @@ export default async function TicketPage({
         quantity: booking.quantity,
         zone: booking.zone,
         unitPrice: formatBaht(booking.totalAmount / booking.quantity),
+        totalPrice: formatBaht(booking.totalAmount),
         paymentMethod: booking.paymentMethod ?? "",
         paidAt: booking.paidAt?.toISOString() ?? "",
         match: {

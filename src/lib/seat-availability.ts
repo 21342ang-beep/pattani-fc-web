@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Match } from "@prisma/client";
+import type { Match, MatchTicketZone } from "@prisma/client";
 import { activeBookingStatusWhere, expirePendingBookings } from "@/lib/booking-expiry";
 import { prisma } from "@/lib/prisma";
 import {
@@ -42,6 +42,22 @@ export type ZoneAvailability = {
 };
 
 export type AggregatedZoneAvailability = Omit<ZoneAvailability, "poolKey">;
+
+type MatchTicketZoneForAvailability = Pick<
+  MatchTicketZone,
+  "id" | "code" | "buttonLabel" | "name" | "capacity" | "price"
+>;
+
+type MatchWithDynamicZones = Pick<Match, "id" | "homeTeam" | "awayTeam"> & {
+  ticketZones: MatchTicketZoneForAvailability[];
+};
+
+export type DynamicZoneAvailability = MatchTicketZoneForAvailability & {
+  matchId: string;
+  matchLabel: string;
+  matchBooked: number;
+  remaining: number;
+};
 
 export function calculateMatchAvailability(
   match: MatchForAvailability,
@@ -96,6 +112,54 @@ export async function getSeatAvailabilityForMatches(matches: MatchForAvailabilit
       .filter((group) => group.matchId === match.id)
       .map((group) => ({ zone: group.zone, quantity: group._sum.quantity ?? 0 }));
     return [match.id, calculateMatchAvailability(match, bookings)];
+  }));
+}
+
+export async function getActiveTicketCountForMatches(
+  matches: readonly Pick<Match, "id">[],
+) {
+  if (matches.length === 0) return 0;
+
+  const matchIds = [...new Set(matches.map((match) => match.id))];
+  await expirePendingBookings({ matchIds });
+  const result = await prisma.booking.aggregate({
+    where: {
+      matchId: { in: matchIds },
+      ...activeBookingStatusWhere(),
+    },
+    _sum: { quantity: true },
+  });
+  return result._sum.quantity ?? 0;
+}
+
+export async function getDynamicZoneAvailabilityForMatches(
+  matches: MatchWithDynamicZones[],
+): Promise<DynamicZoneAvailability[]> {
+  const matchesWithZones = matches.filter((match) => match.ticketZones.length > 0);
+  if (matchesWithZones.length === 0) return [];
+
+  const matchIds = matchesWithZones.map((match) => match.id);
+  await expirePendingBookings({ matchIds });
+  const bookingGroups = await prisma.booking.groupBy({
+    by: ["matchId", "zone"],
+    where: {
+      matchId: { in: matchIds },
+      ...activeBookingStatusWhere(),
+    },
+    _sum: { quantity: true },
+  });
+
+  return matchesWithZones.flatMap((match) => match.ticketZones.map((zone) => {
+    const matchBooked = bookingGroups.find(
+      (group) => group.matchId === match.id && group.zone === zone.code,
+    )?._sum.quantity ?? 0;
+    return {
+      ...zone,
+      matchId: match.id,
+      matchLabel: `${match.homeTeam} vs ${match.awayTeam}`,
+      matchBooked,
+      remaining: Math.max(0, zone.capacity - matchBooked),
+    };
   }));
 }
 
