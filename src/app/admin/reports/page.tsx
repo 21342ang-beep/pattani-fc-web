@@ -66,14 +66,14 @@ export default async function ReportsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-green-900">รายงานยอดขาย</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-4xl font-bold text-green-900 md:text-5xl">รายงานยอดขาย</h1>
+        <p className="text-lg text-slate-500">
           ภาพรวมยอดขายและสถิติการจองตั๋ว
         </p>
       </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-600">ยอดรวม</h2>
+        <h2 className="mb-3 text-xl font-semibold text-slate-600 md:text-2xl">ยอดรวม</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             label="ยอดยืนยันทั้งหมด"
@@ -100,17 +100,17 @@ export default async function ReportsPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-600">
+        <h2 className="mb-3 text-xl font-semibold text-slate-600 md:text-2xl">
           แมตช์ขายดี (Top 5)
         </h2>
         <div className="overflow-hidden rounded-lg border bg-white">
           {topMatchesRaw.length === 0 ? (
-            <p className="p-6 text-center text-sm text-slate-500">
+            <p className="p-6 text-center text-base text-slate-500 md:text-lg">
               ยังไม่มีการจอง
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-green-50 text-left text-xs uppercase text-green-900">
+            <table className="w-full text-base md:text-lg">
+              <thead className="bg-green-50 text-left text-base uppercase text-green-900">
                 <tr>
                   <th className="px-4 py-2">แมตช์</th>
                   <th className="px-4 py-2">วันแข่ง</th>
@@ -153,7 +153,7 @@ export default async function ReportsPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-600">
+        <h2 className="mb-3 text-xl font-semibold text-slate-600 md:text-2xl">
           สถานะการจอง
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -199,9 +199,9 @@ function Stat({
         highlight ? "border-yellow-400 bg-yellow-50" : "border-green-100 bg-white"
       }`}
     >
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold text-green-900">{value}</p>
-      {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
+      <p className="text-base text-slate-500">{label}</p>
+      <p className="mt-1 text-3xl font-bold text-green-900 md:text-4xl">{value}</p>
+      {sub && <p className="mt-1 text-base text-slate-500">{sub}</p>}
     </div>
   );
 }
