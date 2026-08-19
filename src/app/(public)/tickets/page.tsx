@@ -20,7 +20,6 @@ import type { Locale } from "@/lib/i18n/dict";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import { activeBookingStatusWhere } from "@/lib/booking-expiry";
 import { getMatchTicketZoneButtonLabel } from "@/lib/match-ticket-zone-label";
-import { sortTicketZoneCards } from "@/lib/ticket-zone-card-order";
 
 export const metadata = { title: "จองตั๋วรายแมตช์ — Pattani FC" };
 
@@ -174,11 +173,39 @@ export default async function TicketsPage() {
       sharedCapacity: availabilityByZone[zone.code].sharedCapacity,
     };
   });
+  const standardZoneOrder = new Map<string, number>(
+    displayZones.map((zone, index) => [zone.code, index]),
+  );
   const zoneCards: ZoneCardItem[] = [
     ...dynamicZones.map((zone, sourceOrder) => ({ kind: "dynamic" as const, zone, sourceOrder })),
     ...displayZones.map((zone, sourceOrder) => ({ kind: "standard" as const, zone, sourceOrder })),
   ];
-  sortTicketZoneCards(zoneCards, displayZones.map((zone) => zone.code));
+  zoneCards.sort((left, right) => {
+    const getPosition = (item: ZoneCardItem): [number, number, number] => {
+      if (item.kind === "standard") {
+        return [item.sourceOrder + 1, 1, item.sourceOrder];
+      }
+
+      const buttonLabel = getMatchTicketZoneButtonLabel(item.zone);
+      const identity = `${buttonLabel} ${item.zone.code} ${item.zone.name}`.toUpperCase();
+      if (identity.includes("VVIP")) return [0, 0, item.sourceOrder];
+
+      const matchingStandardOrder = standardZoneOrder.get(buttonLabel);
+      if (matchingStandardOrder != null) {
+        return [matchingStandardOrder + 1, 0, item.sourceOrder];
+      }
+
+      // Keep any other back-office-defined special zones near the front while
+      // preserving their configured query order.
+      return [0, 1, item.sourceOrder];
+    };
+
+    const leftPosition = getPosition(left);
+    const rightPosition = getPosition(right);
+    return leftPosition[0] - rightPosition[0]
+      || leftPosition[1] - rightPosition[1]
+      || leftPosition[2] - rightPosition[2];
+  });
   const modelZones: StadiumModelZone[] = displayZones.map((zone) => {
     const label = locale === "th"
       ? zone.label

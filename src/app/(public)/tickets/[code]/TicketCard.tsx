@@ -94,12 +94,7 @@ export default function TicketCard({ booking, barcodeSvg }: Props) {
     setShowScreenshotHelp(false);
     try {
       const ticketImages = Array.from(ticketRef.current.querySelectorAll("img"));
-      // html-to-image fetches every <img> again while cloning the ticket. On
-      // mobile networks that second request can fail and the library caches an
-      // empty result for the rest of the page session, leaving a crest out of
-      // the PNG even though it is visible on screen. Convert each crest to an
-      // embedded data URL first so the exported ticket is self-contained.
-      await Promise.all(ticketImages.map(inlineImageForExport));
+      await Promise.all(ticketImages.map(waitForImage));
       await document.fonts?.ready;
       // ให้เบราว์เซอร์วาดโลโก้ที่ decode แล้วลง ticket ก่อน html-to-image สร้าง clone
       await new Promise<void>((resolve) =>
@@ -423,9 +418,6 @@ function TeamCrest({
               src={logo}
               alt={name}
               crossOrigin="anonymous"
-              loading="eager"
-              decoding="async"
-              fetchPriority="high"
               className="size-full object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
             />
           </div>
@@ -445,107 +437,15 @@ function TeamCrest({
   );
 }
 
-const IMAGE_LOAD_TIMEOUT_MS = 15_000;
-const IMAGE_FETCH_ATTEMPTS = 3;
-
-async function inlineImageForExport(image: HTMLImageElement) {
-  const source = image.currentSrc || image.src;
-  if (!source) throw new Error("E-ticket image source is missing");
-
-  if (!source.startsWith("data:")) {
-    const embeddedSource = await fetchImageAsDataUrl(source);
-    image.removeAttribute("srcset");
-    image.src = embeddedSource;
-  }
-
-  await waitForImage(image);
-}
-
-async function fetchImageAsDataUrl(source: string): Promise<string> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < IMAGE_FETCH_ATTEMPTS; attempt += 1) {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(
-      () => controller.abort(),
-      IMAGE_LOAD_TIMEOUT_MS,
-    );
-
-    try {
-      const url = new URL(source, window.location.href);
-      const response = await fetch(url, {
-        cache: attempt === 0 ? "force-cache" : "reload",
-        credentials: url.origin === window.location.origin ? "same-origin" : "omit",
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        throw new Error(`Unable to load E-ticket image (${response.status})`);
-      }
-
-      const blob = await response.blob();
-      if (!blob.type.startsWith("image/")) {
-        throw new Error("E-ticket image has an invalid content type");
-      }
-      return await blobToDataUrl(blob);
-    } catch (error) {
-      lastError = error;
-      if (attempt + 1 < IMAGE_FETCH_ATTEMPTS) {
-        await new Promise((resolve) =>
-          window.setTimeout(resolve, 250 * (attempt + 1)),
-        );
-      }
-    } finally {
-      window.clearTimeout(timeout);
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Unable to prepare E-ticket image");
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("Unable to encode E-ticket image"));
-    }, { once: true });
-    reader.addEventListener("error", () => reject(reader.error), { once: true });
-    reader.readAsDataURL(blob);
-  });
-}
-
 async function waitForImage(image: HTMLImageElement) {
-  if (!image.complete || image.naturalWidth === 0) {
-    await new Promise<void>((resolve, reject) => {
-      const timeout = window.setTimeout(() => {
-        cleanup();
-        reject(new Error("Timed out while preparing E-ticket image"));
-      }, IMAGE_LOAD_TIMEOUT_MS);
-      const onLoad = () => {
-        cleanup();
-        resolve();
-      };
-      const onError = () => {
-        cleanup();
-        reject(new Error("Unable to decode E-ticket image"));
-      };
-      const cleanup = () => {
-        window.clearTimeout(timeout);
-        image.removeEventListener("load", onLoad);
-        image.removeEventListener("error", onError);
-      };
-
-      image.addEventListener("load", onLoad, { once: true });
-      image.addEventListener("error", onError, { once: true });
+  if (!image.complete) {
+    await new Promise<void>((resolve) => {
+      image.addEventListener("load", () => resolve(), { once: true });
+      image.addEventListener("error", () => resolve(), { once: true });
     });
   }
 
   await image.decode?.().catch(() => undefined);
-  if (image.naturalWidth === 0 || image.naturalHeight === 0) {
-    throw new Error("E-ticket image did not decode");
-  }
 }
 
 function Perforation() {
