@@ -3,6 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { formatBaht } from "@/lib/format";
 import { getAdminUser, hasPermission } from "@/lib/dal";
 import { ADMIN_SECTIONS } from "@/lib/admin-sections";
+import { getActiveTicketCountForMatches } from "@/lib/seat-availability";
+import {
+  getTicketPurchaseSettings,
+  isMatchTicketBookingOpen,
+} from "@/lib/ticket-purchase-settings";
 import type { Permission } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +22,22 @@ export default async function AdminDashboard() {
   const canViewCustomers =
     hasPermission(user, "CUSTOMERS") || hasPermission(user, "MEMBER_DATA");
 
+  const activeTicketCountPromise = canViewBookings
+    ? Promise.all([
+        prisma.match.findMany({
+          where: { status: "ON_SALE" },
+          select: { id: true, competitionType: true },
+        }),
+        getTicketPurchaseSettings(),
+      ]).then(([matches, settings]) =>
+        getActiveTicketCountForMatches(
+          matches.filter((match) => isMatchTicketBookingOpen(match, settings)),
+        ),
+      )
+    : Promise.resolve(null);
+
   // อย่าดึงหรือแสดงสถิติที่อยู่นอก permission ของผู้ดูแล แม้จะเป็น dashboard
-  const [matchSummary, bookingCount, revenue, customerCount] =
+  const [matchSummary, activeTicketCount, revenue, customerCount] =
     await Promise.all([
       canViewMatches
         ? Promise.all([
@@ -26,11 +45,7 @@ export default async function AdminDashboard() {
             prisma.match.count({ where: { status: "ON_SALE" } }),
           ])
         : Promise.resolve(null),
-      canViewBookings
-        ? prisma.booking.count({
-            where: { status: { in: ["PENDING", "CONFIRMED"] } },
-          })
-        : Promise.resolve(null),
+      activeTicketCountPromise,
       canViewRevenue
         ? prisma.booking.aggregate({
             where: { status: "CONFIRMED" },
@@ -45,7 +60,7 @@ export default async function AdminDashboard() {
   if (matchSummary) {
     stats.MATCHES = `${matchSummary[0]} แมตช์ · ${matchSummary[1]} เปิดขาย`;
   }
-  if (bookingCount != null) stats.BOOKINGS = `${bookingCount} รายการ active`;
+  if (activeTicketCount != null) stats.BOOKINGS = `${activeTicketCount} ใบ active`;
   if (customerCount != null) stats.CUSTOMERS = `${customerCount} บัญชี`;
   if (revenue) stats.REPORTS = `ยอดยืนยัน ${formatBaht(revenue._sum.totalAmount ?? 0)}`;
 
@@ -72,7 +87,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* สรุปตัวเลขรวม — แสดงเฉพาะข้อมูลที่บัญชีนี้มีสิทธิ์ */}
-      {(matchSummary || bookingCount != null || revenue) && (
+      {(matchSummary || activeTicketCount != null || revenue) && (
         <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {matchSummary && (
             <>
@@ -84,8 +99,8 @@ export default async function AdminDashboard() {
               />
             </>
           )}
-          {bookingCount != null && (
-            <StatPill label="การจอง active" value={bookingCount.toLocaleString("th-TH")} />
+          {activeTicketCount != null && (
+            <StatPill label="การจอง active" value={activeTicketCount.toLocaleString("th-TH")} />
           )}
           {revenue && (
             <StatPill

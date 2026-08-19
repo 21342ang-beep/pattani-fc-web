@@ -17,7 +17,10 @@ import {
   getSeatAvailabilityForMatches,
   summarizeSeatAvailability,
 } from "@/lib/seat-availability";
-import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
+import {
+  getTicketPurchaseSettings,
+  isMatchTicketBookingOpen,
+} from "@/lib/ticket-purchase-settings";
 
 export const revalidate = 60;
 
@@ -60,11 +63,11 @@ export default async function HomePage() {
     getT(),
     getTicketPurchaseSettings(),
   ]);
-  const isLeagueSaleOpen = (match: { competitionType: string }) =>
-    match.competitionType !== "LEAGUE" || purchaseSettings.leagueBookingOpen;
-  const onSaleMatches = availableMatches.filter(isLeagueSaleOpen);
+  const onSaleMatches = availableMatches.filter((match) =>
+    isMatchTicketBookingOpen(match, purchaseSettings),
+  );
   const effectiveFeatured = featured.map((match) =>
-    match.status === "ON_SALE" && !isLeagueSaleOpen(match)
+    match.status === "ON_SALE" && !isMatchTicketBookingOpen(match, purchaseSettings)
       ? { ...match, status: "SCHEDULED" }
       : match,
   );

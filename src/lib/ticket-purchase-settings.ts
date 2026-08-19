@@ -1,6 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 
+export function isMatchTicketBookingOpen(
+  match: { competitionType: string },
+  settings: { leagueBookingOpen: boolean },
+) {
+  return match.competitionType !== "LEAGUE" || settings.leagueBookingOpen;
+}
+
 export async function getTicketPurchaseSettings() {
   const settings = await prisma.ticketPurchaseSetting.findUnique({
     where: { id: 1 },

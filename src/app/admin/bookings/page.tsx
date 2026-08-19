@@ -117,6 +117,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     if (booking.zone === "AWAY") {
       awayZoneSummary.bookings += 1;
       awayZoneSummary.tickets += booking.quantity;
+      continue;
     }
     const price = booking.quantity > 0 ? booking.totalAmount / booking.quantity : null;
     if (price == null || !Number.isInteger(price)) continue;
@@ -126,7 +127,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     priceGroups.set(price, current);
   }
   const bookings = allBookings.filter((booking) => {
-    if (selectedPrice != null && (booking.quantity <= 0 || booking.totalAmount / booking.quantity !== selectedPrice)) return false;
+    if (selectedPrice != null && (booking.zone === "AWAY" || booking.quantity <= 0 || booking.totalAmount / booking.quantity !== selectedPrice)) return false;
     if (selectedMatchId && booking.matchId !== selectedMatchId) return false;
     if (selectedZone && booking.zone !== selectedZone) return false;
     return true;
@@ -245,11 +246,15 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
       )}
       <div className="mb-6">
         <h2 className="mb-3 text-2xl font-bold text-green-900 md:text-3xl">ข้อมูลการจองโซนทีมเยือน</h2>
-        <div className="max-w-sm rounded-xl border border-violet-200 bg-violet-50 p-4 shadow-sm">
+        <Link
+          href={`/admin/bookings?zone=AWAY${customerName ? `&name=${encodeURIComponent(customerName)}` : ""}`}
+          aria-current={selectedZone === "AWAY" ? "page" : undefined}
+          className={`block max-w-sm rounded-xl border bg-violet-50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${selectedZone === "AWAY" ? "border-violet-600 ring-2 ring-violet-200" : "border-violet-200"}`}
+        >
           <p className="text-sm font-bold uppercase tracking-widest text-violet-700 md:text-base">โซนทีมเยือน</p>
           <p className="mt-1 text-3xl font-black text-violet-950 md:text-4xl">{awayZoneSummary.tickets} ใบ</p>
           <p className="mt-2 text-base text-violet-800 md:text-lg">{awayZoneSummary.bookings} รายการจอง</p>
-        </div>
+        </Link>
       </div>
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="w-full min-w-[1250px] text-base md:text-lg">
