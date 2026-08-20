@@ -2046,6 +2046,18 @@ if ! runuser -u "$NGINX_USER" -- head -c 1 "$MEDIA_CANARY" >/dev/null; then
 fi
 run_as_app pm2 save
 pm2 startup systemd -u "$SERVICE_USER" --hp "$SERVICE_HOME"
+if ! run_as_app pm2 kill; then
+  fail_closed_after_database_change "The manually started PM2 daemon could not be stopped before systemd takeover."
+fi
+systemctl reset-failed "$PM2_SYSTEMD_UNIT" >/dev/null 2>&1 || true
+systemctl daemon-reload
+if ! systemctl start "$PM2_SYSTEMD_UNIT"; then
+  fail_closed_after_database_change "The PM2 systemd service failed to start."
+fi
+if ! systemctl is-active --quiet "$PM2_SYSTEMD_UNIT" || \
+   [ "$(systemctl is-enabled "$PM2_SYSTEMD_UNIT" 2>/dev/null || true)" != "enabled" ]; then
+  fail_closed_after_database_change "The PM2 systemd service is not active and enabled."
+fi
 
 # ────────────────────────────────────────────────
 # Verify
