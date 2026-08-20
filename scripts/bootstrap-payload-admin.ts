@@ -77,7 +77,12 @@ async function main() {
   }
 }
 
-void main().catch((error: unknown) => {
-  console.error("CMS super-admin bootstrap failed", error);
-  process.exitCode = 1;
-});
+void main().then(
+  () => {
+    process.exit(0);
+  },
+  (error: unknown) => {
+    console.error("CMS super-admin bootstrap failed", error);
+    process.exit(1);
+  },
+);
