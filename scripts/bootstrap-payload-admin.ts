@@ -1,5 +1,5 @@
-import { pathToFileURL } from "node:url";
-import { tsImport } from "tsx/esm/api";
+import config from "@payload-config";
+import { getPayload } from "payload";
 
 async function main() {
   const mode = process.env.CMS_BOOTSTRAP_MODE;
@@ -12,10 +12,6 @@ async function main() {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error("CMS_SUPER_ADMIN_EMAIL must be an exact valid email");
   }
-
-  const parentURL = pathToFileURL(__filename).href;
-  const { getPayload } = await tsImport("payload", parentURL);
-  const { default: config } = await tsImport("../src/payload.config.ts", parentURL);
 
   const payload = await getPayload({ config });
   try {

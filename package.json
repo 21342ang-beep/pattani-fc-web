@@ -2,6 +2,7 @@
   "name": "ticket-online",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --webpack --port 3000",
     "prebuild": "prisma generate",
@@ -10,7 +11,7 @@
     "lint": "eslint",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx --env-file=.env --env-file=.env.local prisma/seed.ts",
-    "cms:bootstrap": "tsx --env-file=.env --env-file=.env.local scripts/bootstrap-payload-admin.ts",
+    "cms:bootstrap": "tsx --tsconfig ./tsconfig.json --env-file=.env --env-file=.env.local scripts/bootstrap-payload-admin.ts",
     "db:reset": "prisma migrate reset"
   },
   "prisma": {
