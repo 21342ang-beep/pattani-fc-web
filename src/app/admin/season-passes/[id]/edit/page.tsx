@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { SEASON_TIERS } from "@/lib/season-pass-tiers";
+import {
+  getSeasonPassZoneBarcodeBounds,
+  seasonPassBarcodeIsWithinBounds,
+} from "@/lib/season-pass-zone-ranges";
 import EditSeasonPassForm from "./EditSeasonPassForm";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +31,7 @@ export default async function EditSeasonPassPage({
   const backHref = from === "staff"
     ? "/admin/season-passes/staff"
     : `/admin/season-passes?tier=${returnTier || order.tierId}`;
-  const vvipBarcodes = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE"
+  const vvipBarcodeRows = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE"
     ? await prisma.seasonPassBarcode.findMany({
         where: {
           tierId: order.tierId,
@@ -41,6 +45,32 @@ export default async function EditSeasonPassPage({
         select: { barcode: true },
       })
     : [];
+  const zoneQuotas = await prisma.seasonPassZoneQuota.findMany({
+    where: {
+      seasonLabel: order.seasonLabel,
+      tierId: order.tierId,
+      seatZone: { in: [...tier.allowedSeatZones] },
+    },
+    select: { seatZone: true, totalSeats: true, sponsorReserved: true },
+  });
+  const barcodePrefix = `PFC26-${tier.priceBaht}-`;
+  const tierZoneBounds = tier.allowedSeatZones.flatMap((seatZone) => {
+    const bounds = getSeasonPassZoneBarcodeBounds(
+      barcodePrefix,
+      tier.allowedSeatZones,
+      zoneQuotas,
+      seatZone,
+    );
+    return bounds ? [bounds] : [];
+  });
+  const canAutomaticallyTransferZoneBarcode = tierZoneBounds.length === tier.allowedSeatZones.length;
+  const vvipBarcodes = vvipBarcodeRows.flatMap((item) => {
+    const bounds = tierZoneBounds.find((candidate) =>
+      seasonPassBarcodeIsWithinBounds(item.barcode, candidate),
+    );
+    if (bounds) return [{ barcode: item.barcode, seatZone: bounds.seatZone }];
+    return canAutomaticallyTransferZoneBarcode ? [] : [{ barcode: item.barcode, seatZone: "*" }];
+  });
   const members = order.salesChannel === "OFFLINE"
     ? await prisma.customer.findMany({
         orderBy: [{ name: "asc" }, { createdAt: "asc" }],
@@ -86,7 +116,8 @@ export default async function EditSeasonPassPage({
         }}
         tierBadge={tier.badge}
         zones={[...tier.allowedSeatZones]}
-        vvipBarcodes={vvipBarcodes.map((item) => item.barcode)}
+        vvipBarcodes={vvipBarcodes}
+        canAutomaticallyTransferZoneBarcode={canAutomaticallyTransferZoneBarcode}
         members={members}
         backHref={backHref}
       />

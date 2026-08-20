@@ -6,6 +6,13 @@ import Link from "next/link";
 import BookingStatusSelect from "./BookingStatusSelect";
 import DeleteBookingButton from "./DeleteBookingButton";
 import DeleteAllBookingsButton from "./DeleteAllBookingsButton";
+import {
+  getMatchZoneLabel,
+  getStadiumZone,
+  getZonePrice,
+  STADIUM_ZONE_CODES,
+  type StadiumZoneCode,
+} from "@/lib/stadium-zones";
 
 export const dynamic = "force-dynamic";
 
@@ -16,123 +23,171 @@ const statusColor: Record<string, string> = {
   REFUNDED: "bg-blue-100 text-blue-800",
 };
 
-export default async function AdminBookingsPage(props: { searchParams: Promise<{ price?: string; name?: string; matchId?: string; zone?: string }> }) {
+export default async function AdminBookingsPage(props: { searchParams: Promise<{ name?: string; matchId?: string; zone?: string; view?: string }> }) {
   await verifyPermission("BOOKINGS");
-  const { price: rawPrice, name: rawName, matchId: rawMatchId, zone: rawZone } = await props.searchParams;
-  const selectedPrice = rawPrice && /^\d+$/.test(rawPrice) ? Number(rawPrice) : null;
+  const { name: rawName, matchId: rawMatchId, zone: rawZone, view: rawView } = await props.searchParams;
   const customerName = rawName?.trim().slice(0, 100) ?? "";
-  const selectedMatchId = rawMatchId && /^[a-z0-9_-]{1,50}$/i.test(rawMatchId) ? rawMatchId : null;
+  const requestedMatchId = rawMatchId && /^[a-z0-9_-]{1,50}$/i.test(rawMatchId) ? rawMatchId : null;
   const selectedZone = rawZone?.trim().slice(0, 50) || null;
+  const showAllMatches = rawView === "all";
   await expirePendingBookings();
   const customerFilter = {
     status: { not: "CANCELLED" as const },
     ...(customerName ? { customerName: { contains: customerName, mode: "insensitive" as const } } : {}),
   };
-  const [allBookings, dynamicZones] = await Promise.all([
-    prisma.booking.findMany({
-      where: customerFilter,
-      orderBy: { createdAt: "desc" },
-      include: {
-        match: {
-          select: {
-            homeTeam: true,
-            awayTeam: true,
-            kickoffAt: true,
-            ticketZones: { select: { code: true, name: true } },
+  const bookingSummaryGroups = await prisma.booking.groupBy({
+    by: ["matchId", "zone", "status"],
+    where: { zone: { not: null }, ...customerFilter },
+    _count: { _all: true },
+    _sum: { quantity: true, totalAmount: true },
+  });
+  const summaryMatchIds = [...new Set(bookingSummaryGroups.map((group) => group.matchId))];
+  const summaryMatches = summaryMatchIds.length > 0
+    ? await prisma.match.findMany({
+        where: { id: { in: summaryMatchIds } },
+        include: {
+          ticketZones: {
+            select: { code: true, name: true, price: true, sortOrder: true },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           },
+          zoneLabels: { select: { code: true, label: true } },
         },
-      },
-      take: 100,
-    }),
-    prisma.matchTicketZone.findMany({
-      select: {
-        matchId: true,
-        code: true,
-        name: true,
-        match: { select: { homeTeam: true, awayTeam: true, kickoffAt: true } },
-      },
-    }),
-  ]);
-  const dynamicBookingGroups = dynamicZones.length === 0
-    ? []
-    : await prisma.booking.groupBy({
-        by: ["matchId", "zone", "status"],
-        where: { zone: { not: null }, ...customerFilter },
-        _count: { _all: true },
-        _sum: { quantity: true, totalAmount: true },
-      });
-  const sellerIds = [...new Set(allBookings.map((booking) => booking.soldById).filter((id): id is string => Boolean(id)))];
-  const sellers = sellerIds.length > 0
-    ? await prisma.user.findMany({ where: { id: { in: sellerIds } }, select: { id: true, name: true, email: true } })
+      })
     : [];
-  const sellerById = new Map(sellers.map((seller) => [seller.id, seller.name || seller.email]));
-  const priceGroups = new Map<number, { bookings: number; tickets: number }>();
-  const awayZoneSummary = { bookings: 0, tickets: 0 };
-  const dynamicZoneGroups = new Map<string, {
+  const matchById = new Map(summaryMatches.map((match) => [match.id, match]));
+  const zoneSummaries = new Map<string, {
     matchId: string;
     zoneCode: string;
     zoneName: string;
     matchLabel: string;
     kickoffAt: Date | null;
+    configuredPrice: number | null;
+    zoneOrder: number;
     bookings: number;
     tickets: number;
     confirmedBookings: number;
+    confirmedTickets: number;
     pendingBookings: number;
-    cancelledBookings: number;
+    pendingTickets: number;
+    refundedBookings: number;
+    refundedTickets: number;
     confirmedAmount: number;
   }>();
-  const dynamicZoneByKey = new Map(dynamicZones.map((zone) => [`${zone.matchId}:${zone.code}`, zone]));
-  for (const group of dynamicBookingGroups) {
+  for (const group of bookingSummaryGroups) {
     if (!group.zone) continue;
+    const match = matchById.get(group.matchId);
+    if (!match) continue;
+    const dynamicZone = match.ticketZones.find((zone) => zone.code === group.zone);
+    const legacyZone = getStadiumZone(group.zone);
+    const legacyCode = legacyZone ? group.zone as StadiumZoneCode : null;
+    const zoneName = dynamicZone?.name
+      ?? (legacyCode ? getMatchZoneLabel(match.zoneLabels, legacyCode) : `โซน ${group.zone}`);
+    const configuredPrice = dynamicZone?.price
+      ?? (legacyCode ? getZonePrice(match, legacyCode) : null);
+    const standardOrder = legacyCode ? STADIUM_ZONE_CODES.indexOf(legacyCode) : -1;
     const key = `${group.matchId}:${group.zone}`;
-    const dynamicZone = dynamicZoneByKey.get(key);
-    if (dynamicZone) {
-      const current = dynamicZoneGroups.get(key) ?? {
-        matchId: group.matchId,
-        zoneCode: dynamicZone.code,
-        zoneName: dynamicZone.name,
-        matchLabel: `${dynamicZone.match.homeTeam} vs ${dynamicZone.match.awayTeam}`,
-        kickoffAt: dynamicZone.match.kickoffAt,
-        bookings: 0,
-        tickets: 0,
-        confirmedBookings: 0,
-        pendingBookings: 0,
-        cancelledBookings: 0,
-        confirmedAmount: 0,
-      };
-      current.bookings += group._count._all;
-      current.tickets += group._sum.quantity ?? 0;
-      if (group.status === "CONFIRMED") {
-        current.confirmedBookings += group._count._all;
-        current.confirmedAmount += group._sum.totalAmount ?? 0;
-      } else if (group.status === "PENDING") {
-        current.pendingBookings += group._count._all;
-      } else {
-        current.cancelledBookings += group._count._all;
-      }
-      dynamicZoneGroups.set(key, current);
+    const current = zoneSummaries.get(key) ?? {
+      matchId: group.matchId,
+      zoneCode: group.zone,
+      zoneName,
+      matchLabel: `${match.homeTeam} vs ${match.awayTeam}`,
+      kickoffAt: match.kickoffAt,
+      configuredPrice,
+      zoneOrder: dynamicZone?.sortOrder ?? (standardOrder >= 0 ? 100 + standardOrder : 999),
+      bookings: 0,
+      tickets: 0,
+      confirmedBookings: 0,
+      confirmedTickets: 0,
+      pendingBookings: 0,
+      pendingTickets: 0,
+      refundedBookings: 0,
+      refundedTickets: 0,
+      confirmedAmount: 0,
+    };
+    const bookingCount = group._count._all;
+    const ticketCount = group._sum.quantity ?? 0;
+    current.bookings += bookingCount;
+    current.tickets += ticketCount;
+    if (group.status === "CONFIRMED") {
+      current.confirmedBookings += bookingCount;
+      current.confirmedTickets += ticketCount;
+      current.confirmedAmount += group._sum.totalAmount ?? 0;
+    } else if (group.status === "PENDING") {
+      current.pendingBookings += bookingCount;
+      current.pendingTickets += ticketCount;
+    } else if (group.status === "REFUNDED") {
+      current.refundedBookings += bookingCount;
+      current.refundedTickets += ticketCount;
     }
+    zoneSummaries.set(key, current);
   }
-  for (const booking of allBookings) {
-    if (booking.zone === "AWAY") {
-      awayZoneSummary.bookings += 1;
-      awayZoneSummary.tickets += booking.quantity;
-      continue;
-    }
-    const price = booking.quantity > 0 ? booking.totalAmount / booking.quantity : null;
-    if (price == null || !Number.isInteger(price)) continue;
-    const current = priceGroups.get(price) ?? { bookings: 0, tickets: 0 };
-    current.bookings += 1;
-    current.tickets += booking.quantity;
-    priceGroups.set(price, current);
-  }
-  const bookings = allBookings.filter((booking) => {
-    if (selectedPrice != null && (booking.zone === "AWAY" || booking.quantity <= 0 || booking.totalAmount / booking.quantity !== selectedPrice)) return false;
-    if (selectedMatchId && booking.matchId !== selectedMatchId) return false;
-    if (selectedZone && booking.zone !== selectedZone) return false;
-    return true;
+  const orderedZoneSummaries = [...zoneSummaries.values()].sort((left, right) => {
+    const leftKickoff = left.kickoffAt?.getTime() ?? 0;
+    const rightKickoff = right.kickoffAt?.getTime() ?? 0;
+    return rightKickoff - leftKickoff
+      || left.zoneOrder - right.zoneOrder
+      || left.zoneName.localeCompare(right.zoneName, "th");
   });
-  const filtersActive = selectedPrice != null || customerName !== "" || selectedMatchId != null || selectedZone != null;
+  const matchSummaries = summaryMatches
+    .map((match) => {
+      const zones = orderedZoneSummaries
+        .filter((summary) => summary.matchId === match.id)
+        .sort((left, right) => left.zoneOrder - right.zoneOrder || left.zoneName.localeCompare(right.zoneName, "th"));
+      if (zones.length === 0) return null;
+      return {
+        matchId: match.id,
+        matchLabel: `${match.homeTeam} vs ${match.awayTeam}`,
+        kickoffAt: match.kickoffAt,
+        zones,
+        bookings: zones.reduce((sum, zone) => sum + zone.bookings, 0),
+        tickets: zones.reduce((sum, zone) => sum + zone.tickets, 0),
+        confirmedBookings: zones.reduce((sum, zone) => sum + zone.confirmedBookings, 0),
+        confirmedTickets: zones.reduce((sum, zone) => sum + zone.confirmedTickets, 0),
+        pendingBookings: zones.reduce((sum, zone) => sum + zone.pendingBookings, 0),
+        pendingTickets: zones.reduce((sum, zone) => sum + zone.pendingTickets, 0),
+        refundedBookings: zones.reduce((sum, zone) => sum + zone.refundedBookings, 0),
+        refundedTickets: zones.reduce((sum, zone) => sum + zone.refundedTickets, 0),
+        confirmedAmount: zones.reduce((sum, zone) => sum + zone.confirmedAmount, 0),
+      };
+    })
+    .filter((summary): summary is NonNullable<typeof summary> => summary != null)
+    .sort((left, right) => (right.kickoffAt?.getTime() ?? 0) - (left.kickoffAt?.getTime() ?? 0));
+  const selectedMatchId = showAllMatches
+    ? null
+    : requestedMatchId ?? (selectedZone ? null : matchSummaries[0]?.matchId ?? null);
+  const selectedMatchSummary = selectedMatchId
+    ? matchSummaries.find((summary) => summary.matchId === selectedMatchId) ?? null
+    : null;
+  const selectedZoneSummary = selectedZone
+    ? selectedMatchSummary?.zones.find((zone) => zone.zoneCode === selectedZone) ?? null
+    : null;
+  const tableFilter = {
+    ...customerFilter,
+    ...(selectedMatchId ? { matchId: selectedMatchId } : {}),
+    ...(selectedZone ? { zone: selectedZone } : {}),
+  };
+  const allBookings = await prisma.booking.findMany({
+    where: tableFilter,
+    orderBy: { createdAt: "desc" },
+    include: {
+      match: {
+        select: {
+          homeTeam: true,
+          awayTeam: true,
+          kickoffAt: true,
+          ticketZones: { select: { code: true, name: true } },
+        },
+      },
+    },
+    take: 100,
+  });
+  const sellerIds = [...new Set(allBookings.map((booking) => booking.soldById).filter((id): id is string => Boolean(id)))];
+  const sellers = sellerIds.length > 0
+    ? await prisma.user.findMany({ where: { id: { in: sellerIds } }, select: { id: true, name: true, email: true } })
+    : [];
+  const sellerById = new Map(sellers.map((seller) => [seller.id, seller.name || seller.email]));
+  const bookings = allBookings;
+  const filtersActive = customerName !== "" || requestedMatchId != null || selectedZone != null;
 
   return (
     <div>
@@ -161,9 +216,9 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
         </div>
       </div>
       <form method="get" className="mb-6 flex flex-wrap items-end gap-2 rounded-xl border border-green-100 bg-white p-4 shadow-sm">
-        {selectedPrice != null && <input type="hidden" name="price" value={selectedPrice} />}
         {selectedMatchId && <input type="hidden" name="matchId" value={selectedMatchId} />}
         {selectedZone && <input type="hidden" name="zone" value={selectedZone} />}
+        {showAllMatches && <input type="hidden" name="view" value="all" />}
         <label className="min-w-64 flex-1">
           <span className="block text-base font-semibold text-green-900 md:text-lg">ค้นหาชื่อลูกค้า</span>
           <input
@@ -179,84 +234,98 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
         </button>
         {filtersActive && <Link href="/admin/bookings" className="rounded-md border border-slate-300 px-4 py-2.5 text-base font-medium text-slate-700 hover:bg-slate-50 md:text-lg">ล้างตัวกรอง</Link>}
       </form>
-      {dynamicZoneGroups.size > 0 && (
+      {matchSummaries.length > 0 && (
         <div className="mb-6">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-bold text-green-900 md:text-3xl">การจองโซนขายเพิ่มเติมรายแมตช์</h2>
-              <p className="mt-1 text-sm text-slate-600 md:text-base">ยอดเงินนับเฉพาะรายการที่ยืนยันชำระแล้ว</p>
+              <h2 className="text-2xl font-bold text-green-900 md:text-3xl">ข้อมูลการจองตามแมตช์</h2>
+              <p className="mt-1 text-sm text-slate-600 md:text-base">เลือกการ์ดแมตช์เพื่อดูทุกโซน หรือเลือกปุ่มโซนภายในการ์ดเพื่อดูเฉพาะโซนนั้น</p>
             </div>
-            {(selectedMatchId || selectedZone) && (
-              <Link href={`/admin/bookings${customerName ? `?name=${encodeURIComponent(customerName)}` : ""}`} className="text-base font-medium text-green-800 hover:underline md:text-lg">
-                แสดงทุกโซน
+            {!showAllMatches && (
+              <Link href={`/admin/bookings?view=all${customerName ? `&name=${encodeURIComponent(customerName)}` : ""}#bookings`} className="text-base font-medium text-green-800 hover:underline md:text-lg">
+                ดูรายการทุกแมตช์
               </Link>
             )}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {[...dynamicZoneGroups.values()].map((summary) => {
-              const selected = selectedMatchId === summary.matchId && selectedZone === summary.zoneCode;
-              const query = new URLSearchParams({ matchId: summary.matchId, zone: summary.zoneCode });
-              if (customerName) query.set("name", customerName);
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" role="tablist" aria-label="แมตช์ที่มีการจอง">
+            {matchSummaries.map((summary) => {
+              const selected = selectedMatchId === summary.matchId;
+              const matchQuery = new URLSearchParams({ matchId: summary.matchId });
+              if (customerName) matchQuery.set("name", customerName);
               return (
-                <Link
-                  key={`${summary.matchId}:${summary.zoneCode}`}
-                  href={`/admin/bookings?${query.toString()}`}
-                  className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${selected ? "border-violet-500 bg-violet-50" : "border-violet-200 bg-white"}`}
+                <div
+                  key={summary.matchId}
+                  className={`flex h-full flex-col rounded-xl border p-4 shadow-sm transition ${selected ? "border-green-700 bg-green-50 ring-2 ring-green-700/20" : "border-green-100 bg-white"}`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-bold uppercase tracking-widest text-violet-700 md:text-base">โซน {summary.zoneCode}</p>
-                      <h3 className="mt-1 text-2xl font-black text-violet-950">{summary.zoneName}</h3>
+                  <Link
+                    href={`/admin/bookings?${matchQuery.toString()}#bookings`}
+                    role="tab"
+                    aria-selected={selected}
+                    className="block flex-1 rounded-lg transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-green-700/30"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold uppercase tracking-widest text-yellow-700 md:text-base">แมตช์</p>
+                        <h3 className="mt-1 text-xl font-black text-green-950 md:text-2xl">{summary.matchLabel}</h3>
+                        <p className="mt-1 text-sm text-slate-500">{summary.kickoffAt ? formatDateTime(summary.kickoffAt) : "ยังไม่กำหนดวันแข่งขัน"}</p>
+                      </div>
+                      <div className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-right">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">ยืนยันแล้ว</p>
+                        <strong className="block text-2xl text-emerald-800">{summary.confirmedTickets}</strong>
+                        <span className="text-xs text-emerald-700">ใบ</span>
+                      </div>
                     </div>
-                    <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-bold text-violet-800">{summary.tickets} ใบ</span>
+                    <p className="mt-3 text-3xl font-black text-green-900 md:text-4xl">{summary.bookings.toLocaleString("th-TH")} <span className="text-base font-medium md:text-lg">รายการ</span></p>
+                    <p className="mt-1 text-sm text-slate-600 md:text-base">
+                      {summary.tickets.toLocaleString("th-TH")} ใบ · ยืนยัน {summary.confirmedBookings.toLocaleString("th-TH")} รายการ · {formatBaht(summary.confirmedAmount)}
+                    </p>
+                    {summary.pendingBookings > 0 && (
+                      <p className="mt-1 text-sm font-semibold text-amber-700">รอชำระ {summary.pendingBookings} รายการ · {summary.pendingTickets} ใบ</p>
+                    )}
+                  </Link>
+                  <div className="mt-3 flex flex-wrap gap-1.5 border-t border-green-100 pt-3" aria-label={`รายละเอียดโซน ${summary.matchLabel}`}>
+                    {summary.zones.map((zone) => {
+                      const zoneQuery = new URLSearchParams({ matchId: summary.matchId, zone: zone.zoneCode });
+                      if (customerName) zoneQuery.set("name", customerName);
+                      const zoneSelected = selected && selectedZone === zone.zoneCode;
+                      return (
+                        <Link
+                          key={zone.zoneCode}
+                          href={`/admin/bookings?${zoneQuery.toString()}#bookings`}
+                          aria-current={zoneSelected ? "page" : undefined}
+                          title={`${zone.zoneName} · ยืนยัน ${zone.confirmedTickets} ใบ`}
+                          className={`rounded-full border px-2.5 py-1 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-green-700/30 ${zoneSelected ? "border-green-800 bg-green-800 text-white" : "border-green-200 bg-white text-green-900 hover:border-green-600 hover:bg-green-100"}`}
+                        >
+                          {zone.zoneCode} · {zone.confirmedTickets.toLocaleString("th-TH")} ใบ
+                        </Link>
+                      );
+                    })}
                   </div>
-                  <p className="mt-3 font-semibold text-slate-800">{summary.matchLabel}</p>
-                  <p className="mt-1 text-sm text-slate-500">{summary.kickoffAt ? formatDateTime(summary.kickoffAt) : "ยังไม่กำหนดวันแข่งขัน"}</p>
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
-                    <div className="rounded-lg bg-amber-50 p-2 text-amber-800"><strong className="block text-xl">{summary.pendingBookings}</strong>รอชำระ</div>
-                    <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800"><strong className="block text-xl">{summary.confirmedBookings}</strong>ยืนยัน</div>
-                    <div className="rounded-lg bg-slate-100 p-2 text-slate-600"><strong className="block text-xl">{summary.cancelledBookings}</strong>ยกเลิก/คืนเงิน</div>
-                  </div>
-                  <div className="mt-4 flex items-end justify-between gap-3 border-t border-violet-100 pt-3">
-                    <span className="text-sm text-slate-600">ทั้งหมด {summary.bookings} รายการ</span>
-                    <span className="text-right"><span className="block text-xs text-slate-500">ยอดยืนยันแล้ว</span><strong className="text-xl text-green-800">{formatBaht(summary.confirmedAmount)}</strong></span>
-                  </div>
-                </Link>
+                </div>
               );
             })}
           </div>
         </div>
       )}
-      {priceGroups.size > 0 && (
-        <div className="mb-6">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-2xl font-bold text-green-900 md:text-3xl">ประเภทการจองตามราคา</h2>
-            {filtersActive && <Link href={`/admin/bookings${customerName ? `?name=${encodeURIComponent(customerName)}` : ""}`} className="text-base font-medium text-green-800 hover:underline md:text-lg">แสดงทั้งหมด</Link>}
+      <div id="bookings" className="scroll-mt-4">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-green-900 md:text-3xl">
+              รายละเอียดการจอง {selectedMatchSummary?.matchLabel ?? "ทุกแมตช์"}
+              {selectedZone ? ` · ${selectedZoneSummary?.zoneName ?? `โซน ${selectedZone}`}` : " · ทุกโซน"}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600 md:text-base">แสดงสูงสุด 100 รายการ · ไม่รวมรายการที่ยกเลิกและหมดเวลา</p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[...priceGroups.entries()].sort(([a], [b]) => a - b).map(([price, summary]) => (
-              <Link key={price} href={`/admin/bookings?price=${price}${customerName ? `&name=${encodeURIComponent(customerName)}` : ""}`} className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${selectedPrice === price ? "border-yellow-400 bg-yellow-50" : "border-green-100 bg-white"}`}>
-                <p className="text-sm font-bold uppercase tracking-widest text-slate-500 md:text-base">ราคาต่อใบ</p>
-                <p className="mt-1 text-3xl font-black text-green-900 md:text-4xl">{formatBaht(price)}</p>
-                <p className="mt-2 text-base text-slate-600 md:text-lg">{summary.bookings} รายการ · {summary.tickets} ใบ</p>
-              </Link>
-            ))}
-          </div>
+          {selectedZone && selectedMatchId && (
+            <Link
+              href={`/admin/bookings?matchId=${encodeURIComponent(selectedMatchId)}${customerName ? `&name=${encodeURIComponent(customerName)}` : ""}#bookings`}
+              className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-sm font-semibold text-green-900 hover:bg-green-50 md:text-base"
+            >
+              ดูทุกโซนของแมตช์นี้
+            </Link>
+          )}
         </div>
-      )}
-      <div className="mb-6">
-        <h2 className="mb-3 text-2xl font-bold text-green-900 md:text-3xl">ข้อมูลการจองโซนทีมเยือน</h2>
-        <Link
-          href={`/admin/bookings?zone=AWAY${customerName ? `&name=${encodeURIComponent(customerName)}` : ""}`}
-          aria-current={selectedZone === "AWAY" ? "page" : undefined}
-          className={`block max-w-sm rounded-xl border bg-violet-50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${selectedZone === "AWAY" ? "border-violet-600 ring-2 ring-violet-200" : "border-violet-200"}`}
-        >
-          <p className="text-sm font-bold uppercase tracking-widest text-violet-700 md:text-base">โซนทีมเยือน</p>
-          <p className="mt-1 text-3xl font-black text-violet-950 md:text-4xl">{awayZoneSummary.tickets} ใบ</p>
-          <p className="mt-2 text-base text-violet-800 md:text-lg">{awayZoneSummary.bookings} รายการจอง</p>
-        </Link>
-      </div>
-      <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-lg border bg-white shadow-sm" role="tabpanel">
         <table className="w-full min-w-[1250px] text-base md:text-lg">
           <thead className="border-b bg-slate-50 text-sm uppercase md:text-base">
             <tr>
@@ -358,6 +427,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

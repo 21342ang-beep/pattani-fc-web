@@ -353,33 +353,78 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const barcodeLockKey = `season-pass-barcode:${pass.id}`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${barcodeLockKey}))::text AS lock_result`;
+      const currentPass = await tx.seasonPassBarcode.findUnique({
+        where: { id: pass.id },
+        include: {
+          order: {
+            select: {
+              id: true,
+              status: true,
+              passCode: true,
+              customerName: true,
+              customerPhone: true,
+              customerEmail: true,
+              seatZone: true,
+            },
+          },
+        },
+      });
+      if (!currentPass) throw new Error("NOT_FOUND");
+      if (currentPass.tierId === "vvip-elite" && currentPass.isGenerated && !currentPass.order) {
+        throw new Error("UNREGISTERED");
+      }
+      if (!currentPass.order || currentPass.order.status !== "CONFIRMED") {
+        throw new Error("INACTIVE");
+      }
+      if (consumesLeagueUse && currentPass.usesRemaining <= 0) {
+        throw new Error("EXHAUSTED");
+      }
+
       if (consumesLeagueUse) {
         const consumed = await tx.seasonPassBarcode.updateMany({
-          where: { id: pass.id, usesRemaining: { gt: 0 } },
+          where: {
+            id: currentPass.id,
+            orderId: currentPass.order.id,
+            usesRemaining: { gt: 0 },
+          },
           data: { usesRemaining: { decrement: 1 } },
         });
         if (consumed.count !== 1) throw new Error("EXHAUSTED");
       }
       const scan = await tx.seasonPassScan.create({
-        data: { barcodeId: pass.id, matchId, scannedBy: user.id },
+        data: { barcodeId: currentPass.id, matchId, scannedBy: user.id },
         select: { id: true, barcode: { select: { usesRemaining: true } } },
       });
-      return { usesRemaining: scan.barcode.usesRemaining, scanId: scan.id };
+      return {
+        usesRemaining: scan.barcode.usesRemaining,
+        scanId: scan.id,
+        passCode: currentPass.order.passCode,
+        customerName: currentPass.order.customerName,
+        customerPhone: currentPass.order.customerPhone,
+        customerEmail: currentPass.order.customerEmail,
+        seatZone: currentPass.order.seatZone,
+        tierId: currentPass.tierId,
+      };
     });
     return {
       ok: true,
-      passCode: order.passCode,
-      customerName: order.customerName,
-      customerPhoneLast4: phoneLast4(order.customerPhone),
-      customerEmail: order.customerEmail,
-      seatZone: order.seatZone,
-      tierId: pass.tierId,
+      passCode: result.passCode,
+      customerName: result.customerName,
+      customerPhoneLast4: phoneLast4(result.customerPhone),
+      customerEmail: result.customerEmail,
+      seatZone: result.seatZone,
+      tierId: result.tierId,
       usesRemaining: result.usesRemaining,
       scanId: result.scanId,
       competitionType: match.competitionType,
     };
   } catch (error) {
     if (error instanceof Error && error.message === "EXHAUSTED") return { ok: false, error: "EXHAUSTED" };
+    if (error instanceof Error && error.message === "NOT_FOUND") return { ok: false, error: "NOT_FOUND" };
+    if (error instanceof Error && error.message === "UNREGISTERED") return { ok: false, error: "UNREGISTERED" };
+    if (error instanceof Error && error.message === "INACTIVE") return { ok: false, error: "INACTIVE" };
     // PostgreSQL unique index [barcodeId, matchId] is the final duplicate guard.
     return { ok: false, error: "DUPLICATE" };
   }

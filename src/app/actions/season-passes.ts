@@ -24,6 +24,8 @@ import {
 import {
   calculateSeasonPassZoneRanges,
   formatSeasonPassSequence,
+  getSeasonPassZoneBarcodeBounds,
+  seasonPassBarcodeIsWithinBounds,
 } from "@/lib/season-pass-zone-ranges";
 import {
   activeSeasonPassOrderWhere,
@@ -457,6 +459,7 @@ const editSeasonPassSchema = z
     seatZone: z.union([z.enum(SEASON_PASS_SEAT_ZONES), z.literal("")]),
     seatNumber: z.string().trim().toUpperCase().max(30).optional().or(z.literal("")),
     barcode: z.string().trim().toUpperCase().max(50).optional().or(z.literal("")),
+    confirmZoneTransfer: z.enum(["yes"]).optional(),
     shirtSize: z.enum(SEASON_PASS_SHIRT_SIZES).optional().or(z.literal("")),
     deliveryMethod: z.enum(["SHIPPING", "PICKUP"] as const),
     shipAddress: z.string().trim().max(300).optional().or(z.literal("")),
@@ -500,7 +503,7 @@ export async function updateSeasonPassOrder(
 
   const input = parsed.data;
   try {
-    await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`season-order-edit:${input.orderId}`}))`;
       const order = await tx.seasonPassOrder.findUnique({
         where: { id: input.orderId },
@@ -526,47 +529,149 @@ export async function updateSeasonPassOrder(
       const tier = SEASON_TIERS.find((item) => item.id === order.tierId);
       const isOfflineVvip = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
       const canDeferStaffZone = ["vvip-elite", "vip-advanced"].includes(order.tierId) && order.salesChannel === "OFFLINE";
-      if (!tier || (!input.seatZone && !canDeferStaffZone) || (input.seatZone && !tier.allowedSeatZones.includes(input.seatZone))) {
+      if (
+        !tier ||
+        (!input.seatZone && (!canDeferStaffZone || Boolean(order.barcode))) ||
+        (input.seatZone && !tier.allowedSeatZones.includes(input.seatZone))
+      ) {
         throw new Error("INVALID_ZONE");
       }
       if (order.tierId === "vvip-elite" && !input.seatNumber && !isOfflineVvip) {
         throw new Error("SEAT_REQUIRED");
       }
 
-      if (order.seatZone !== input.seatZone && input.seatZone && ["PENDING", "CONFIRMED"].includes(order.status)) {
-        const quotaLockKey = `${order.seasonLabel}:${order.tierId}:${input.seatZone}`;
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))::text AS lock_result`;
-        const quotas = await tx.seasonPassZoneQuota.findMany({
+      const zoneChanged = order.seatZone !== input.seatZone;
+      let configuredQuotas: {
+        seatZone: string;
+        totalSeats: number;
+        sponsorReserved: number;
+      }[] | null = null;
+      let destinationBarcodeBounds: ReturnType<typeof getSeasonPassZoneBarcodeBounds> = null;
+
+      if (zoneChanged && input.seatZone) {
+        if (order.barcode && input.confirmZoneTransfer !== "yes") {
+          throw new Error("ZONE_TRANSFER_CONFIRMATION_REQUIRED");
+        }
+
+        const zonesToLock = [...new Set([order.seatZone, input.seatZone].filter(Boolean))].sort();
+        for (const seatZone of zonesToLock) {
+          const quotaLockKey = `${order.seasonLabel}:${order.tierId}:${seatZone}`;
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))::text AS lock_result`;
+        }
+
+        configuredQuotas = await tx.seasonPassZoneQuota.findMany({
           where: {
             seasonLabel: order.seasonLabel,
             tierId: order.tierId,
             seatZone: { in: [...tier.allowedSeatZones] },
           },
         });
-        if (quotas.length === tier.allowedSeatZones.length) {
-          const quota = quotas.find((item) => item.seatZone === input.seatZone);
+        destinationBarcodeBounds = getSeasonPassZoneBarcodeBounds(
+          `PFC26-${tier.priceBaht}-`,
+          tier.allowedSeatZones,
+          configuredQuotas,
+          input.seatZone,
+        );
+
+        if (configuredQuotas.length === tier.allowedSeatZones.length) {
+          const quota = configuredQuotas.find((item) => item.seatZone === input.seatZone);
           const limit = quota ? Math.max(0, quota.totalSeats - quota.sponsorReserved) : 0;
-          const active = await tx.seasonPassOrder.count({
-            where: {
-              id: { not: order.id },
-              seasonLabel: order.seasonLabel,
-              tierId: order.tierId,
-              seatZone: input.seatZone,
-              ...activeSeasonPassOrderWhere(),
-            },
-          });
-          if (active >= limit) throw new Error("ZONE_SOLD_OUT");
+          if (["PENDING", "CONFIRMED"].includes(order.status)) {
+            const active = await tx.seasonPassOrder.count({
+              where: {
+                id: { not: order.id },
+                seasonLabel: order.seasonLabel,
+                tierId: order.tierId,
+                seatZone: input.seatZone,
+                ...activeSeasonPassOrderWhere(),
+              },
+            });
+            if (active >= limit) throw new Error("ZONE_SOLD_OUT");
+          }
+        }
+
+        if (order.barcode && !destinationBarcodeBounds) {
+          throw new Error("ZONE_BARCODE_RANGE_UNCONFIGURED");
         }
       }
 
       let assignedBarcode = order.barcode;
-      if (isOfflineVvip && input.barcode && input.barcode !== order.barcode?.barcode) {
+      if (zoneChanged && input.seatZone && order.barcode) {
+        const barcodeLockKey = `season-pass-barcode:${order.barcode.id}`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${barcodeLockKey}))::text AS lock_result`;
+        const scanCount = await tx.seasonPassScan.count({
+          where: { barcodeId: order.barcode.id },
+        });
+        if (scanCount > 0) throw new Error("BARCODE_HAS_SCANS");
+        if (!destinationBarcodeBounds || destinationBarcodeBounds.publicSeatCount <= 0) {
+          throw new Error("BARCODE_UNAVAILABLE");
+        }
+
+        const availableBarcode = await tx.seasonPassBarcode.findFirst({
+          where: {
+            tierId: order.tierId,
+            seasonLabel: order.seasonLabel,
+            isGenerated: true,
+            orderId: null,
+            barcode: {
+              gte: destinationBarcodeBounds.lowerBound,
+              lte: destinationBarcodeBounds.upperBound,
+            },
+            scans: { none: {} },
+          },
+          orderBy: { barcode: "asc" },
+          select: { id: true, barcode: true },
+        });
+        if (!availableBarcode) throw new Error("BARCODE_UNAVAILABLE");
+
+        await tx.seasonPassBarcode.update({
+          where: { id: order.barcode.id },
+          data: {
+            orderId: null,
+            assignedAt: null,
+            usesRemaining: SEASON_MATCHES,
+          },
+        });
+        const claimed = await tx.seasonPassBarcode.updateMany({
+          where: { id: availableBarcode.id, orderId: null, isGenerated: true },
+          data: { orderId: order.id, assignedAt: new Date(), usesRemaining: SEASON_MATCHES },
+        });
+        if (claimed.count !== 1) throw new Error("BARCODE_UNAVAILABLE");
+        assignedBarcode = availableBarcode;
+      } else if (isOfflineVvip && input.barcode && input.barcode !== order.barcode?.barcode) {
         if (order.barcode) {
+          const barcodeLockKey = `season-pass-barcode:${order.barcode.id}`;
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${barcodeLockKey}))::text AS lock_result`;
           const scanCount = await tx.seasonPassScan.count({
             where: { barcodeId: order.barcode.id },
           });
           if (scanCount > 0) throw new Error("BARCODE_HAS_SCANS");
         }
+
+        if (!configuredQuotas) {
+          configuredQuotas = await tx.seasonPassZoneQuota.findMany({
+            where: {
+              seasonLabel: order.seasonLabel,
+              tierId: order.tierId,
+              seatZone: { in: [...tier.allowedSeatZones] },
+            },
+          });
+        }
+        destinationBarcodeBounds = input.seatZone
+          ? getSeasonPassZoneBarcodeBounds(
+              `PFC26-${tier.priceBaht}-`,
+              tier.allowedSeatZones,
+              configuredQuotas,
+              input.seatZone,
+            )
+          : null;
+        if (
+          destinationBarcodeBounds &&
+          !seasonPassBarcodeIsWithinBounds(input.barcode, destinationBarcodeBounds)
+        ) {
+          throw new Error("BARCODE_OUTSIDE_ZONE");
+        }
+
         const availableBarcode = await tx.seasonPassBarcode.findFirst({
           where: {
             barcode: input.barcode,
@@ -598,42 +703,33 @@ export async function updateSeasonPassOrder(
       }
       if (order.tierId === "vip-advanced" && order.salesChannel === "OFFLINE" && !order.barcode && input.seatZone) {
         const barcodePrefix = `PFC26-${tier.priceBaht}-`;
-        const configuredQuotas = await tx.seasonPassZoneQuota.findMany({
-          where: {
-            seasonLabel: order.seasonLabel,
-            tierId: order.tierId,
-            seatZone: { in: [...tier.allowedSeatZones] },
-          },
-        });
-        const hasCompleteZoneAllocation = configuredQuotas.length === tier.allowedSeatZones.length;
-        const zoneRanges = hasCompleteZoneAllocation
-          ? calculateSeasonPassZoneRanges(tier.allowedSeatZones, configuredQuotas)
-          : [];
-        const selectedRange = zoneRanges.find((range) => range.seatZone === input.seatZone);
-        const legacyPublicSaleLimit = hasCompleteZoneAllocation ? null : getSeasonPublicSaleLimit(tier);
-        const barcodeLowerBound = selectedRange
-          ? `${barcodePrefix}${formatSeasonPassSequence(selectedRange.publicStartSequence)}`
-          : null;
-        const barcodeUpperBound = selectedRange
-          ? `${barcodePrefix}${formatSeasonPassSequence(selectedRange.publicEndSequence)}`
-          : legacyPublicSaleLimit == null
-            ? null
-            : `${barcodePrefix}${formatSeasonPassSequence(legacyPublicSaleLimit)}`;
+        if (!configuredQuotas) {
+          configuredQuotas = await tx.seasonPassZoneQuota.findMany({
+            where: {
+              seasonLabel: order.seasonLabel,
+              tierId: order.tierId,
+              seatZone: { in: [...tier.allowedSeatZones] },
+            },
+          });
+        }
+        destinationBarcodeBounds = getSeasonPassZoneBarcodeBounds(
+          barcodePrefix,
+          tier.allowedSeatZones,
+          configuredQuotas,
+          input.seatZone,
+        );
+        if (!destinationBarcodeBounds) throw new Error("ZONE_BARCODE_RANGE_UNCONFIGURED");
         const availableBarcode = await tx.seasonPassBarcode.findFirst({
           where: {
             tierId: order.tierId,
             seasonLabel: order.seasonLabel,
             isGenerated: true,
             orderId: null,
-            ...(barcodeUpperBound
-              ? {
-                  barcode: {
-                    startsWith: barcodePrefix,
-                    ...(barcodeLowerBound ? { gte: barcodeLowerBound } : {}),
-                    lte: barcodeUpperBound,
-                  },
-                }
-              : { barcode: { startsWith: barcodePrefix } }),
+            barcode: {
+              gte: destinationBarcodeBounds.lowerBound,
+              lte: destinationBarcodeBounds.upperBound,
+            },
+            scans: { none: {} },
           },
           orderBy: { barcode: "asc" },
           select: { id: true, barcode: true },
@@ -648,7 +744,7 @@ export async function updateSeasonPassOrder(
       }
 
       const detailsComplete = Boolean(input.seatZone && assignedBarcode);
-      await tx.seasonPassOrder.update({
+      const updatedOrder = await tx.seasonPassOrder.update({
         where: { id: order.id },
         data: {
           customerId: linkedCustomer ? linkedCustomer.id : order.customerId,
@@ -668,16 +764,24 @@ export async function updateSeasonPassOrder(
           ...(order.salesChannel === "OFFLINE" ? { paymentMethod: input.paymentMethod } : {}),
           offlineReceiptNo: order.salesChannel === "OFFLINE" ? input.offlineReceiptNo || null : order.offlineReceiptNo,
           notes: input.notes || null,
-          ...(canDeferStaffZone && assignedBarcode ? { passCode: assignedBarcode.barcode } : {}),
+          ...(assignedBarcode && assignedBarcode.barcode !== order.passCode
+            ? { passCode: assignedBarcode.barcode }
+            : {}),
           ...(canDeferStaffZone && order.status === "PENDING" && detailsComplete ? { status: "CONFIRMED" } : {}),
         },
+        select: { passCode: true },
       });
+      return { oldPassCode: order.passCode, newPassCode: updatedOrder.passCode };
     });
     revalidatePath("/admin/season-passes");
     revalidatePath("/admin/season-passes/check");
     revalidatePath("/admin/season-passes/staff");
     revalidatePath("/admin/members");
     revalidatePath("/member");
+    revalidatePath(`/tickets/season/${result.oldPassCode}`);
+    if (result.newPassCode !== result.oldPassCode) {
+      revalidatePath(`/tickets/season/${result.newPassCode}`);
+    }
     revalidateTag("bookings", { expire: 0 });
     revalidateSeatAvailability();
     return { ok: true };
@@ -690,6 +794,15 @@ export async function updateSeasonPassOrder(
     if (error instanceof Error && error.message === "ZONE_SOLD_OUT") return { ok: false, error: "โซนที่เลือกเต็มตามโควตาแล้ว" };
     if (error instanceof Error && error.message === "BARCODE_UNAVAILABLE") return { ok: false, error: "บาร์โค้ดนี้ไม่พร้อมใช้งานหรือถูกจองไปแล้ว" };
     if (error instanceof Error && error.message === "BARCODE_HAS_SCANS") return { ok: false, error: "ไม่สามารถเปลี่ยนบาร์โค้ดที่มีประวัติการสแกนแล้วได้ เพื่อป้องกันข้อมูลการใช้งานสูญหาย" };
+    if (error instanceof Error && error.message === "ZONE_TRANSFER_CONFIRMATION_REQUIRED") {
+      return { ok: false, error: "กรุณายืนยันการย้ายโซนและการเปลี่ยนบาร์โค้ดก่อนบันทึก" };
+    }
+    if (error instanceof Error && error.message === "ZONE_BARCODE_RANGE_UNCONFIGURED") {
+      return { ok: false, error: "ยังไม่ได้กำหนดช่วงเลขบาร์โค้ดของทุกโซนในแพ็กเกจนี้ จึงยังย้ายโซนอย่างปลอดภัยไม่ได้" };
+    }
+    if (error instanceof Error && error.message === "BARCODE_OUTSIDE_ZONE") {
+      return { ok: false, error: "เลขบาร์โค้ดที่เลือกไม่อยู่ในช่วงเลขของโซนนี้" };
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { ok: false, error: "หมายเลขที่นั่งนี้ถูกใช้งานแล้ว" };
     }

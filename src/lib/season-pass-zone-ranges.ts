@@ -46,3 +46,45 @@ export function calculateSeasonPassZoneRanges(
 export function formatSeasonPassSequence(sequence: number) {
   return String(sequence).padStart(4, "0");
 }
+
+export type SeasonPassZoneBarcodeBounds = {
+  seatZone: string;
+  lowerBound: string;
+  upperBound: string;
+  publicSeatCount: number;
+};
+
+/**
+ * Resolves the public barcode interval owned by one zone. A null result means
+ * the package does not have a complete zone allocation, so callers must not
+ * guess a zone from a package-wide barcode sequence.
+ */
+export function getSeasonPassZoneBarcodeBounds(
+  barcodePrefix: string,
+  orderedSeatZones: readonly string[],
+  quotas: readonly SeasonPassZoneQuotaInput[],
+  seatZone: string,
+): SeasonPassZoneBarcodeBounds | null {
+  const range = calculateSeasonPassZoneRanges(orderedSeatZones, quotas).find(
+    (item) => item.seatZone === seatZone,
+  );
+  if (!range) return null;
+
+  return {
+    seatZone,
+    lowerBound: `${barcodePrefix}${formatSeasonPassSequence(range.publicStartSequence)}`,
+    upperBound: `${barcodePrefix}${formatSeasonPassSequence(range.publicEndSequence)}`,
+    publicSeatCount: range.publicSeatCount,
+  };
+}
+
+export function seasonPassBarcodeIsWithinBounds(
+  barcode: string,
+  bounds: SeasonPassZoneBarcodeBounds,
+): boolean {
+  return (
+    bounds.publicSeatCount > 0 &&
+    barcode >= bounds.lowerBound &&
+    barcode <= bounds.upperBound
+  );
+}
