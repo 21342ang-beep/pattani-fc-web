@@ -1767,6 +1767,10 @@ if [ -e "$BUILD_CACHE_PATH" ] || [ -L "$BUILD_CACHE_PATH" ]; then
     echo "Build cache is missing or unsafe; refusing credential cleanup."
     exit 1
   fi
+  if [ "$(stat -c '%d' "$BUILD_CACHE_REAL")" != "$(stat -c '%d' "$BUILD_NEXT_REAL")" ]; then
+    echo "Build cache is mounted on an unexpected filesystem."
+    exit 1
+  fi
   find "$BUILD_CACHE_REAL" -xdev -depth -delete
 fi
 
@@ -1795,9 +1799,24 @@ for build_secret_index in "${!build_secret_labels[@]}"; do
     exit 1
   fi
 
-  mapfile -d '' -t build_secret_matches < <(
-    grep -R -F -l -Z -- "$build_only_secret" "$BUILD_WORK/.next" 2>/dev/null || true
-  )
+  build_secret_match_file=$(mktemp "$ARTIFACT_BACKUP_ROOT/.secret-scan.XXXXXX")
+  chmod 600 "$build_secret_match_file"
+  if grep -r -F -l -Z -- "$build_only_secret" "$BUILD_WORK/.next" \
+      > "$build_secret_match_file" 2>/dev/null; then
+    build_secret_scan_status=0
+  else
+    build_secret_scan_status=$?
+  fi
+  if [ "$build_secret_scan_status" -gt 1 ]; then
+    unlink "$build_secret_match_file"
+    echo "Credential scan failed while checking: $build_secret_label"
+    exit 1
+  fi
+  build_secret_matches=()
+  if [ "$build_secret_scan_status" = "0" ]; then
+    mapfile -d '' -t build_secret_matches < "$build_secret_match_file"
+  fi
+  unlink "$build_secret_match_file"
   if [ "${#build_secret_matches[@]}" -gt 0 ]; then
     build_secret_scan_failed=1
     echo "Build-only credential match: $build_secret_label"
@@ -1878,7 +1897,8 @@ NODE_MODULES_SWAP_ARMED=1
 NEXT_SWAP_ARMED=1
 ARTIFACT_SWAP_STARTED=1
 install -m 600 /dev/null "$ARTIFACT_TRANSACTION_MARKER"
-printf 'phase=artifact-swap\nbackup_dir=%s\nstage_dir=%s\nnode_modules_old_present=%s\nnext_old_present=%s\n' \
+printf 'phase=artifact-swap\nnginx_snapshot=%s\nbackup_file=%s\nbackup_dir=%s\nstage_dir=%s\nnode_modules_old_present=%s\nnext_old_present=%s\n' \
+  "$NGINX_SNAPSHOT_DIR" "$BACKUP_FILE" \
   "$ARTIFACT_BACKUP_DIR" "$ARTIFACT_STAGE_DIR" \
   "$NODE_MODULES_OLD_PRESENT" "$NEXT_OLD_PRESENT" \
   > "$ARTIFACT_TRANSACTION_MARKER"
@@ -1931,7 +1951,8 @@ find "$APP_DIR/public/uploads" -type d -exec chmod 2750 {} +
 find "$APP_DIR/public/uploads" -type f -exec chmod 0640 {} +
 chown root:"$SERVICE_USER" "$APP_DIR/.env.local" "$APP_DIR/.env"
 chmod 640 "$APP_DIR/.env.local" "$APP_DIR/.env"
-UNEXPECTED_GROUP_WRITABLE=$(find "$APP_DIR" -xdev -group "$SERVICE_USER" -perm -0020 -print -quit)
+UNEXPECTED_GROUP_WRITABLE=$(find "$APP_DIR" -xdev \( -type f -o -type d \) \
+  -group "$SERVICE_USER" -perm -0020 -print -quit)
 if [ -n "$UNEXPECTED_GROUP_WRITABLE" ]; then
   echo "Runtime service group can still modify release content: $UNEXPECTED_GROUP_WRITABLE"
   exit 1
