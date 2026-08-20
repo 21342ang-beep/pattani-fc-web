@@ -2041,7 +2041,7 @@ MEDIA_CANARY="$APP_DIR/public/uploads/security-media-canary.txt"
 printf 'pattani-media-ok\n' > "$MEDIA_CANARY"
 chown "$SERVICE_USER:$MEDIA_GROUP" "$MEDIA_CANARY"
 chmod 0640 "$MEDIA_CANARY"
-if ! runuser -u "$NGINX_USER" -- test -r "$MEDIA_CANARY"; then
+if ! runuser -u "$NGINX_USER" -- head -c 1 "$MEDIA_CANARY" >/dev/null; then
   fail_closed_after_database_change "nginx cannot read CMS uploads through the dedicated media group."
 fi
 run_as_app pm2 save
