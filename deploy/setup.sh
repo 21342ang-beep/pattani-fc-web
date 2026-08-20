@@ -1748,6 +1748,28 @@ run_in_build env \
 pkill -KILL -u "$BUILD_USER" 2>/dev/null || true
 destroy_isolated_build_database
 
+# Turbopack's filesystem cache contains build-time environment values. It is
+# not a runtime artifact, this deployment always builds from a fresh workspace,
+# and an empty writable runtime cache is created after the atomic swap below.
+# Remove only the validated in-workspace cache before scanning every remaining
+# published artifact for build-only credentials.
+BUILD_NEXT_REAL=$(realpath -e "$BUILD_WORK/.next" 2>/dev/null || true)
+if [ -L "$BUILD_WORK/.next" ] || [ ! -d "$BUILD_WORK/.next" ] || \
+   [ "$BUILD_NEXT_REAL" != "$BUILD_WORK_REAL/.next" ]; then
+  echo "Build output directory is missing or unsafe before credential scan."
+  exit 1
+fi
+BUILD_CACHE_PATH="$BUILD_WORK/.next/cache"
+if [ -e "$BUILD_CACHE_PATH" ] || [ -L "$BUILD_CACHE_PATH" ]; then
+  BUILD_CACHE_REAL=$(realpath -e "$BUILD_CACHE_PATH" 2>/dev/null || true)
+  if [ -L "$BUILD_CACHE_PATH" ] || [ ! -d "$BUILD_CACHE_PATH" ] || \
+     [ "$BUILD_CACHE_REAL" != "$BUILD_NEXT_REAL/cache" ]; then
+    echo "Build cache is missing or unsafe; refusing credential cleanup."
+    exit 1
+  fi
+  find "$BUILD_CACHE_REAL" -xdev -depth -delete
+fi
+
 build_secret_labels=(
   BUILD_DB_PASSWORD
   BUILD_SESSION_SECRET
