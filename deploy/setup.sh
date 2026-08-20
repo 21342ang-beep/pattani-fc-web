@@ -1748,19 +1748,50 @@ run_in_build env \
 pkill -KILL -u "$BUILD_USER" 2>/dev/null || true
 destroy_isolated_build_database
 
-for build_only_secret in \
-  "$BUILD_DB_PASSWORD" \
-  "$BUILD_SESSION_SECRET" \
-  "$BUILD_PAYLOAD_SECRET" \
-  "$BUILD_GATE_SECRET" \
-  "$BUILD_BARCODE_SECRET" \
-  "$BUILD_RATE_SECRET"; do
-  if grep -R -F -q -- "$build_only_secret" "$BUILD_WORK/.next"; then
-    echo "A build-only credential was embedded in the Next.js output."
-    echo "Refusing to publish the artifact; remove build-time secret inlining first."
+build_secret_labels=(
+  BUILD_DB_PASSWORD
+  BUILD_SESSION_SECRET
+  BUILD_PAYLOAD_SECRET
+  BUILD_GATE_SECRET
+  BUILD_BARCODE_SECRET
+  BUILD_RATE_SECRET
+)
+build_secret_values=(
+  "$BUILD_DB_PASSWORD"
+  "$BUILD_SESSION_SECRET"
+  "$BUILD_PAYLOAD_SECRET"
+  "$BUILD_GATE_SECRET"
+  "$BUILD_BARCODE_SECRET"
+  "$BUILD_RATE_SECRET"
+)
+build_secret_scan_failed=0
+for build_secret_index in "${!build_secret_labels[@]}"; do
+  build_secret_label="${build_secret_labels[$build_secret_index]}"
+  build_only_secret="${build_secret_values[$build_secret_index]}"
+  if [ -z "$build_only_secret" ]; then
+    echo "Build-only credential is unexpectedly empty: $build_secret_label"
     exit 1
   fi
+
+  mapfile -d '' -t build_secret_matches < <(
+    grep -R -F -l -Z -- "$build_only_secret" "$BUILD_WORK/.next" 2>/dev/null || true
+  )
+  if [ "${#build_secret_matches[@]}" -gt 0 ]; then
+    build_secret_scan_failed=1
+    echo "Build-only credential match: $build_secret_label"
+    for build_secret_match in "${build_secret_matches[@]:0:20}"; do
+      echo "  artifact: ${build_secret_match#"$BUILD_WORK/"}"
+    done
+    if [ "${#build_secret_matches[@]}" -gt 20 ]; then
+      echo "  ... and $((${#build_secret_matches[@]} - 20)) more artifact(s)"
+    fi
+  fi
 done
+if [ "$build_secret_scan_failed" = "1" ]; then
+  echo "A build-only credential was embedded in the Next.js output."
+  echo "Refusing to publish the artifact; remove build-time secret inlining first."
+  exit 1
+fi
 
 for built_artifact in "$BUILD_WORK/node_modules" "$BUILD_WORK/.next"; do
   if [ ! -d "$built_artifact" ] || [ -L "$built_artifact" ]; then
