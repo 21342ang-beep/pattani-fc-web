@@ -4,7 +4,9 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyPermission } from "@/lib/dal";
+import { verifyPermission, verifySuperAdmin } from "@/lib/dal";
+import { rateLimit } from "@/lib/rate-limit";
+import { hasRetainedCustomerHistory } from "@/lib/customer-deletion-policy";
 
 const updateMemberSchema = z.object({
   name: z
@@ -30,6 +32,7 @@ const updateMemberSchema = z.object({
       message: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
     }),
   confirmPassword: z.string().max(200, "รหัสผ่านยาวเกินไป"),
+  adminPassword: z.string().max(200, "รหัสผ่านผู้ดูแลยาวเกินไป"),
 }).refine((data) => data.password === data.confirmPassword, {
   path: ["confirmPassword"],
   message: "ยืนยันรหัสผ่านไม่ตรงกัน",
@@ -52,7 +55,7 @@ export async function updateMember(
   _prev: MemberFormState,
   formData: FormData,
 ): Promise<MemberFormState> {
-  await verifyPermission("MEMBER_DATA");
+  const actor = await verifyPermission("MEMBER_DATA");
   if (!validMemberId(memberId)) return { error: "รหัสสมาชิกไม่ถูกต้อง" };
 
   const parsed = updateMemberSchema.safeParse({
@@ -61,9 +64,50 @@ export async function updateMember(
     phone: formData.get("phone"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
+    adminPassword: formData.get("adminPassword"),
   });
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  if (parsed.data.password && actor.role !== "SUPER_ADMIN") {
+    return {
+      fieldErrors: {
+        password: ["เฉพาะผู้ดูแลสูงสุดเท่านั้นที่ตั้งรหัสผ่านใหม่ให้สมาชิกได้"],
+      },
+    };
+  }
+  if (parsed.data.password) {
+    if (!parsed.data.adminPassword) {
+      return {
+        fieldErrors: {
+          adminPassword: ["กรอกรหัสผ่านปัจจุบันของผู้ดูแลเพื่อยืนยัน"],
+        },
+      };
+    }
+    const stepUpLimit = await rateLimit("member_admin_password_stepup", {
+      max: 5,
+      windowMs: 15 * 60_000,
+      ip: actor.id,
+    });
+    if (!stepUpLimit.ok) {
+      return { error: "ยืนยันสิทธิ์บ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่" };
+    }
+    const adminCredential = await prisma.user.findUnique({
+      where: { id: actor.id },
+      select: { passwordHash: true },
+    });
+    const validAdminPassword = await bcrypt.compare(
+      parsed.data.adminPassword,
+      adminCredential?.passwordHash ??
+        "$2b$12$QZJ/HRFVLd4HnZLjo8OBU.j8KD14Szu.WVM20ciuOHbEESySgkRN.",
+    );
+    if (!validAdminPassword) {
+      return {
+        fieldErrors: {
+          adminPassword: ["รหัสผ่านผู้ดูแลไม่ถูกต้อง"],
+        },
+      };
+    }
   }
 
   const current = await prisma.customer.findUnique({
@@ -109,6 +153,10 @@ export async function updateMember(
           email: parsed.data.email,
           phone,
           passwordHash,
+          authVersion:
+            passwordHash || emailChanged || phoneChanged
+              ? { increment: 1 }
+              : undefined,
           emailVerifiedAt: emailChanged ? null : undefined,
           phoneVerifiedAt: phoneChanged ? null : undefined,
         },
@@ -126,21 +174,57 @@ export async function updateMember(
   return { ok: true };
 }
 
-// ลบข้อมูลสมาชิก แต่เก็บประวัติการซื้อบัตรรายปีไว้และตัดการเชื่อมต่อกับบัญชีเดิม
+// Hard-delete is reserved for unused accounts. Unlinking retained records would
+// let a future account with the same email/phone claim the old tickets.
 export async function deleteMember(memberId: string): Promise<{ ok: true } | { error: string }> {
-  await verifyPermission("MEMBER_DATA");
+  await verifySuperAdmin();
   if (!validMemberId(memberId)) {
     return { error: "รหัสสมาชิกไม่ถูกต้อง" };
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.seasonPassOrder.updateMany({
-        where: { customerId: memberId },
-        data: { customerId: null },
-      });
+    const outcome = await prisma.$transaction(async (tx) => {
+      // Season-pass customerId fields are legacy strings without a foreign
+      // key, so an owner-row lock alone cannot stop a concurrent association.
+      // This brief write lock makes count + delete atomic across every retained
+      // history table. It never blocks read-only sales/admin pages.
+      await tx.$executeRaw`SET LOCAL lock_timeout TO '3s'`;
+      await tx.$executeRaw`
+        LOCK TABLE "Booking", "SeasonPassPurchase", "SeasonPassOrder"
+        IN SHARE ROW EXCLUSIVE MODE
+      `;
+      const owner = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "Customer"
+        WHERE "id" = ${memberId}
+        FOR UPDATE
+      `;
+      if (!owner[0]) return "not-found" as const;
+
+      const [bookings, seasonPassPurchases, seasonPassOrders] = await Promise.all([
+        tx.booking.count({ where: { customerId: memberId } }),
+        tx.seasonPassPurchase.count({ where: { customerId: memberId } }),
+        tx.seasonPassOrder.count({ where: { customerId: memberId } }),
+      ]);
+      if (
+        hasRetainedCustomerHistory({
+          bookings,
+          seasonPassPurchases,
+          seasonPassOrders,
+        })
+      ) {
+        return "has-history" as const;
+      }
+
       await tx.customer.delete({ where: { id: memberId } });
+      return "deleted" as const;
     });
+    if (outcome === "not-found") return { error: "ไม่พบสมาชิกบัญชีนี้" };
+    if (outcome === "has-history") {
+      return {
+        error:
+          "ลบบัญชีนี้ไม่ได้ เนื่องจากมีประวัติการจองหรือตั๋วอยู่ กรุณาเก็บบัญชีไว้เพื่อป้องกันผู้อื่นอ้างสิทธิ์รายการเดิม",
+      };
+    }
     revalidatePath("/admin/members");
     return { ok: true };
   } catch {

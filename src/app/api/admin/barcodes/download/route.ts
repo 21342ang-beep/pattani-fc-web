@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getAdminUser, hasPermission } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { withSeasonPassBarcodePrintSize } from "@/lib/season-pass-barcode-svg";
+import { createSeasonPassGateToken } from "@/lib/season-pass-gate-token";
 
 const inputSchema = z.object({
   tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"]),
@@ -28,23 +29,28 @@ export async function POST(request: Request) {
     orderBy: { barcode: "asc" },
     skip: parsed.data.offset,
     take: DOWNLOAD_BATCH_SIZE,
-    select: { barcode: true },
+    select: {
+      id: true,
+      barcode: true,
+      gateVersion: true,
+      gateNonce: true,
+    },
   });
   if (records.length === 0) {
     return new Response("Barcode not found", { status: 404 });
   }
 
   const zip = createZip(
-    records.map(({ barcode }) => ({
-      name: `${barcode}.svg`,
+    records.map((record) => ({
+      name: `${record.barcode}.svg`,
       content: Buffer.from(
         withSeasonPassBarcodePrintSize(
           bwipjs.toSVG({
             bcid: "code128",
-            text: barcode,
+            text: createSeasonPassGateToken(record),
             scale: 2,
             height: 12,
-            includetext: true,
+            includetext: false,
           }),
         ),
         "utf8",

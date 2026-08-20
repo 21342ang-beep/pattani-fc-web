@@ -3,6 +3,10 @@ import "server-only";
 const XENDIT_API_VERSION = "2024-11-11";
 const XENDIT_BASE_URL = "https://api.xendit.co";
 
+export function xenditLegacyPaymentsEnabled(): boolean {
+  return process.env.ENABLE_XENDIT_LEGACY_PAYMENTS === "true";
+}
+
 type XenditAction = {
   type?: string;
   descriptor?: string;
@@ -45,6 +49,7 @@ export async function createPromptPayPaymentRequest(input: {
       metadata: { source: "pattani-fc-ticketing" },
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
   });
 
   const body = (await response.json().catch(() => null)) as XenditPaymentRequest | null;

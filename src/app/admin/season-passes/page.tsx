@@ -16,6 +16,7 @@ import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
 import { compareSeasonPassOrders } from "@/lib/season-pass-order-sort";
 import SeasonPassExpiryRefresh from "./SeasonPassExpiryRefresh";
+import SeasonPassSalesCalendar from "./SeasonPassSalesCalendar";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "บัตรรายปี — Admin" };
@@ -28,11 +29,11 @@ const statusColor: Record<string, string> = {
 };
 
 export default async function AdminSeasonPassesPage(props: {
-  searchParams: Promise<{ tier?: string; zone?: string }>;
+  searchParams: Promise<{ tier?: string; zone?: string; month?: string; date?: string }>;
 }) {
   await verifyPermission("SEASON_PASSES");
   await expirePendingSeasonPassPurchases();
-  const { tier: rawTier, zone: rawZone } = await props.searchParams;
+  const { tier: rawTier, zone: rawZone, month: rawMonth, date: rawDate } = await props.searchParams;
   const saleTiers = SEASON_TIERS;
   const selectedTier = saleTiers.some((tier) => tier.id === rawTier)
     ? (rawTier as SeasonTierId)
@@ -146,6 +147,14 @@ export default async function AdminSeasonPassesPage(props: {
           accent="green"
         />
       </div>
+
+      <SeasonPassSalesCalendar
+        orders={orders.filter((order) => order.status === "CONFIRMED")}
+        rawMonth={rawMonth}
+        rawDate={rawDate}
+        selectedTier={selectedTier}
+        selectedZone={selectedZone}
+      />
 
       <section className="mb-6">
         <div className="mb-3 flex items-center justify-between gap-3">

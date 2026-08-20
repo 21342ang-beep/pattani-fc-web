@@ -13,7 +13,7 @@ export default function DeleteMemberButton({ memberId, memberName }: { memberId:
       type="button"
       disabled={pending}
       onClick={() => {
-        if (!confirm(`ยืนยันลบสมาชิก ${memberName}?\n\nการลบไม่สามารถกู้คืนได้ แต่ประวัติการซื้อบัตรจะยังคงอยู่`)) return;
+        if (!confirm(`ยืนยันลบสมาชิก ${memberName}?\n\nลบได้เฉพาะบัญชีที่ไม่เคยมีประวัติการจองหรือตั๋ว และไม่สามารถกู้คืนได้`)) return;
         startTransition(async () => {
           const result = await deleteMember(memberId);
           if ("error" in result) alert(result.error);

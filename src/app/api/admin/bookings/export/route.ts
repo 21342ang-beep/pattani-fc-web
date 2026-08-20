@@ -1,17 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { getAdminUser, hasPermission } from "@/lib/dal";
 import { expirePendingBookings } from "@/lib/booking-expiry";
+import { escapeCsvCell } from "@/lib/csv";
 
 export const dynamic = "force-dynamic";
-
-function csvEscape(v: string | number | null | undefined): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v);
-  if (/[",\n\r]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
 
 export async function GET() {
   const user = await getAdminUser();
@@ -70,7 +62,7 @@ export async function GET() {
       b.soldAt?.toISOString() ?? "",
       b.notes ?? "",
     ]
-      .map(csvEscape)
+      .map(escapeCsvCell)
       .join(",")
   );
 

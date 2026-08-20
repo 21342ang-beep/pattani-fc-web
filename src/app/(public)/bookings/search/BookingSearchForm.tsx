@@ -45,7 +45,18 @@ function BookingSearchFlow({ onStartOver, locale }: { onStartOver: () => void; l
     : null;
 
   if (results) {
-    return <BookingResults results={results} onStartOver={onStartOver} locale={locale} />;
+    return (
+      <BookingResults
+        results={results}
+        phoneLinkWarning={
+          verifyState && "verified" in verifyState
+            ? verifyState.phoneLinkWarning
+            : undefined
+        }
+        onStartOver={onStartOver}
+        locale={locale}
+      />
+    );
   }
 
   if (request) {
@@ -111,10 +122,12 @@ function BookingSearchFlow({ onStartOver, locale }: { onStartOver: () => void; l
 
 function BookingResults({
   results,
+  phoneLinkWarning,
   onStartOver,
   locale,
 }: {
   results: BookingSearchResults;
+  phoneLinkWarning?: string;
   onStartOver: () => void;
   locale: Locale;
 }) {
@@ -125,6 +138,11 @@ function BookingResults({
 
   return (
     <section>
+      {phoneLinkWarning && (
+        <p className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+          {phoneLinkWarning}
+        </p>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-black text-green-900 md:text-2xl">{t("พบทั้งหมด", "Found")} {totalTicketCount} {t("ใบ", "tickets")}</h2>
@@ -179,9 +197,11 @@ function BookingResults({
                     </div>
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-800">{order.status}</span>
                   </div>
-                  <a href={`/api/season-passes/${encodeURIComponent(order.passCode)}/barcode`} className="mt-4 inline-flex items-center gap-2 rounded-full bg-green-800 px-5 py-2.5 text-base font-bold text-yellow-300 hover:bg-green-900 md:text-lg">
+                  {order.barcodeAccessToken ? (
+                  <a href={`/api/season-passes/${encodeURIComponent(order.passCode)}/barcode?token=${encodeURIComponent(order.barcodeAccessToken)}`} className="mt-4 inline-flex items-center gap-2 rounded-full bg-green-800 px-5 py-2.5 text-base font-bold text-yellow-300 hover:bg-green-900 md:text-lg">
                     <Ticket className="size-5" /> {t("เปิดบาร์โค้ดบัตรรายปี", "Open Season Pass Barcode")}
                   </a>
+                  ) : null}
                 </article>
               ))
             )}

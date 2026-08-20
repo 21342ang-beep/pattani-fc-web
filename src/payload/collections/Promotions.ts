@@ -1,4 +1,9 @@
 import type { CollectionConfig } from "payload";
+import {
+  contentManagersOnly,
+  hideFromNonContentManagers,
+  activeContentRead,
+} from "../access";
 
 export const Promotions: CollectionConfig = {
   slug: "promotions",
@@ -7,12 +12,13 @@ export const Promotions: CollectionConfig = {
     useAsTitle: "title",
     group: "กิจกรรม",
     defaultColumns: ["title", "type", "startAt", "endAt", "active"],
+    hidden: hideFromNonContentManagers,
   },
   access: {
-    read: () => true,
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: activeContentRead,
+    create: contentManagersOnly,
+    update: contentManagersOnly,
+    delete: contentManagersOnly,
   },
   fields: [
     { name: "title", type: "text", label: "ชื่อกิจกรรม", required: true },

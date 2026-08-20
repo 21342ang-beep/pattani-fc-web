@@ -1,10 +1,14 @@
 import "server-only";
 import { buildRedirectUri } from "@/lib/oauth";
+import {
+  mergeVerifiedLineProfile,
+  validateVerifiedLineClaims,
+} from "@/lib/oauth-line-policy";
+import { fetchOAuthProvider } from "@/lib/oauth-network";
 
-// LINE Login v2.1 (OpenID Connect-based)
-// scope: profile + openid + (email — ต้องขอ approve จาก LINE)
-// email อาจไม่มาถ้ายังไม่ approve → ใช้ userId (sub) เป็นหลัก
-
+// LINE Login v2.1 uses OpenID Connect. Email may be absent when the LINE
+// channel has not been approved for the email scope, so the verified `sub` is
+// always the authoritative provider identity.
 const AUTH_URL = "https://access.line.me/oauth2/v2.1/authorize";
 const TOKEN_URL = "https://api.line.me/oauth2/v2.1/token";
 const PROFILE_URL = "https://api.line.me/v2/profile";
@@ -18,7 +22,9 @@ function requireCreds() {
   const clientId = process.env.LINE_CHANNEL_ID;
   const clientSecret = process.env.LINE_CHANNEL_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error("LINE OAuth ยังไม่ได้ตั้งค่า (LINE_CHANNEL_ID / SECRET)");
+    throw new Error(
+      "LINE OAuth is not configured (LINE_CHANNEL_ID / LINE_CHANNEL_SECRET)",
+    );
   }
   return { clientId, clientSecret };
 }
@@ -42,22 +48,12 @@ export type LineProfile = {
   name: string | null;
 };
 
-// LINE id_token คือ JWT — decode payload ตรง ๆ (verify แล้วผ่าน /verify)
-function decodeIdTokenPayload(idToken: string): Record<string, unknown> | null {
-  const parts = idToken.split(".");
-  if (parts.length !== 3) return null;
-  try {
-    const json = Buffer.from(parts[1], "base64url").toString("utf8");
-    return JSON.parse(json) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-export async function fetchLineProfile(code: string): Promise<LineProfile> {
+export async function fetchLineProfile(
+  code: string,
+  expectedNonce: string,
+): Promise<LineProfile> {
   const { clientId, clientSecret } = requireCreds();
 
-  // 1) exchange code → access + id token
   const tokenBody = new URLSearchParams({
     grant_type: "authorization_code",
     code,
@@ -65,7 +61,7 @@ export async function fetchLineProfile(code: string): Promise<LineProfile> {
     client_id: clientId,
     client_secret: clientSecret,
   });
-  const tokenRes = await fetch(TOKEN_URL, {
+  const tokenRes = await fetchOAuthProvider(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: tokenBody,
@@ -78,51 +74,37 @@ export async function fetchLineProfile(code: string): Promise<LineProfile> {
     id_token?: string;
   };
   if (!token.access_token) throw new Error("no access_token from LINE");
+  if (!token.id_token) throw new Error("no id_token from LINE");
 
-  // 2) verify + decode id_token (มี email + sub + name เมื่อ scope=openid+email)
-  let email: string | null = null;
-  let name: string | null = null;
-  let sub: string | null = null;
-  if (token.id_token) {
-    const verifyBody = new URLSearchParams({
-      id_token: token.id_token,
-      client_id: clientId,
-    });
-    const verifyRes = await fetch(VERIFY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: verifyBody,
-    });
-    if (verifyRes.ok) {
-      const payload = decodeIdTokenPayload(token.id_token);
-      if (payload) {
-        if (typeof payload.sub === "string") sub = payload.sub;
-        if (typeof payload.email === "string") email = payload.email.toLowerCase();
-        if (typeof payload.name === "string") name = payload.name;
-      }
-    }
+  // Trust only the claims returned by LINE's verification endpoint. Locally
+  // decoding the JWT payload would not authenticate the claims.
+  const verifyBody = new URLSearchParams({
+    id_token: token.id_token,
+    client_id: clientId,
+  });
+  const verifyRes = await fetchOAuthProvider(VERIFY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: verifyBody,
+  });
+  if (!verifyRes.ok) {
+    throw new Error(`LINE ID token verification failed: ${verifyRes.status}`);
   }
+  const verifiedClaims = (await verifyRes.json()) as Record<string, unknown>;
+  let identity = validateVerifiedLineClaims(verifiedClaims, expectedNonce);
 
-  // 3) fallback — เรียก /v2/profile ด้วย access_token ถ้ายังขาด sub/name
-  if (!sub || !name) {
-    const profileRes = await fetch(PROFILE_URL, {
+  // The access-token profile may fill a missing display name, but only after
+  // proving it belongs to the exact same subject as the verified ID token.
+  if (!identity.name) {
+    const profileRes = await fetchOAuthProvider(PROFILE_URL, {
       headers: { Authorization: `Bearer ${token.access_token}` },
     });
-    if (profileRes.ok) {
-      const profile = (await profileRes.json()) as {
-        userId?: string;
-        displayName?: string;
-      };
-      if (!sub && profile.userId) sub = profile.userId;
-      if (!name && profile.displayName) name = profile.displayName;
+    if (!profileRes.ok) {
+      throw new Error(`LINE profile fetch failed: ${profileRes.status}`);
     }
+    const profile = (await profileRes.json()) as Record<string, unknown>;
+    identity = mergeVerifiedLineProfile(identity, profile);
   }
 
-  if (!sub) throw new Error("no userId from LINE");
-
-  return {
-    providerAccountId: sub,
-    email,
-    name,
-  };
+  return identity;
 }

@@ -1,6 +1,9 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -8,11 +11,26 @@ import {
   createCustomerSession,
   deleteCustomerSession,
 } from "@/lib/customer-session";
+import { clearBookingAccessCookies } from "@/lib/booking-access-cookies";
 import { rateLimit } from "@/lib/rate-limit";
+import { getVerifiedPhoneOwnerIds } from "@/lib/customer-phone-ownership";
 import { createOAuthState, getSafeReturnTo } from "@/lib/oauth";
 import { buildGoogleAuthUrl, isGoogleConfigured } from "@/lib/oauth-google";
 import { buildLineAuthUrl, isLineConfigured } from "@/lib/oauth-line";
 import { verifyRegistrationTurnstile } from "@/lib/turnstile";
+import {
+  CUSTOMER_REGISTRATION_MAX_OTP_ATTEMPTS,
+  CUSTOMER_REGISTRATION_OTP_TTL_MS,
+  normalizeRegistrationPhone,
+  passwordRegistrationSecurityPlan,
+  registrationChallengeActivationEligible,
+} from "@/lib/customer-registration-policy";
+
+const REGISTRATION_COOKIE = "customer_registration";
+const REGISTRATION_GENERIC_ERROR =
+  "ไม่สามารถเริ่มการสมัครสมาชิกได้ กรุณาตรวจสอบข้อมูลหรือลองใหม่ภายหลัง";
+const REGISTRATION_OTP_GENERIC_ERROR =
+  "รหัส OTP ไม่ถูกต้อง หมดอายุ หรือคำขอถูกใช้งานแล้ว กรุณาขอรหัสใหม่";
 
 const registerSchema = z.object({
   name: z.string().trim().min(2, "กรอกชื่อ-นามสกุลให้ครบ").max(100),
@@ -21,8 +39,7 @@ const registerSchema = z.object({
     .trim()
     .toLowerCase()
     .email("อีเมลไม่ถูกต้อง")
-    .optional()
-    .or(z.literal("")),
+    .max(200, "อีเมลยาวเกินไป"),
   phone: z
     .string()
     .trim()
@@ -39,8 +56,8 @@ const registerSchema = z.object({
     }, "วันเกิดไม่ถูกต้อง"),
   // รองรับเลขที่บ้านสั้น เช่น 73/1 หรือ 1/1
   address: z.string().trim().min(3, "กรุณากรอกที่อยู่").max(500),
-  province: z.string().trim().min(1, "กรุณาเลือกจังหวัด"),
-  district: z.string().trim().min(1, "กรุณาเลือกอำเภอ/เขต"),
+  province: z.string().trim().min(1, "กรุณาเลือกจังหวัด").max(100),
+  district: z.string().trim().min(1, "กรุณาเลือกอำเภอ/เขต").max(100),
   postalCode: z.string().regex(/^\d{5}$/, "กรุณาเลือกรหัสไปรษณีย์"),
   password: z
     .string()
@@ -62,11 +79,48 @@ const loginSchema = z.object({
   password: z.string().min(1, "กรุณากรอกรหัสผ่าน").max(200),
 });
 
+const registrationPinSchema = z.string().trim().regex(/^\d{4,8}$/);
+
+function registrationOtpCredentials() {
+  const key = process.env.THAIBULKSMS_OTP_KEY?.trim();
+  const secret = process.env.THAIBULKSMS_OTP_SECRET?.trim();
+  return key && secret ? { key, secret } : null;
+}
+
+function registrationProviderValue(data: unknown, key: string): string | null {
+  if (!data || typeof data !== "object") return null;
+  const value = (data as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+async function registrationOtpProviderRequest(
+  path: "/v2/otp/request" | "/v2/otp/verify",
+  values: Record<string, string>,
+) {
+  const response = await fetch(`https://otp.thaibulksms.com${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(values),
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+  });
+  const data: unknown = await response.json().catch(() => null);
+  return { response, data };
+}
+
+function maskedRegistrationPhone(phone: string): string {
+  return phone.replace(/^(\d{3})\d{4}(\d{3})$/, "$1****$2");
+}
+
 export type CustomerAuthState =
   | {
       error?: string;
       fieldErrors?: Partial<Record<string, string>>;
       redirectTo?: string;
+      otpRequired?: true;
+      maskedPhone?: string;
+      reference?: string | null;
+      registered?: true;
     }
   | undefined;
 
@@ -120,7 +174,6 @@ export async function registerCustomer(
   }
 
   const { name, email, phone, gender, birthDate, address, province, district, postalCode, password } = parsed.data;
-  const accountEmail = email || `member-${crypto.randomUUID()}@accounts.pattanifc.local`;
 
   // ── โหมดผูก Google / LINE ──
   // validate ครบแล้ว → hash รหัสผ่าน, ฝากข้อมูลไว้ใน OAuth state (signed cookie),
@@ -157,49 +210,331 @@ export async function registerCustomer(
     redirect(authUrl); // absolute/external URL — server action ตอบ 303
   }
 
-  // ── โหมดสมัครด้วยรหัสผ่าน (email/password) ──
-  // กัน race: ตรวจซ้ำก่อน แล้ว create — error code P2002 จะกันได้อีกชั้น
-  const existing = email ? await prisma.customer.findUnique({ where: { email } }) : null;
-  if (existing) {
+  // ── โหมดสมัครด้วยรหัสผ่าน: ขั้นที่ 1 — ส่ง OTP เท่านั้น ──
+  // Keep all pending data in a short-lived server-side row. There is no
+  // Customer and no authenticated session until verifyCustomerRegistrationOtp.
+  const normalizedPhone = normalizeRegistrationPhone(phone);
+  if (!normalizedPhone) {
     return {
-      error: "อีเมลนี้ถูกใช้งานแล้ว",
-      fieldErrors: { email: "อีเมลนี้ถูกใช้งานแล้ว" },
+      error: "กรุณาตรวจสอบข้อมูล",
+      fieldErrors: { phone: "กรุณากรอกเบอร์มือถือไทย 10 หลัก" },
     };
   }
+  const phoneLimit = await rateLimit("customer_registration_phone", {
+    max: 3,
+    windowMs: 15 * 60_000,
+    ip: normalizedPhone,
+  });
+  if (!phoneLimit.ok) return { error: REGISTRATION_GENERIC_ERROR };
 
+  const credentials = registrationOtpCredentials();
+  if (!credentials) return { error: "ระบบ OTP ยังไม่พร้อมใช้งาน" };
+
+  // Hash before the ownership lookups so duplicate/non-duplicate responses do
+  // not differ by one expensive bcrypt operation.
   const passwordHash = await bcrypt.hash(password, 12);
+  const [existingEmail, verifiedPhoneOwners] = await Promise.all([
+    prisma.customer.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: { id: true },
+    }),
+    getVerifiedPhoneOwnerIds(normalizedPhone),
+  ]);
+  // Never reveal whether either identifier already belongs to an account.
+  // A duplicate follows the same provider + persisted challenge + OTP UI, but
+  // the immutable eligibility bit prevents activation after proof succeeds.
+  const activationEligible = registrationChallengeActivationEligible({
+    emailAlreadyRegistered: Boolean(existingEmail),
+    verifiedPhoneOwnerCount: verifiedPhoneOwners.length,
+  });
 
   try {
-    const customer = await prisma.customer.create({
-      data: {
-        email: accountEmail,
-        passwordHash,
-        name,
-        phone: phone || null,
-        gender,
-        birthDate: new Date(`${birthDate}T00:00:00.000Z`),
-        address,
-        province,
-        district,
-        postalCode,
-        pdpaConsentAt: new Date(),
+    const { response, data } = await registrationOtpProviderRequest(
+      "/v2/otp/request",
+      {
+        key: credentials.key,
+        secret: credentials.secret,
+        msisdn: normalizedPhone,
       },
-    });
-    await createCustomerSession(customer.id, customer.email, customer.name);
-  } catch (err) {
-    const code = (err as { code?: string }).code;
-    if (code === "P2002") {
-      return {
-        error: "อีเมลนี้ถูกใช้งานแล้ว",
-        fieldErrors: { email: "อีเมลนี้ถูกใช้งานแล้ว" },
-      };
+    );
+    const providerToken = registrationProviderValue(data, "token");
+    if (
+      !response.ok ||
+      registrationProviderValue(data, "status") !== "success" ||
+      !providerToken ||
+      providerToken.length > 4096
+    ) {
+      console.error("Registration OTP provider rejected request", {
+        status: response.status,
+        code: registrationProviderValue(data, "code"),
+      });
+      return { error: REGISTRATION_GENERIC_ERROR };
     }
-    return { error: "เกิดข้อผิดพลาดในการสมัคร กรุณาลองใหม่อีกครั้ง" };
-  }
 
-  // สมัครสำเร็จแล้วให้ Server Action เปลี่ยนหน้าโดยตรง เพื่อให้ cookie session
-  // และปลายทางการจองถูกใช้งานใน response เดียวกัน (ไม่พึ่ง client-side effect)
-  redirect(returnTo ?? "/member");
+    const challengeId = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + CUSTOMER_REGISTRATION_OTP_TTL_MS);
+    const reference = registrationProviderValue(data, "refno")?.slice(0, 100) ?? null;
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      // Bounded opportunistic cleanup keeps abandoned challenges from growing
+      // indefinitely without turning one request into an unbounded delete.
+      await tx.$executeRaw`
+        WITH expired AS (
+          SELECT "id" FROM "CustomerRegistrationChallenge"
+          WHERE "expiresAt" <= NOW()
+          ORDER BY "expiresAt" ASC
+          LIMIT 100
+        )
+        DELETE FROM "CustomerRegistrationChallenge"
+        WHERE "id" IN (SELECT "id" FROM expired)
+      `;
+      await tx.customerRegistrationChallenge.create({
+        data: {
+          id: challengeId,
+          email,
+          passwordHash,
+          name,
+          phone: normalizedPhone,
+          gender,
+          birthDate: new Date(`${birthDate}T00:00:00.000Z`),
+          address,
+          province,
+          district,
+          postalCode,
+          pdpaConsentAt: now,
+          providerToken,
+          reference,
+          returnTo,
+          activationEligible,
+          expiresAt,
+        },
+      });
+    });
+    (await cookies()).set(REGISTRATION_COOKIE, challengeId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/register",
+      expires: expiresAt,
+    });
+    return {
+      otpRequired: true,
+      maskedPhone: maskedRegistrationPhone(normalizedPhone),
+      reference,
+    };
+  } catch (error) {
+    console.error("Registration challenge could not be created", {
+      code:
+        typeof error === "object" && error && "code" in error
+          ? String(error.code)
+          : "unknown",
+    });
+    return { error: REGISTRATION_GENERIC_ERROR };
+  }
+}
+
+export async function verifyCustomerRegistrationOtp(
+  _prev: CustomerAuthState,
+  formData: FormData,
+): Promise<CustomerAuthState> {
+  const ipLimit = await rateLimit("customer_registration_otp_verify", {
+    max: 8,
+    windowMs: 15 * 60_000,
+  });
+  if (!ipLimit.ok) return { error: REGISTRATION_OTP_GENERIC_ERROR };
+
+  const parsedPin = registrationPinSchema.safeParse(formData.get("pin"));
+  if (!parsedPin.success) return { error: REGISTRATION_OTP_GENERIC_ERROR };
+  const credentials = registrationOtpCredentials();
+  if (!credentials) return { error: "ระบบ OTP ยังไม่พร้อมใช้งาน" };
+
+  const cookieStore = await cookies();
+  const challengeId = cookieStore.get(REGISTRATION_COOKIE)?.value;
+  if (!challengeId || !/^[A-Za-z0-9_-]{43}$/.test(challengeId)) {
+    return { error: REGISTRATION_OTP_GENERIC_ERROR };
+  }
+  const challengeLimit = await rateLimit("customer_registration_otp_challenge", {
+    max: CUSTOMER_REGISTRATION_MAX_OTP_ATTEMPTS,
+    windowMs: CUSTOMER_REGISTRATION_OTP_TTL_MS,
+    ip: challengeId,
+  });
+  if (!challengeLimit.ok) return { error: REGISTRATION_OTP_GENERIC_ERROR };
+
+  let attempts: { id: string; phone: string; providerToken: string }[];
+  try {
+    attempts = await prisma.$queryRaw<{
+      id: string;
+      phone: string;
+      providerToken: string;
+    }[]>`
+      UPDATE "CustomerRegistrationChallenge"
+      SET "attempts" = "attempts" + 1
+      WHERE "id" = ${challengeId}
+        AND "expiresAt" > NOW()
+        AND "completedAt" IS NULL
+        AND "attempts" < ${CUSTOMER_REGISTRATION_MAX_OTP_ATTEMPTS}
+      RETURNING "id", "phone", "providerToken"
+    `;
+  } catch {
+    return { error: REGISTRATION_OTP_GENERIC_ERROR };
+  }
+  const attempt = attempts[0];
+  if (!attempt) return { error: REGISTRATION_OTP_GENERIC_ERROR };
+
+  const phoneLimit = await rateLimit("customer_registration_otp_phone_verify", {
+    max: CUSTOMER_REGISTRATION_MAX_OTP_ATTEMPTS,
+    windowMs: 15 * 60_000,
+    ip: attempt.phone,
+  });
+  if (!phoneLimit.ok) return { error: REGISTRATION_OTP_GENERIC_ERROR };
+
+  try {
+    const { response, data } = await registrationOtpProviderRequest(
+      "/v2/otp/verify",
+      {
+        key: credentials.key,
+        secret: credentials.secret,
+        token: attempt.providerToken,
+        pin: parsedPin.data,
+      },
+    );
+    const otpVerified =
+      response.ok && registrationProviderValue(data, "status") === "success";
+    if (!otpVerified) return { error: REGISTRATION_OTP_GENERIC_ERROR };
+
+    const verifiedAt = new Date();
+    const activated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`customer-phone:${attempt.phone}`}))`,
+      );
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "CustomerRegistrationChallenge"
+        WHERE "id" = ${attempt.id}
+          AND "expiresAt" > NOW()
+          AND "completedAt" IS NULL
+        FOR UPDATE
+      `;
+      if (!locked[0]) return null;
+      const challenge = await tx.customerRegistrationChallenge.findUnique({
+        where: { id: attempt.id },
+      });
+      if (!challenge) return null;
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`customer-email:${challenge.email.toLowerCase()}`}))`,
+      );
+
+      const activationPlan = passwordRegistrationSecurityPlan({
+        challengeActive: true,
+        activationEligible: challenge.activationEligible,
+        otpVerified,
+        verifiedAt,
+      });
+      if (
+        !activationPlan.createCustomer ||
+        !activationPlan.issueCustomerSession ||
+        !activationPlan.trustPhoneForRecovery ||
+        !activationPlan.phoneVerifiedAt
+      ) {
+        await tx.customerRegistrationChallenge.delete({
+          where: { id: challenge.id },
+        });
+        return null;
+      }
+
+      const [emailOwner, phoneOwners] = await Promise.all([
+        tx.customer.findFirst({
+          where: { email: { equals: challenge.email, mode: "insensitive" } },
+          select: { id: true },
+        }),
+        tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+          SELECT "id" FROM "Customer"
+          WHERE "phoneVerifiedAt" IS NOT NULL
+            AND (
+              regexp_replace(coalesce("phone", ''), '\\D', '', 'g') = ${challenge.phone}
+              OR regexp_replace(coalesce("phone", ''), '\\D', '', 'g') = ${`66${challenge.phone.slice(1)}`}
+            )
+          LIMIT 1
+        `),
+      ]);
+      if (emailOwner || phoneOwners.length > 0) {
+        await tx.customerRegistrationChallenge.delete({
+          where: { id: challenge.id },
+        });
+        return null;
+      }
+
+      const customer = await tx.customer.create({
+        data: {
+          email: challenge.email,
+          passwordHash: challenge.passwordHash,
+          name: challenge.name,
+          phone: challenge.phone,
+          phoneVerifiedAt: activationPlan.phoneVerifiedAt,
+          gender: challenge.gender,
+          birthDate: challenge.birthDate,
+          address: challenge.address,
+          province: challenge.province,
+          district: challenge.district,
+          postalCode: challenge.postalCode,
+          pdpaConsentAt: challenge.pdpaConsentAt,
+        },
+        select: { id: true, email: true, name: true, authVersion: true },
+      });
+      await tx.customerRegistrationChallenge.delete({
+        where: { id: challenge.id },
+      });
+      return {
+        ...customer,
+        returnTo: challenge.returnTo,
+      };
+    });
+    cookieStore.delete(REGISTRATION_COOKIE);
+    if (!activated) return { error: REGISTRATION_OTP_GENERIC_ERROR };
+    try {
+      await createCustomerSession(
+        activated.id,
+        activated.email,
+        activated.name,
+        activated.authVersion,
+      );
+      return {
+        registered: true,
+        redirectTo: activated.returnTo ?? "/member",
+      };
+    } catch {
+      // Account + verified recovery phone are already safely activated. If
+      // session issuance races a security change, require a normal login.
+      return { registered: true, redirectTo: "/member/login?registered=1" };
+    }
+  } catch (error) {
+    console.error("Registration OTP verification failed", {
+      code:
+        typeof error === "object" && error && "code" in error
+          ? String(error.code)
+          : "unknown",
+    });
+    return { error: REGISTRATION_OTP_GENERIC_ERROR };
+  }
+}
+
+export async function cancelCustomerRegistrationChallenge(): Promise<void> {
+  const cookieStore = await cookies();
+  const challengeId = cookieStore.get(REGISTRATION_COOKIE)?.value;
+  if (challengeId && /^[A-Za-z0-9_-]{43}$/.test(challengeId)) {
+    try {
+      await prisma.customerRegistrationChallenge.deleteMany({
+        where: { id: challengeId },
+      });
+    } catch (error) {
+      console.error("Registration challenge cancellation cleanup failed", {
+        code:
+          typeof error === "object" && error && "code" in error
+            ? String(error.code).slice(0, 80)
+            : "unknown",
+      });
+    }
+  }
+  cookieStore.delete(REGISTRATION_COOKIE);
 }
 
 export async function loginCustomer(
@@ -226,24 +561,32 @@ export async function loginCustomer(
   }
 
   const identifier = parsed.data.identifier;
+  const loginIdentity = identifier.includes("@")
+    ? identifier.trim().toLowerCase()
+    : identifier.replace(/\D/g, "");
+  const accountRl = await rateLimit("customer_login_account", {
+    max: 10,
+    windowMs: 30 * 60_000,
+    ip: loginIdentity,
+  });
+  if (!accountRl.ok) {
+    return {
+      error: `พยายามเข้าสู่ระบบบ่อยเกินไป ลองอีกครั้งใน ${accountRl.retryAfterSec} วินาที`,
+    };
+  }
   let customer: Awaited<ReturnType<typeof prisma.customer.findUnique>> = null;
   if (identifier.includes("@")) {
     customer = await prisma.customer.findUnique({
       where: { email: identifier.toLowerCase() },
     });
   } else {
-    // เบอร์ถูกเก็บตามที่ผู้ใช้พิมพ์ (มี - เว้นวรรคได้) → เทียบเฉพาะตัวเลขใน DB
-    const digits = identifier.replace(/\D/g, "");
-    if (digits.length >= 9) {
-      const rows = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT id FROM "Customer"
-        WHERE regexp_replace(coalesce("phone", ''), '\\D', '', 'g') = ${digits}
-        ORDER BY "lastLoginAt" DESC NULLS LAST, "createdAt" DESC
-        LIMIT 1
-      `;
-      if (rows.length > 0) {
-        customer = await prisma.customer.findUnique({ where: { id: rows[0].id } });
-      }
+    // A phone number is a login identifier only after OTP verification and
+    // only when it has exactly one owner. Never guess between duplicate rows.
+    const ownerIds = await getVerifiedPhoneOwnerIds(identifier);
+    if (ownerIds.length === 1) {
+      customer = await prisma.customer.findUnique({
+        where: { id: ownerIds[0] },
+      });
     }
   }
   // เปรียบเทียบ password เสมอแม้ user ไม่มี เพื่อกัน timing attack
@@ -276,5 +619,6 @@ export async function loginCustomer(
 
 export async function logoutCustomer(): Promise<void> {
   await deleteCustomerSession();
+  await clearBookingAccessCookies();
   redirect("/");
 }

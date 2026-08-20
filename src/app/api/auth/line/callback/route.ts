@@ -29,7 +29,7 @@ export async function GET(req: Request) {
 
   let profile;
   try {
-    profile = await fetchLineProfile(code);
+    profile = await fetchLineProfile(code, stateData.nonce);
   } catch {
     return NextResponse.redirect(
       errorRedirectUrl(stateData.intent, "provider_fetch_failed"),

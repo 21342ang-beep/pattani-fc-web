@@ -1,62 +1,101 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { parseBeamPaymentReference, verifyBeamSignature } from "@/lib/beam-webhook";
+import {
+  acquirePaymentTargetLock,
+  confirmStoredPaymentTarget,
+  type StoredPaymentTarget,
+} from "@/lib/payment-confirmation";
+import {
+  InvalidJsonBodyError,
+  RequestBodyTooLargeError,
+  jsonNoStore,
+  readRequestBodyLimited,
+} from "@/lib/payment-http";
+import {
+  PAYMENT_REVIEW_STATUS,
+  PAYMENT_SUCCESS_STATUS,
+  paymentCanAutomaticallySucceed,
+  paymentEnvelopeError,
+  paymentStatusAfterFailure,
+  paymentTimestampError,
+  paymentTargetCount,
+} from "@/lib/payment-state";
 import { prisma } from "@/lib/prisma";
-import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export const runtime = "nodejs";
+
+const MAX_WEBHOOK_BODY_BYTES = 64 * 1024;
 
 type BeamPayload = {
   chargeId?: unknown;
   merchantId?: unknown;
   referenceId?: unknown;
   status?: unknown;
+  currency?: unknown;
   amount?: unknown;
   transactionTime?: unknown;
   paymentMethod?: { paymentMethodType?: unknown } | null;
-  order?: { referenceId?: unknown; netAmount?: unknown } | null;
+};
+
+type BeamPaymentRow = StoredPaymentTarget & {
+  id: string;
+  chargeId: string | null;
+  status: string;
+  createdAt: Date;
+  expiresAt: Date | null;
 };
 
 type PaymentDetails = {
-  chargeId: string | null;
+  chargeId: string;
   referenceId: string;
-  amount: number;
+  amount: number | null;
   paymentMethod: string;
-  paidAt: Date;
+  paidAt: Date | null;
+  providerEnvelopeError: string | null;
 };
 
-function paymentDetails(event: string, payload: BeamPayload): PaymentDetails | null {
-  if (event === "payment_link.paid") {
-    if (payload.status !== "PAID" || typeof payload.order?.referenceId !== "string" || !Number.isInteger(payload.order.netAmount)) {
-      return null;
-    }
-    return {
-      chargeId: null,
-      referenceId: payload.order.referenceId,
-      amount: payload.order.netAmount as number,
-      paymentMethod: "BEAM",
-      paidAt: new Date(),
-    };
-  }
+type ProcessingResult =
+  | { outcome: "CONFIRMED"; kind: "booking" | "season"; code: string }
+  | { outcome: "DUPLICATE" }
+  | { outcome: "FAILED_RECORDED" }
+  | { outcome: "REVIEW_REQUIRED"; reason: string }
+  | { outcome: "IGNORED"; reason: string };
 
-  if (event === "charge.succeeded") {
-    if (payload.status !== "SUCCEEDED" || typeof payload.referenceId !== "string" || !Number.isInteger(payload.amount)) {
-      return null;
-    }
-    const method = typeof payload.paymentMethod?.paymentMethodType === "string"
-      ? payload.paymentMethod.paymentMethodType.replace(/[^A-Z0-9_]/gi, "_").toUpperCase().slice(0, 40)
-      : "UNKNOWN";
-    const transactionTime = typeof payload.transactionTime === "string" ? new Date(payload.transactionTime) : new Date();
-    return {
-      chargeId: typeof payload.chargeId === "string" ? payload.chargeId : null,
-      referenceId: payload.referenceId,
-      amount: payload.amount as number,
-      paymentMethod: `BEAM_${method}`,
-      paidAt: Number.isNaN(transactionTime.getTime()) ? new Date() : transactionTime,
-    };
+function successfulPaymentDetails(payload: BeamPayload): PaymentDetails | null {
+  if (
+    payload.status !== "SUCCEEDED" ||
+    typeof payload.chargeId !== "string" ||
+    payload.chargeId.length === 0 ||
+    typeof payload.referenceId !== "string"
+  ) {
+    return null;
   }
-
-  return null;
+  const method = typeof payload.paymentMethod?.paymentMethodType === "string"
+    ? payload.paymentMethod.paymentMethodType.replace(/[^A-Z0-9_]/gi, "_").toUpperCase().slice(0, 40)
+    : "UNKNOWN";
+  const transactionTime = typeof payload.transactionTime === "string"
+    ? new Date(payload.transactionTime)
+    : new Date(Number.NaN);
+  const amount = Number.isSafeInteger(payload.amount) && (payload.amount as number) > 0
+    ? payload.amount as number
+    : null;
+  const paidAt = Number.isNaN(transactionTime.getTime()) ? null : transactionTime;
+  const providerEnvelopeError = payload.currency !== "THB"
+    ? "currency_mismatch"
+    : amount == null
+      ? "invalid_provider_amount"
+      : paidAt == null
+        ? "invalid_payment_timestamp"
+        : null;
+  return {
+    chargeId: payload.chargeId,
+    referenceId: payload.referenceId,
+    amount,
+    paymentMethod: `BEAM_${method}`,
+    paidAt,
+    providerEnvelopeError,
+  };
 }
 
 function revalidatePaymentViews(kind: "booking" | "season", code: string) {
@@ -77,142 +116,247 @@ function revalidatePaymentViews(kind: "booking" | "season", code: string) {
 
 export async function POST(request: Request) {
   const encodedHmacKey = process.env.BEAM_WEBHOOK_HMAC_KEY;
-  if (!encodedHmacKey) {
-    console.error("Beam webhook is not configured: BEAM_WEBHOOK_HMAC_KEY is missing");
+  const merchantId = process.env.BEAM_MERCHANT_ID;
+  if (!encodedHmacKey || !merchantId) {
+    console.error("Beam webhook is not configured");
     return new Response("Webhook is not configured", { status: 503 });
   }
 
-  const rawBody = new Uint8Array(await request.arrayBuffer());
+  let rawBody: Uint8Array;
+  try {
+    rawBody = await readRequestBodyLimited(request, MAX_WEBHOOK_BODY_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return new Response("Webhook payload too large", { status: 413 });
+    }
+    return new Response("Unable to read webhook payload", { status: 400 });
+  }
   if (!verifyBeamSignature(rawBody, request.headers.get("x-beam-signature"), encodedHmacKey)) {
     return new Response("Invalid Beam signature", { status: 401 });
   }
 
   let payload: BeamPayload;
   try {
-    const parsed: unknown = JSON.parse(Buffer.from(rawBody).toString("utf8"));
+    const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(rawBody));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return new Response("Invalid JSON payload", { status: 400 });
+      throw new InvalidJsonBodyError();
     }
     payload = parsed as BeamPayload;
   } catch {
     return new Response("Invalid JSON payload", { status: 400 });
   }
 
-  const event = request.headers.get("x-beam-event") ?? "";
-  const merchantId = process.env.BEAM_MERCHANT_ID;
-  if (merchantId && typeof payload.merchantId === "string" && payload.merchantId !== merchantId) {
+  if (payload.merchantId !== merchantId) {
     return new Response("Invalid Beam merchant", { status: 401 });
   }
 
-  if (event === "charge.failed" && typeof payload.referenceId === "string") {
-    const result = await prisma.$executeRaw(Prisma.sql`UPDATE "BeamPayment"
-      SET "status" = 'FAILED', "chargeId" = COALESCE(${typeof payload.chargeId === "string" ? payload.chargeId : null}, "chargeId"),
-          "updatedAt" = NOW()
-      WHERE "referenceId" = ${payload.referenceId}`);
-    const reference = parseBeamPaymentReference(payload.referenceId);
-    if (reference?.kind === "booking") {
-      const cancelled = await prisma.booking.updateMany({
-        where: {
-          bookingCode: reference.code,
-          status: "PENDING",
-          paymentExpiresAt: { lte: new Date() },
-        },
-        data: { status: "CANCELLED" },
-      });
-      if (cancelled.count > 0) revalidatePaymentViews("booking", reference.code);
-    } else if (reference?.kind === "season") {
-      const cancelled = await expirePendingSeasonPassPurchases({
-        purchaseCode: reference.code,
-        passCode: reference.code,
-      });
-      if (cancelled.count > 0) revalidatePaymentViews("season", reference.code);
-    }
-    return Response.json({ ok: true, processed: result > 0 });
-  }
-
-  const payment = paymentDetails(event, payload);
-  if (!payment) return Response.json({ ok: true, processed: false });
-
-  const reference = parseBeamPaymentReference(payment.referenceId);
-  if (!reference) {
-    console.warn("Ignored Beam payment with an unsupported reference format", { event });
-    return Response.json({ ok: true, processed: false });
-  }
-
-  let updated = 0;
-  await prisma.$executeRaw(Prisma.sql`UPDATE "BeamPayment"
-    SET "status" = 'SUCCEEDED', "chargeId" = COALESCE(${payment.chargeId}, "chargeId"), "updatedAt" = NOW()
-    WHERE "referenceId" = ${payment.referenceId}`);
-  if (reference.kind === "booking") {
-    const result = await prisma.$transaction(async (tx) => {
-      const booking = await tx.booking.findUnique({
-        where: { bookingCode: reference.code },
-        select: { id: true, matchId: true },
-      });
-      if (!booking) return { count: 0 };
-      await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${booking.matchId}`}))`);
-      return tx.booking.updateMany({
-        where: {
-          id: booking.id,
-          status: { in: ["PENDING", "CANCELLED"] },
-          salesChannel: "ONLINE",
-          paidAt: null,
-          totalAmount: payment.amount,
-          // Accept a delayed webhook only when Beam says payment happened
-          // before the exact QR deadline stored on the booking.
-          paymentExpiresAt: { gte: payment.paidAt },
-        },
-        data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod, paidAt: payment.paidAt },
-      });
-    });
-    updated = result.count;
-  } else {
-    const purchase = await prisma.seasonPassPurchase.findUnique({
-      where: { purchaseCode: reference.code },
-      select: { id: true, totalBaht: true, status: true, paymentExpiresAt: true },
-    });
+  const event = request.headers.get("x-beam-event") ?? "";
+  let result: ProcessingResult;
+  if (event === "charge.succeeded") {
+    const details = successfulPaymentDetails(payload);
+    if (!details) return jsonNoStore({ ok: true, processed: false });
+    result = await processSuccessfulCharge(details);
+  } else if (event === "charge.failed") {
     if (
-      purchase?.status === "PENDING" &&
-      purchase.totalBaht * 100 === payment.amount &&
-      (!purchase.paymentExpiresAt || purchase.paymentExpiresAt >= payment.paidAt)
+      payload.status !== "FAILED" ||
+      typeof payload.referenceId !== "string" ||
+      typeof payload.chargeId !== "string"
     ) {
-      const result = await prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`season-purchase:${purchase.id}`}))`;
-        const updatedPurchase = await tx.seasonPassPurchase.updateMany({
-          where: {
-            id: purchase.id,
-            status: "PENDING",
-            OR: [
-              { paymentExpiresAt: null },
-              { paymentExpiresAt: { gte: payment.paidAt } },
-            ],
-          },
-          data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod },
-        });
-        if (updatedPurchase.count > 0) {
-          await tx.seasonPassOrder.updateMany({
-            where: { purchaseId: purchase.id, status: "PENDING" },
-            data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod },
-          });
-        }
-        return updatedPurchase;
-      });
-      updated = result.count;
-    } else if (!purchase) {
-    const order = await prisma.seasonPassOrder.findUnique({
-      where: { passCode: reference.code },
-      select: { id: true, priceBaht: true, shippingFeeBaht: true, status: true },
-    });
-    if (order?.status === "PENDING" && (order.priceBaht + order.shippingFeeBaht) * 100 === payment.amount) {
-      const result = await prisma.seasonPassOrder.updateMany({
-        where: { id: order.id, status: "PENDING" },
-        data: { status: "CONFIRMED", paymentMethod: payment.paymentMethod },
-      });
-      updated = result.count;
+      return jsonNoStore({ ok: true, processed: false });
     }
-    }
+    result = await processFailedCharge(payload.referenceId, payload.chargeId);
+  } else {
+    // This application creates Charge API records only. Payment Link events are
+    // deliberately ignored so an unrelated merchant-side payment link cannot
+    // confirm a Pattani FC booking by choosing a similar reference.
+    return jsonNoStore({ ok: true, processed: false });
   }
 
-  if (updated > 0) revalidatePaymentViews(reference.kind, reference.code);
-  return Response.json({ ok: true, processed: updated > 0 });
+  if (result.outcome === "CONFIRMED") {
+    revalidatePaymentViews(result.kind, result.code);
+  }
+  return jsonNoStore({
+    ok: true,
+    processed: result.outcome !== "IGNORED",
+    reviewRequired: result.outcome === "REVIEW_REQUIRED",
+  });
+}
+
+async function processSuccessfulCharge(details: PaymentDetails): Promise<ProcessingResult> {
+  const reference = parseBeamPaymentReference(details.referenceId);
+  if (!reference) return { outcome: "IGNORED", reason: "unsupported_reference" };
+
+  const preliminary = await prisma.beamPayment.findUnique({
+    where: { referenceId: details.referenceId },
+    select: {
+      id: true,
+      bookingId: true,
+      seasonPassOrderId: true,
+      seasonPassPurchaseId: true,
+      referenceId: true,
+      chargeId: true,
+      amount: true,
+      status: true,
+      createdAt: true,
+      expiresAt: true,
+    },
+  });
+  if (!preliminary) return { outcome: "IGNORED", reason: "payment_not_found" };
+
+  return prisma.$transaction(async (tx) => {
+    await acquirePaymentTargetLock(tx, preliminary);
+    const rows = await tx.$queryRaw<BeamPaymentRow[]>(Prisma.sql`
+      SELECT "id", "bookingId", "seasonPassOrderId", "seasonPassPurchaseId",
+             "referenceId", "chargeId", "amount", "status", "createdAt", "expiresAt"
+      FROM "BeamPayment" WHERE "id" = ${preliminary.id} FOR UPDATE
+    `);
+    const payment = rows[0];
+    if (!payment) return { outcome: "IGNORED", reason: "payment_deleted" } as const;
+
+    const envelopeError = details.providerEnvelopeError ?? paymentEnvelopeError({
+      storedAmount: payment.amount,
+      receivedAmount: details.amount ?? Number.NaN,
+      storedProviderId: payment.chargeId,
+      receivedProviderId: details.chargeId,
+      targetCount: paymentTargetCount(payment),
+    });
+    if (envelopeError) {
+      return markBeamReview(tx, payment, details.chargeId, envelopeError);
+    }
+    const providerOwner = await tx.beamPayment.findUnique({
+      where: { chargeId: details.chargeId },
+      select: { id: true },
+    });
+    if (providerOwner && providerOwner.id !== payment.id) {
+      return markBeamReview(tx, payment, details.chargeId, "provider_id_owned_by_other_payment");
+    }
+    const timestampError = paymentTimestampError({
+      paidAt: details.paidAt!,
+      paymentCreatedAt: payment.createdAt,
+      paymentExpiresAt: payment.expiresAt,
+    });
+    if (timestampError) {
+      return markBeamReview(tx, payment, details.chargeId, timestampError);
+    }
+    if (payment.status === PAYMENT_SUCCESS_STATUS) return { outcome: "DUPLICATE" } as const;
+    if (payment.status === PAYMENT_REVIEW_STATUS) {
+      return { outcome: "REVIEW_REQUIRED", reason: "payment_already_in_review" } as const;
+    }
+    if (!paymentCanAutomaticallySucceed(payment.status)) {
+      return markBeamReview(tx, payment, details.chargeId, `invalid_source_status_${payment.status}`);
+    }
+
+    const confirmation = await confirmStoredPaymentTarget(tx, payment, {
+      reference,
+      paidAt: details.paidAt!,
+      paymentMethod: details.paymentMethod,
+    });
+    if (confirmation.outcome === "REVIEW_REQUIRED") {
+      return markBeamReview(tx, payment, details.chargeId, confirmation.reason);
+    }
+
+    const succeeded = await tx.beamPayment.updateMany({
+      where: { id: payment.id, status: { in: ["INITIATED", "PENDING"] } },
+      data: { status: PAYMENT_SUCCESS_STATUS, chargeId: details.chargeId },
+    });
+    if (succeeded.count !== 1) throw new Error("BEAM_PAYMENT_STATE_CHANGED");
+    return {
+      outcome: "CONFIRMED",
+      kind: confirmation.kind,
+      code: confirmation.code,
+    } as const;
+  });
+}
+
+async function processFailedCharge(
+  referenceId: string,
+  chargeId: string,
+): Promise<ProcessingResult> {
+  const reference = parseBeamPaymentReference(referenceId);
+  if (!reference) return { outcome: "IGNORED", reason: "unsupported_reference" };
+  const preliminary = await prisma.beamPayment.findUnique({
+    where: { referenceId },
+    select: {
+      id: true,
+      bookingId: true,
+      seasonPassOrderId: true,
+      seasonPassPurchaseId: true,
+      referenceId: true,
+      chargeId: true,
+      amount: true,
+      status: true,
+      createdAt: true,
+      expiresAt: true,
+    },
+  });
+  if (!preliminary) return { outcome: "IGNORED", reason: "payment_not_found" };
+
+  return prisma.$transaction(async (tx) => {
+    await acquirePaymentTargetLock(tx, preliminary);
+    const rows = await tx.$queryRaw<BeamPaymentRow[]>(Prisma.sql`
+      SELECT "id", "bookingId", "seasonPassOrderId", "seasonPassPurchaseId",
+             "referenceId", "chargeId", "amount", "status", "createdAt", "expiresAt"
+      FROM "BeamPayment" WHERE "id" = ${preliminary.id} FOR UPDATE
+    `);
+    const payment = rows[0];
+    if (!payment) return { outcome: "IGNORED", reason: "payment_deleted" } as const;
+    if (paymentTargetCount(payment) !== 1) {
+      return markBeamReview(tx, payment, chargeId, "invalid_payment_target");
+    }
+    if (payment.chargeId && payment.chargeId !== chargeId) {
+      return markBeamReview(tx, payment, chargeId, "provider_id_mismatch");
+    }
+    const providerOwner = await tx.beamPayment.findUnique({
+      where: { chargeId },
+      select: { id: true },
+    });
+    if (providerOwner && providerOwner.id !== payment.id) {
+      return markBeamReview(tx, payment, chargeId, "provider_id_owned_by_other_payment");
+    }
+    const nextStatus = paymentStatusAfterFailure(payment.status);
+    if (nextStatus === payment.status) {
+      if (payment.status === PAYMENT_SUCCESS_STATUS) return { outcome: "DUPLICATE" } as const;
+      if (payment.status === PAYMENT_REVIEW_STATUS) {
+        return { outcome: "REVIEW_REQUIRED", reason: "payment_already_in_review" } as const;
+      }
+      return { outcome: "FAILED_RECORDED" } as const;
+    }
+    await tx.beamPayment.update({
+      where: { id: payment.id },
+      data: { status: nextStatus, ...(payment.chargeId ? {} : { chargeId }) },
+    });
+    return { outcome: "FAILED_RECORDED" } as const;
+  });
+}
+
+async function markBeamReview(
+  tx: Prisma.TransactionClient,
+  payment: BeamPaymentRow,
+  chargeId: string,
+  reason: string,
+): Promise<ProcessingResult> {
+  console.warn("Beam payment requires manual review", {
+    paymentRecordId: payment.id,
+    providerChargeId: chargeId,
+    previousStatus: payment.status,
+    reason,
+  });
+  if (payment.status !== PAYMENT_SUCCESS_STATUS) {
+    const providerOwner = payment.chargeId
+      ? null
+      : await tx.beamPayment.findUnique({
+          where: { chargeId },
+          select: { id: true },
+        });
+    await tx.beamPayment.update({
+      where: { id: payment.id },
+      data: {
+        status: PAYMENT_REVIEW_STATUS,
+        ...(!payment.chargeId && (!providerOwner || providerOwner.id === payment.id)
+          ? { chargeId }
+          : {}),
+      },
+    });
+  }
+  return { outcome: "REVIEW_REQUIRED", reason };
 }

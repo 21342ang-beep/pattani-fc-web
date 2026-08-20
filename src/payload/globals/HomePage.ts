@@ -1,4 +1,9 @@
 import type { GlobalConfig } from "payload";
+import {
+  contentManagersOnly,
+  hideFromNonContentManagers,
+  publicRead,
+} from "../access";
 
 export const HomePage: GlobalConfig = {
   slug: "home-page",
@@ -6,10 +11,11 @@ export const HomePage: GlobalConfig = {
   admin: {
     group: "การตั้งค่าเว็บไซต์",
     description: "จัดการสื่อ Mainboard ที่แสดงบนหน้าแรกของเว็บไซต์",
+    hidden: hideFromNonContentManagers,
   },
   access: {
-    read: () => true,
-    update: ({ req }) => Boolean(req.user),
+    read: publicRead,
+    update: contentManagersOnly,
   },
   fields: [
     {

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { prisma } from "@/lib/prisma";
@@ -6,11 +7,12 @@ import { buildPromptPayPayload } from "@/lib/promptpay";
 import { formatBaht } from "@/lib/format";
 import PageHero from "../../../_components/PageHero";
 import PhoneGate from "./PhoneGate";
-import ConfirmPaidButton from "./ConfirmPaidButton";
+import {
+  SHOP_ORDER_ACCESS_COOKIE,
+  verifyShopOrderAccessToken,
+} from "@/lib/shop-order-access";
 
 export const dynamic = "force-dynamic";
-
-const CLUB_PROMPTPAY = "0812345678";
 
 const STATUS_LABEL: Record<string, { th: string; tone: string }> = {
   PENDING: { th: "รอชำระเงิน", tone: "bg-amber-100 text-amber-800" },
@@ -34,21 +36,19 @@ const PAYMENT_LABEL: Record<string, string> = {
   COD: "เก็บปลายทาง",
 };
 
-function normalizePhone(p: string): string {
-  return p.replace(/\D/g, "");
-}
-
 export default async function ShopOrderPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ phone?: string }>;
 }) {
   const { code } = await params;
-  const { phone } = await searchParams;
 
   if (!code || !/^[a-z0-9]+$/i.test(code)) notFound();
+
+  const accessCookie = (await cookies()).get(SHOP_ORDER_ACCESS_COOKIE)?.value;
+  if (!(await verifyShopOrderAccessToken(accessCookie, code))) {
+    return <PhoneGate code={code} />;
+  }
 
   const order = await prisma.shopOrder.findUnique({
     where: { orderCode: code },
@@ -56,20 +56,31 @@ export default async function ShopOrderPage({
   });
   if (!order) notFound();
 
-  if (!phone || normalizePhone(order.customerPhone) !== normalizePhone(phone)) {
-    return <PhoneGate code={code} />;
-  }
-
   const status = STATUS_LABEL[order.status] ?? STATUS_LABEL.PENDING;
   const totalBaht = order.totalAmount / 100;
   const showPaymentBlock = order.status === "PENDING";
-  const showPromptPay = showPaymentBlock && order.paymentMethod === "PROMPTPAY";
-  const showBank = showPaymentBlock && order.paymentMethod === "BANK_TRANSFER";
+  const promptPayTarget = process.env.SHOP_PROMPTPAY_ID?.trim() || null;
+  const bankName = process.env.SHOP_BANK_NAME?.trim() || null;
+  const bankAccount = process.env.SHOP_BANK_ACCOUNT?.trim() || null;
+  const bankAccountName = process.env.SHOP_BANK_ACCOUNT_NAME?.trim() || null;
+  const showPromptPay =
+    showPaymentBlock && order.paymentMethod === "PROMPTPAY" && !!promptPayTarget;
+  const showBank =
+    showPaymentBlock &&
+    order.paymentMethod === "BANK_TRANSFER" &&
+    !!bankName &&
+    !!bankAccount &&
+    !!bankAccountName;
+  const missingOnlinePaymentConfiguration =
+    showPaymentBlock &&
+    order.paymentMethod !== "COD" &&
+    !showPromptPay &&
+    !showBank;
 
   let qrSvg: string | null = null;
   if (showPromptPay) {
     const payload = buildPromptPayPayload({
-      target: CLUB_PROMPTPAY,
+      target: promptPayTarget!,
       amountBaht: totalBaht,
     });
     qrSvg = await QRCode.toString(payload, {
@@ -194,7 +205,7 @@ export default async function ShopOrderPage({
                   สแกน PromptPay
                 </h2>
                 <p className="text-xs text-slate-500">
-                  ยอด {formatBaht(order.totalAmount)} · พร้อมเพย์ {CLUB_PROMPTPAY}
+                  ยอด {formatBaht(order.totalAmount)} · พร้อมเพย์ {promptPayTarget}
                 </p>
                 <div
                   className="mx-auto mt-3 size-56 [&_svg]:h-full [&_svg]:w-full"
@@ -202,7 +213,9 @@ export default async function ShopOrderPage({
                   dangerouslySetInnerHTML={{ __html: qrSvg }}
                   aria-label="PromptPay QR code"
                 />
-                <ConfirmPaidButton orderCode={order.orderCode} phone={order.customerPhone} />
+                <p className="mt-3 text-xs font-semibold text-amber-700">
+                  สถานะชำระแล้วจะอัปเดตจากระบบรับชำระเงินหรือทีมงานเท่านั้น
+                </p>
               </div>
             )}
 
@@ -213,14 +226,19 @@ export default async function ShopOrderPage({
                   ยอดที่ต้องโอน {formatBaht(order.totalAmount)}
                 </p>
                 <dl className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3 text-sm">
-                  <Row label="ธนาคาร" value="กรุงไทย (KTB)" />
-                  <Row label="เลขที่บัญชี" value="123-4-56789-0" />
-                  <Row label="ชื่อบัญชี" value="สโมสรปัตตานี เอฟซี" />
+                  <Row label="ธนาคาร" value={bankName!} />
+                  <Row label="เลขที่บัญชี" value={bankAccount!} />
+                  <Row label="ชื่อบัญชี" value={bankAccountName!} />
                 </dl>
                 <p className="mt-3 text-[11px] text-slate-500">
-                  โอนแล้วกดปุ่ม &quot;ฉันชำระแล้ว&quot; ทีมงานจะตรวจสอบสลิปและอัปเดตสถานะ
+                  หลังโอน กรุณาส่งหลักฐานให้ทีมงาน สถานะจะเปลี่ยนเมื่อทีมงานตรวจสอบแล้ว
                 </p>
-                <ConfirmPaidButton orderCode={order.orderCode} phone={order.customerPhone} />
+              </div>
+            )}
+
+            {missingOnlinePaymentConfiguration && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
+                ช่องทางรับชำระเงินของร้านค้ายังไม่พร้อม กรุณาอย่าโอนเงินและติดต่อทีมงาน
               </div>
             )}
 

@@ -20,6 +20,7 @@ import {
   calculateSeasonPassZoneRanges,
   formatSeasonPassSequence,
 } from "@/lib/season-pass-zone-ranges";
+import { secureSeasonPassGateAssignment } from "@/lib/season-pass-gate-state";
 
 const staffSeasonPassSchema = z
   .object({
@@ -221,6 +222,7 @@ export async function registerStaffSeasonPass(
             orderId: order.id,
             assignedAt: new Date(),
             usesRemaining: SEASON_MATCHES,
+            ...secureSeasonPassGateAssignment(),
           },
         });
         if (claimed.count !== 1) throw new Error("SOLD_OUT");

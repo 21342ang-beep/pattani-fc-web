@@ -5,9 +5,16 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { activeBookingStatusWhere, newBookingPaymentDeadline } from "@/lib/booking-expiry";
+import { cancellablePendingBookingWhere } from "@/lib/booking-expiry-policy";
 import { bookingCreateSchema } from "@/lib/validations";
-import { verifyPermission } from "@/lib/dal";
-import { readCustomerSession } from "@/lib/customer-session";
+import { verifyPermission, verifySuperAdmin } from "@/lib/dal";
+import { getOptionalCustomer } from "@/lib/customer-dal";
+import { grantDirectBookingAccess } from "@/lib/booking-access";
+import { rateLimit } from "@/lib/rate-limit";
+import {
+  PAYMENT_TARGET_DELETION_SAFE_STATUSES,
+  paymentEvidenceAllowsTargetDeletion,
+} from "@/lib/payment-state";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import {
   getStadiumZone,
@@ -30,19 +37,37 @@ export async function createBooking(
 ): Promise<BookingFormState> {
   // login เสริม (optional) — ถ้ามี session จะใช้อีเมลของบัญชี
   // ถ้าไม่มี session = guest booking (อีเมล null)
-  const session = await readCustomerSession();
+  const [customer, ipLimit] = await Promise.all([
+    getOptionalCustomer(),
+    rateLimit("booking_create_ip", { max: 12, windowMs: 5 * 60_000 }),
+  ]);
+  if (!ipLimit.ok) {
+    return {
+      error: `ทำรายการจองบ่อยเกินไป กรุณาลองใหม่ใน ${ipLimit.retryAfterSec} วินาที`,
+    };
+  }
 
   const parsed = bookingCreateSchema.safeParse({
     matchId: formData.get("matchId"),
     zone: formData.get("zone"),
     customerName: formData.get("customerName"),
-    customerEmail: session?.email ?? null, // ← session-only, ไม่อ่านจาก form
+    customerEmail: customer?.email ?? null, // verified session only; never trust form input
     customerPhone: formData.get("customerPhone"),
     quantity: Number(formData.get("quantity") ?? 0),
     notes: (formData.get("notes") as string) || undefined,
   });
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const identityLimit = await rateLimit("booking_create_identity", {
+    max: 3,
+    windowMs: 10 * 60_000,
+    ip: `${parsed.data.matchId}:${parsed.data.customerPhone.replace(/\D/g, "")}`,
+  });
+  if (!identityLimit.ok) {
+    return {
+      error: `มีการสร้างรายการจองจากข้อมูลนี้บ่อยเกินไป กรุณารอ ${identityLimit.retryAfterSec} วินาที`,
+    };
   }
   const settings = await getTicketPurchaseSettings();
   if (parsed.data.quantity > settings.matchMaxQuantity) {
@@ -53,7 +78,7 @@ export async function createBooking(
     };
   }
 
-  let bookingCode: string;
+  let createdBooking: { id: string; bookingCode: string } | null = null;
   try {
     const booking = await prisma.$transaction(
       async (tx) => {
@@ -67,8 +92,8 @@ export async function createBooking(
           },
         });
         if (!match) throw new Error("ไม่พบแมตช์ที่ต้องการ");
-        if (match.competitionType === "LEAGUE" && !settings.leagueBookingOpen) {
-          throw new Error("ขณะนี้ปิดการจองตั๋วบอลลีกชั่วคราว");
+        if (!settings.leagueBookingOpen) {
+          throw new Error("ขณะนี้ปิดการจองตั๋วรายแมตช์ชั่วคราว");
         }
         if (match.status !== "ON_SALE") throw new Error("แมตช์นี้ยังไม่เปิดจอง หรือปิดการจองแล้ว");
         // defense-in-depth — แมตช์ ON_SALE ควรมีข้อมูลครบเสมอ (validate ตอน save)
@@ -102,8 +127,7 @@ export async function createBooking(
         await tx.booking.updateMany({
           where: {
             matchId: match.id,
-            status: "PENDING",
-            paymentExpiresAt: { lte: now },
+            ...cancellablePendingBookingWhere(now),
           },
           data: { status: "CANCELLED" },
         });
@@ -125,6 +149,7 @@ export async function createBooking(
         return tx.booking.create({
           data: {
             match: { connect: { id: match.id } },
+            ...(customer ? { customer: { connect: { id: customer.id } } } : {}),
             customerName: parsed.data.customerName,
             customerEmail: parsed.data.customerEmail ?? null,
             customerPhone: parsed.data.customerPhone,
@@ -146,17 +171,22 @@ export async function createBooking(
     revalidatePath(`/matches/${parsed.data.matchId}`);
     // invalidate unstable_cache queries — ที่นั่งเหลือต้องอัปเดตทันที
     revalidateTag("bookings", { expire: 0 });
-    bookingCode = booking.bookingCode;
+    createdBooking = { id: booking.id, bookingCode: booking.bookingCode };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "เกิดข้อผิดพลาด" };
   }
 
+  if (!createdBooking) return { error: "ไม่สามารถสร้างสิทธิ์เข้าถึงรายการจองได้" };
+  await grantDirectBookingAccess({
+    bookingId: createdBooking.id,
+    bookingCode: createdBooking.bookingCode,
+    customerId: customer?.id ?? null,
+  });
+
   // ข้าม intermediate "จองสำเร็จ" — ไป checkout ทันที เพื่อไม่ให้
   // PENDING booking ค้าง แล้วกันที่นั่งของลูกค้ารายอื่น
   // (redirect throws NEXT_REDIRECT → ต้องเรียกนอก try/catch)
-  redirect(
-    `/checkout/${bookingCode}?phone=${encodeURIComponent(parsed.data.customerPhone)}`
-  );
+  redirect(`/checkout/${createdBooking.bookingCode}`);
 }
 
 // Admin — เปลี่ยนสถานะการจอง
@@ -170,6 +200,9 @@ export async function updateBookingStatus(
   }
   try {
     const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id" FROM "Booking" WHERE "id" = ${bookingId} FOR UPDATE
+      `;
       const current = await tx.booking.findUnique({ where: { id: bookingId } });
       if (!current) throw new Error("BOOKING_NOT_FOUND");
       if (current.status === status) return { booking: current, expired: false };
@@ -179,7 +212,14 @@ export async function updateBookingStatus(
       if (current.status === "PENDING" && !["CONFIRMED", "CANCELLED"].includes(status)) throw new Error("INVALID_TRANSITION");
       const now = new Date();
       if (status === "CONFIRMED" && current.paymentExpiresAt && current.paymentExpiresAt <= now) {
-        const cancelled = await tx.booking.update({ where: { id: current.id }, data: { status: "CANCELLED" } });
+        const changed = await tx.booking.updateMany({
+          where: { id: current.id, status: current.status },
+          data: { status: "CANCELLED" },
+        });
+        if (changed.count !== 1) throw new Error("STATE_CHANGED");
+        const cancelled = await tx.booking.findUniqueOrThrow({
+          where: { id: current.id },
+        });
         await tx.bookingAuditLog.create({
           data: {
             bookingId: current.id,
@@ -194,12 +234,16 @@ export async function updateBookingStatus(
         });
         return { booking: cancelled, expired: true };
       }
-      const updated = await tx.booking.update({
-        where: { id: current.id },
+      const changed = await tx.booking.updateMany({
+        where: { id: current.id, status: current.status },
         data: {
           status,
           ...(status === "CONFIRMED" ? { paidAt: current.paidAt ?? now, paymentExpiresAt: null } : {}),
         },
+      });
+      if (changed.count !== 1) throw new Error("STATE_CHANGED");
+      const updated = await tx.booking.findUniqueOrThrow({
+        where: { id: current.id },
       });
       await tx.bookingAuditLog.create({
         data: {
@@ -229,6 +273,7 @@ export async function updateBookingStatus(
       CANCELLED_IS_FINAL: "รายการยกเลิกแล้วไม่สามารถเปิดกลับได้ กรุณาสร้างรายการใหม่เพื่อให้ระบบตรวจที่นั่งอีกครั้ง",
       CONFIRMED_REQUIRES_REFUND: "รายการยืนยันรับเงินแล้วต้องเปลี่ยนเป็น REFUNDED เท่านั้น ห้ามยกเลิกข้ามขั้นตอน",
       INVALID_TRANSITION: "ไม่สามารถเปลี่ยนสถานะตามลำดับนี้ได้",
+      STATE_CHANGED: "สถานะรายการเปลี่ยนไประหว่างดำเนินการ กรุณาโหลดหน้าใหม่และตรวจสอบอีกครั้ง",
     };
     return { error: error instanceof Error && messages[error.message] ? messages[error.message] : "อัปเดตไม่สำเร็จ" };
   }
@@ -245,9 +290,42 @@ export async function deleteBooking(
   }
   try {
     const booking = await prisma.$transaction(async (tx) => {
-      const current = await tx.booking.findUnique({ where: { id: bookingId } });
+      const preliminary = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: { matchId: true },
+      });
+      if (!preliminary) throw new Error("BOOKING_NOT_FOUND");
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${preliminary.matchId}`}))`,
+      );
+      // Keep the same lock order as payment confirmation: match, payment,
+      // booking. This closes the window where a signed success webhook could
+      // be cascaded away between the evidence check and the delete.
+      await tx.$queryRaw(Prisma.sql`
+        SELECT "id" FROM "BeamPayment" WHERE "bookingId" = ${bookingId} ORDER BY "id" FOR UPDATE
+      `);
+      await tx.$queryRaw(Prisma.sql`
+        SELECT "id" FROM "XenditPayment" WHERE "bookingId" = ${bookingId} ORDER BY "id" FOR UPDATE
+      `);
+      await tx.$queryRaw(Prisma.sql`
+        SELECT "id" FROM "Booking" WHERE "id" = ${bookingId} FOR UPDATE
+      `);
+      const current = await tx.booking.findUnique({
+        where: { id: bookingId },
+        include: {
+          beamPayments: { select: { status: true } },
+          xenditPayments: { select: { status: true } },
+        },
+      });
       if (!current) throw new Error("BOOKING_NOT_FOUND");
       if (current.status !== "CANCELLED") throw new Error("DELETE_CANCELLED_ONLY");
+      if (
+        current.paidAt ||
+        current.beamPayments.some((payment) => !paymentEvidenceAllowsTargetDeletion(payment.status)) ||
+        current.xenditPayments.some((payment) => !paymentEvidenceAllowsTargetDeletion(payment.status))
+      ) {
+        throw new Error("PAYMENT_EVIDENCE_EXISTS");
+      }
       await tx.bookingAuditLog.create({
         data: {
           bookingId: current.id,
@@ -259,7 +337,20 @@ export async function deleteBooking(
           details: { salesChannel: current.salesChannel },
         },
       });
-      await tx.booking.delete({ where: { id: current.id } });
+      const deleted = await tx.booking.deleteMany({
+        where: {
+          id: current.id,
+          status: "CANCELLED",
+          paidAt: null,
+          beamPayments: {
+            none: { status: { notIn: [...PAYMENT_TARGET_DELETION_SAFE_STATUSES] } },
+          },
+          xenditPayments: {
+            none: { status: { notIn: [...PAYMENT_TARGET_DELETION_SAFE_STATUSES] } },
+          },
+        },
+      });
+      if (deleted.count !== 1) throw new Error("STATE_CHANGED");
       return current;
     });
     revalidatePath("/admin/bookings");
@@ -272,6 +363,12 @@ export async function deleteBooking(
     if (error instanceof Error && error.message === "DELETE_CANCELLED_ONLY") {
       return { error: "ลบได้เฉพาะรายการที่ยกเลิกแล้วเท่านั้น รายการรับเงินต้องเก็บไว้เป็นหลักฐาน" };
     }
+    if (error instanceof Error && error.message === "PAYMENT_EVIDENCE_EXISTS") {
+      return { error: "รายการนี้มีหลักฐานการชำระเงิน จึงห้ามลบถาวร" };
+    }
+    if (error instanceof Error && error.message === "STATE_CHANGED") {
+      return { error: "สถานะรายการเปลี่ยนไประหว่างดำเนินการ กรุณาโหลดหน้าใหม่" };
+    }
     return { error: "ลบไม่สำเร็จ" };
   }
 }
@@ -280,10 +377,37 @@ export async function deleteBooking(
 export async function deleteAllBookings(): Promise<
   { ok: true; deleted: number } | { error: string }
 > {
-  const user = await verifyPermission("BOOKINGS");
+  const user = await verifySuperAdmin();
+  if (process.env.NODE_ENV === "production") {
+    return { error: "ปิดการลบรายการเป็นชุดบนระบบจริงเพื่อรักษาหลักฐาน" };
+  }
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const cancelled = await tx.booking.findMany({ where: { status: "CANCELLED" }, select: { id: true, bookingCode: true, salesChannel: true } });
+      const candidateMatches = await tx.booking.findMany({
+        where: { status: "CANCELLED" },
+        distinct: ["matchId"],
+        select: { matchId: true },
+      });
+      const lockedMatchIds = candidateMatches.map((booking) => booking.matchId).sort();
+      for (const matchId of lockedMatchIds) {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${matchId}`}))`,
+        );
+      }
+      const cancelled = await tx.booking.findMany({
+        where: {
+          status: "CANCELLED",
+          matchId: { in: lockedMatchIds },
+          paidAt: null,
+          beamPayments: {
+            none: { status: { notIn: [...PAYMENT_TARGET_DELETION_SAFE_STATUSES] } },
+          },
+          xenditPayments: {
+            none: { status: { notIn: [...PAYMENT_TARGET_DELETION_SAFE_STATUSES] } },
+          },
+        },
+        select: { id: true, bookingCode: true, salesChannel: true },
+      });
       if (cancelled.length > 0) {
         await tx.bookingAuditLog.createMany({
           data: cancelled.map((booking) => ({
@@ -297,7 +421,9 @@ export async function deleteAllBookings(): Promise<
           })),
         });
       }
-      return tx.booking.deleteMany({ where: { status: "CANCELLED" } });
+      return tx.booking.deleteMany({
+        where: { id: { in: cancelled.map((booking) => booking.id) } },
+      });
     });
     revalidatePath("/admin/bookings");
     revalidatePath("/");

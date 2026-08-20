@@ -1355,12 +1355,8 @@ function DigitalPass({
             {passCode}
           </p>
         </div>
-        <div className="w-full max-w-44 shrink-0 rounded-lg bg-white p-2 sm:w-44">
-          <img
-            src={`/api/season-passes/${encodeURIComponent(passCode)}/barcode`}
-            alt={`บาร์โค้ด ${passCode}`}
-            className="h-auto w-full"
-          />
+        <div className="w-full max-w-44 shrink-0 rounded-lg bg-white p-3 text-center text-xs font-bold text-green-900 sm:w-44">
+          บาร์โค้ดจะแสดงหลังระบบยืนยันการชำระเงิน
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { buildRedirectUri } from "@/lib/oauth";
+import { fetchOAuthProvider } from "@/lib/oauth-network";
 
 // Google OAuth 2.0 (OIDC)
 // scope: openid + email + profile → ได้ sub, email, name, picture
@@ -51,7 +52,7 @@ export async function fetchGoogleProfile(code: string): Promise<GoogleProfile> {
     redirect_uri: buildRedirectUri("GOOGLE"),
     grant_type: "authorization_code",
   });
-  const tokenRes = await fetch(TOKEN_URL, {
+  const tokenRes = await fetchOAuthProvider(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -62,7 +63,7 @@ export async function fetchGoogleProfile(code: string): Promise<GoogleProfile> {
   const token = (await tokenRes.json()) as { access_token?: string };
   if (!token.access_token) throw new Error("no access_token from Google");
 
-  const userRes = await fetch(USERINFO_URL, {
+  const userRes = await fetchOAuthProvider(USERINFO_URL, {
     headers: { Authorization: `Bearer ${token.access_token}` },
   });
   if (!userRes.ok) {

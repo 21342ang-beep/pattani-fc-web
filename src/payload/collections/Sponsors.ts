@@ -1,14 +1,24 @@
 import type { CollectionConfig } from "payload";
+import {
+  contentManagersOnly,
+  hideFromNonContentManagers,
+  activeContentRead,
+} from "../access";
 
 export const Sponsors: CollectionConfig = {
   slug: "sponsors",
   labels: { singular: "ผู้สนับสนุน", plural: "ผู้สนับสนุน" },
-  admin: { useAsTitle: "name", group: "เนื้อหา", defaultColumns: ["name", "tier", "active"] },
+  admin: {
+    useAsTitle: "name",
+    group: "เนื้อหา",
+    defaultColumns: ["name", "tier", "active"],
+    hidden: hideFromNonContentManagers,
+  },
   access: {
-    read: () => true,
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: activeContentRead,
+    create: contentManagersOnly,
+    update: contentManagersOnly,
+    delete: contentManagersOnly,
   },
   fields: [
     { name: "name", type: "text", label: "ชื่อ", required: true },

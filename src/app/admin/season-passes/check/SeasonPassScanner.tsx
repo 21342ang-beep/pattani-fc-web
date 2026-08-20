@@ -106,7 +106,10 @@ export default function SeasonPassScanner({
     setError(null);
 
     startTransition(async () => {
-      const result = await scanSeasonPass({ matchId, barcode: preview.barcode });
+      const result = await scanSeasonPass({
+        matchId,
+        barcode: preview.scanCredential,
+      });
       if (!result.ok) {
         setError(scanErrorMessage(result.error));
         setPreview(null);

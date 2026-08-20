@@ -54,3 +54,12 @@ next-env.d.ts
 # Playwright MCP scratch dir + k6 summary exports
 /.playwright-mcp/
 /load-test/*-summary.json
+
+# Local diagnostic scripts may contain customer identifiers or one-off inputs.
+/scripts/tmp-*.mjs
+
+# Local database snapshots must never be committed.
+/prisma/*.db
+/prisma/*.db-*
+/prisma/*.sqlite
+/prisma/*.sqlite-*

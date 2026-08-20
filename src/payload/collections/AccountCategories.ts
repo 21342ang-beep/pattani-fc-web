@@ -1,4 +1,8 @@
 import type { CollectionConfig } from "payload";
+import {
+  financeManagersOnly,
+  hideFromNonFinanceManagers,
+} from "../access";
 
 export const AccountCategories: CollectionConfig = {
   slug: "account-categories",
@@ -7,12 +11,13 @@ export const AccountCategories: CollectionConfig = {
     useAsTitle: "name",
     group: "บัญชี",
     defaultColumns: ["code", "name", "type"],
+    hidden: hideFromNonFinanceManagers,
   },
   access: {
-    read: ({ req }) => Boolean(req.user),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: financeManagersOnly,
+    create: financeManagersOnly,
+    update: financeManagersOnly,
+    delete: financeManagersOnly,
   },
   fields: [
     { name: "code", type: "text", label: "รหัสบัญชี", required: true, unique: true, index: true },

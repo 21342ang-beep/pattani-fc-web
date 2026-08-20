@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Shield } from "lucide-react";
 import { getAllProvinces } from "geothai";
-import { readCustomerSession } from "@/lib/customer-session";
+import { getOptionalCustomer } from "@/lib/customer-dal";
 import { getSafeReturnTo } from "@/lib/oauth";
 import { getTurnstileSiteKey } from "@/lib/turnstile";
 import RegisterForm, { type ShippingProvince } from "./RegisterForm";
@@ -23,6 +23,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   provider_not_configured: "ยังไม่ได้เปิดใช้บริการนี้ กรุณาสมัครด้วยอีเมลก่อน",
   email_not_verified:
     "อีเมลของบัญชี Google ยังไม่ได้ยืนยัน กรุณายืนยันก่อนเชื่อมต่อ",
+  link_verification_required:
+    "อีเมลนี้มีบัญชีเดิมที่ยังไม่ได้ยืนยัน จึงยังเชื่อม Google/LINE อัตโนมัติไม่ได้ กรุณาเข้าสู่ระบบบัญชีเดิมหรือขอให้ทีมงานช่วยตรวจสอบ",
   conflict: "เกิดข้อผิดพลาดในการเชื่อมต่อบัญชี กรุณาลองใหม่",
 };
 
@@ -31,10 +33,12 @@ export default async function RegisterPage(props: {
 }) {
   const sp = await props.searchParams;
   const returnTo = getSafeReturnTo(sp.next);
-  const session = await readCustomerSession();
+  const session = await getOptionalCustomer();
   if (session) redirect(returnTo ?? "/member");
   const errorMessage = sp.error ? ERROR_MESSAGES[sp.error] : undefined;
   const turnstileSiteKey = getTurnstileSiteKey();
+  const registrationUnavailable =
+    process.env.NODE_ENV === "production" && !turnstileSiteKey;
   const shippingProvinces: ShippingProvince[] = getAllProvinces()
     .map((province) => ({
       name: province.name_th,
@@ -65,12 +69,22 @@ export default async function RegisterPage(props: {
           </p>
         </div>
 
-        <RegisterForm
-          errorMessage={errorMessage}
-          shippingProvinces={shippingProvinces}
-          returnTo={returnTo ?? undefined}
-          turnstileSiteKey={turnstileSiteKey ?? undefined}
-        />
+        {registrationUnavailable ? (
+          <div
+            role="status"
+            className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-center text-base font-semibold text-amber-950"
+          >
+            ระบบสมัครสมาชิกปิดชั่วคราวเพื่อการตรวจสอบความปลอดภัย
+            กรุณาติดต่อทีมงานหรือลองใหม่ภายหลัง
+          </div>
+        ) : (
+          <RegisterForm
+            errorMessage={errorMessage}
+            shippingProvinces={shippingProvinces}
+            returnTo={returnTo ?? undefined}
+            turnstileSiteKey={turnstileSiteKey ?? undefined}
+          />
+        )}
 
         <p className="mt-6 text-center text-base text-slate-600 md:text-lg">
           มีบัญชีอยู่แล้ว?{" "}

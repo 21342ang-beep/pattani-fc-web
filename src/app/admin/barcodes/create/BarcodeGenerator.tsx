@@ -19,6 +19,7 @@ type TierId = (typeof packages)[number]["id"];
 type BarcodeItem = Extract<CreateBarcodesState, { ok: true }>['barcodes'][number];
 type BarcodesByTier = Record<TierId, BarcodeItem[]>;
 const DOWNLOAD_BATCH_SIZE = 500;
+const SAFE_PREVIEW_LIMIT = 30;
 
 const initialCreateBarcodesState: CreateBarcodesState = {
   ok: false,
@@ -48,6 +49,7 @@ export default function BarcodeGenerator({
   const [pending, startTransition] = useTransition();
   const activePackage = packages.find((item) => item.id === activeTab)!;
   const activeBarcodes = barcodesByTier[activeTab];
+  const previewBarcodes = activeBarcodes.slice(0, SAFE_PREVIEW_LIMIT);
   const activeBarcodeCount = barcodeCounts[activeTab];
 
   function submit(formData: FormData) {
@@ -265,8 +267,8 @@ export default function BarcodeGenerator({
                 </tr>
               </thead>
               <tbody>
-                {activeBarcodes.map((item) => {
-                  const barcodeUrl = `/api/season-passes/${encodeURIComponent(item.barcode)}/barcode`;
+                {previewBarcodes.map((item) => {
+                  const barcodeUrl = `/api/season-passes/${encodeURIComponent(item.barcode)}/barcode?token=${encodeURIComponent(item.barcodeAccessToken)}`;
                   return (
                     <tr key={item.barcode} className="border-t border-slate-100">
                       <td className="px-4 py-3 font-medium text-slate-700">{item.sequence.toLocaleString("th-TH")}</td>
@@ -300,6 +302,12 @@ export default function BarcodeGenerator({
                 })}
               </tbody>
             </table>
+            {activeBarcodes.length > SAFE_PREVIEW_LIMIT && (
+              <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+                แสดงตัวอย่าง {SAFE_PREVIEW_LIMIT} ใบแรก เพื่อป้องกันการโหลดบาร์โค้ดจำนวนมากพร้อมกัน
+                — ไฟล์ดาวน์โหลดด้านบนยังรวมครบทุกใบ
+              </p>
+            )}
           </div>
         )}
         {downloadError && <p className="px-5 pb-4 text-sm text-red-700">{downloadError}</p>}

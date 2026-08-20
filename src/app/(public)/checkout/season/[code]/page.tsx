@@ -5,6 +5,8 @@ import { verifyCustomer } from "@/lib/customer-dal";
 import { getSeasonTier } from "@/lib/season-pass-tiers";
 import PaymentGateway from "../../[code]/PaymentGateway";
 import { expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
+import { getVerifiedEmailOwnerIds } from "@/lib/customer-email-ownership";
+import { guestEmailOwnershipClause } from "@/lib/customer-ownership-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +19,21 @@ export default async function SeasonPassCheckoutPage({
   if (!code || !/^[A-Z0-9-]{8,100}$/i.test(code)) notFound();
   await expirePendingSeasonPassPurchases({ purchaseCode: code, passCode: code });
 
+  const verifiedEmailOwnerIds = customer.emailVerifiedAt
+    ? await getVerifiedEmailOwnerIds(customer.email)
+    : [];
+  const canClaimGuestEmail =
+    verifiedEmailOwnerIds.length === 1 &&
+    verifiedEmailOwnerIds[0] === customer.id;
+
   const ownerWhere = {
     OR: [
       { customerId: customer.id },
-      { customerEmail: { equals: customer.email, mode: "insensitive" as const } },
+      ...(canClaimGuestEmail
+        ? [
+            guestEmailOwnershipClause(customer.email),
+          ]
+        : []),
     ],
   };
   const purchase = await prisma.seasonPassPurchase.findFirst({

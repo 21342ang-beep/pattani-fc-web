@@ -1,4 +1,8 @@
 import type { CollectionConfig } from "payload";
+import {
+  financeManagersOnly,
+  hideFromNonFinanceManagers,
+} from "../access";
 
 export const Revenues: CollectionConfig = {
   slug: "revenues",
@@ -7,12 +11,13 @@ export const Revenues: CollectionConfig = {
     useAsTitle: "title",
     group: "บัญชี",
     defaultColumns: ["recordedAt", "title", "category", "amountSatang"],
+    hidden: hideFromNonFinanceManagers,
   },
   access: {
-    read: ({ req }) => Boolean(req.user),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: financeManagersOnly,
+    create: financeManagersOnly,
+    update: financeManagersOnly,
+    delete: financeManagersOnly,
   },
   fields: [
     {

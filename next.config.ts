@@ -13,11 +13,18 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
   },
+  // A deliberately small CSP that blocks high-risk embedding primitives while
+  // leaving Next/Payload scripts and payment-provider connections untouched.
+  {
+    key: "Content-Security-Policy",
+    value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'",
+  },
   // กันการโหลด cross-origin โดยไม่ตั้งใจ (Spectre mitigation)
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   // Server Action body limit — รับโล้โก้ 2 ทีม × 2MB + form fields
   // (default 1MB ไม่พอ → block ก่อน server validate รัน)
   experimental: {

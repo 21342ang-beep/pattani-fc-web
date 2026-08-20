@@ -23,6 +23,7 @@ import {
   MapPin,
   ScanLine,
   ArrowLeft,
+  ShieldAlert,
 } from "lucide-react";
 import {
   downloadWhitelist,
@@ -31,17 +32,23 @@ import {
   type WhitelistEntry,
 } from "@/app/actions/gate-check";
 import {
-  countScans,
+  countEffectiveAdmissions,
+  clearAllGateStorage,
   deleteWhitelist,
-  getScan,
+  initializeGateStorage,
   listUnsyncedScans,
   loadWhitelist,
   markSynced,
-  markWhitelistScanned,
-  recordScan,
+  reserveAdmissionScan,
   saveWhitelist,
   type StoredWhitelist,
+  updateWhitelistBookingState,
 } from "./db";
+import {
+  GATE_CACHE_PREFIX,
+  GATE_OFFLINE_REVOKED_COOKIE,
+  type GateOfflineSession,
+} from "./offline-policy";
 
 type Match = {
   id: string;
@@ -60,7 +67,7 @@ type ScanState =
   | { kind: "unknown"; code: string }
   | { kind: "invalid"; reason: string };
 
-const CODE_FORMAT = /^[a-z0-9-]{8,50}$/i;
+const CODE_FORMAT = /^[a-z0-9._-]{8,256}$/i;
 
 // subscribe online/offline ผ่าน useSyncExternalStore → ไม่ต้อง setState ใน useEffect
 function subscribeOnline(cb: () => void) {
@@ -74,7 +81,40 @@ function subscribeOnline(cb: () => void) {
 const getOnlineSnapshot = () => navigator.onLine;
 const getOnlineServerSnapshot = () => true;
 
-export default function GateCheckClient({ initialMatches }: { initialMatches: Match[] }) {
+type GateStorageState = "initializing" | "ready" | "expired" | "revoked" | "error";
+
+function hasLogoutRevocationMarker(): boolean {
+  return document.cookie
+    .split(";")
+    .some((part) => part.trim().startsWith(`${GATE_OFFLINE_REVOKED_COOKIE}=`));
+}
+
+async function clearGateCacheStorage(notifyWorker: boolean): Promise<void> {
+  if ("caches" in window) {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((key) => key.startsWith(GATE_CACHE_PREFIX))
+        .map((key) => caches.delete(key)),
+    );
+  }
+  if (notifyWorker && "serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      if (new URL(registration.scope).pathname.startsWith("/gate-check")) {
+        registration.active?.postMessage({ type: "CLEAR_GATE_DATA" });
+      }
+    }
+  }
+}
+
+export default function GateCheckClient({
+  initialMatches,
+  offlineSession,
+}: {
+  initialMatches: Match[];
+  offlineSession: GateOfflineSession;
+}) {
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
   const [whitelist, setWhitelist] = useState<StoredWhitelist | null>(null);
   const [scanState, setScanState] = useState<ScanState>({ kind: "idle" });
@@ -84,7 +124,10 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
   const [scannedCount, setScannedCount] = useState(0);
   const [recent, setRecent] = useState<ScanState[]>([]);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [storageState, setStorageState] =
+    useState<GateStorageState>("initializing");
   const inputRef = useRef<HTMLInputElement>(null);
+  const storageRevokedRef = useRef(false);
 
   const online = useSyncExternalStore(
     subscribeOnline,
@@ -92,19 +135,114 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
     getOnlineServerSnapshot
   );
 
-  // ─── PWA service worker register (ครั้งเดียว) ─────────
+  const lockGateStorage = useCallback(
+    async (
+      reason: Exclude<GateStorageState, "initializing" | "ready">,
+      notifyWorker = true,
+    ) => {
+      storageRevokedRef.current = true;
+      await Promise.allSettled([
+        clearAllGateStorage(),
+        clearGateCacheStorage(notifyWorker),
+      ]);
+      setWhitelist(null);
+      setActiveMatchId(null);
+      setUnsyncedCount(0);
+      setScannedCount(0);
+      setRecent([]);
+      setScanState({ kind: "idle" });
+      setStorageState(reason);
+    },
+    [],
+  );
+
+  // Bind IndexedDB to this exact admin login and erase it at session expiry.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+
+    void (async () => {
+      if (hasLogoutRevocationMarker()) {
+        await lockGateStorage("revoked");
+        return;
+      }
+      try {
+        const result = await initializeGateStorage(offlineSession);
+        if (cancelled || storageRevokedRef.current) return;
+        setStorageState("ready");
+        if (result.clearedLegacyData || result.clearedPreviousSession) {
+          setSyncMessage(
+            result.clearedLegacyData
+              ? "ล้างข้อมูล Gate รุ่นเก่าที่ไม่ทราบเจ้าของแล้ว กรุณาดาวน์โหลด whitelist ใหม่"
+              : "ล้างข้อมูล Gate ของเซสชันก่อนหน้าแล้ว",
+          );
+        }
+        const remainingMs = offlineSession.expiresAt - Date.now();
+        if (remainingMs <= 0) {
+          await lockGateStorage("expired");
+          return;
+        }
+        expiryTimer = setTimeout(() => {
+          void lockGateStorage("expired");
+        }, remainingMs);
+      } catch {
+        if (!cancelled) await lockGateStorage("error");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (expiryTimer) clearTimeout(expiryTimer);
+    };
+  }, [lockGateStorage, offlineSession]);
+
+  // Lock other open Gate tabs as soon as logout/cleanup occurs in this origin.
+  useEffect(() => {
+    const handleClear = () => {
+      void lockGateStorage("revoked", false);
+    };
+    const handleWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === "GATE_DATA_CLEARED") handleClear();
+    };
+    navigator.serviceWorker?.addEventListener("message", handleWorkerMessage);
+    const channel =
+      "BroadcastChannel" in window
+        ? new BroadcastChannel("pattani-gate-security")
+        : null;
+    if (channel) channel.onmessage = handleClear;
+    return () => {
+      navigator.serviceWorker?.removeEventListener(
+        "message",
+        handleWorkerMessage,
+      );
+      channel?.close();
+    };
+  }, [lockGateStorage]);
+
+  // ─── PWA service worker register (ครั้งเดียวต่อ session) ─────────
+  useEffect(() => {
+    if (storageState !== "ready") return;
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker
-      .register("/sw.js", { scope: "/gate-check" })
-      .catch((err) => console.warn("SW register failed", err));
-  }, []);
+    void (async () => {
+      try {
+        await navigator.serviceWorker.register("/sw.js", {
+          scope: "/gate-check",
+        });
+        const registration = await navigator.serviceWorker.ready;
+        registration.active?.postMessage({
+          type: "CONFIGURE_GATE_SESSION",
+          expiresAt: offlineSession.expiresAt,
+        });
+      } catch (error) {
+        console.warn("SW register failed", error);
+      }
+    })();
+  }, [offlineSession.expiresAt, storageState]);
 
   // ─── โหลด whitelist จาก IndexedDB เมื่อเลือกแมตช์ ─────
   // setState เฉพาะใน async callback หลัง await → ไม่กระทบ render synchronous
   useEffect(() => {
-    if (!activeMatchId) return;
+    if (storageState !== "ready" || !activeMatchId) return;
     let cancelled = false;
     void (async () => {
       const w = await loadWhitelist(activeMatchId);
@@ -112,7 +250,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
       setWhitelist(w ?? null);
       const [unsynced, scanned] = await Promise.all([
         listUnsyncedScans(activeMatchId),
-        countScans(activeMatchId),
+        countEffectiveAdmissions(activeMatchId, w?.entries ?? []),
       ]);
       if (cancelled) return;
       setUnsyncedCount(unsynced.length);
@@ -121,7 +259,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
     return () => {
       cancelled = true;
     };
-  }, [activeMatchId]);
+  }, [activeMatchId, storageState]);
 
   // ─── auto focus input ตลอด — เครื่องสแกน USB ยิงเข้าได้ทันที ────
   useEffect(() => {
@@ -147,19 +285,28 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
   const handleScan = useCallback(
     async (raw: string) => {
       if (!activeMatchId || !lookupMap || !whitelist) return;
-      const code = raw.trim().toLowerCase();
-      if (!CODE_FORMAT.test(code)) {
+      const scannedValue = raw.trim();
+      if (!CODE_FORMAT.test(scannedValue)) {
         setScanState({ kind: "invalid", reason: "รหัสไม่ถูกต้อง" });
         return;
       }
       // Season-pass scans are always checked online; unlike match tickets they
       // must reject a second scan at another gate immediately.
-      if (code.toUpperCase().startsWith("PFC26-") || code.toUpperCase().startsWith("SP-")) {
+      const upperValue = scannedValue.toUpperCase();
+      if (
+        scannedValue.startsWith("SPG2.") ||
+        scannedValue.startsWith("SPG1.") ||
+        upperValue.startsWith("PFC26-") ||
+        upperValue.startsWith("SP-")
+      ) {
         if (!online) {
           setScanState({ kind: "invalid", reason: "บัตรรายปีต้องสแกนขณะเชื่อมต่ออินเทอร์เน็ต" });
           return;
         }
-        const result = await scanSeasonPass({ matchId: activeMatchId, barcode: code });
+        const result = await scanSeasonPass({
+          matchId: activeMatchId,
+          barcode: scannedValue,
+        });
         if (!result.ok) {
           const reasons = {
             NOT_FOUND: "ไม่พบบัตรรายปีนี้",
@@ -177,12 +324,13 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
           return;
         }
         const entry: WhitelistEntry = {
-          bookingCode: code,
+          bookingCode: result.passCode,
           customerName: result.customerName,
           quantity: 1,
           seatNumbers: [result.competitionType === "CUP"
             ? `Season Pass · บอลถ้วย (ไม่หักสิทธิ์ลีก) · ลีกเหลือ ${result.usesRemaining}/15`
             : `Season Pass · ลีกเหลือ ${result.usesRemaining}/15`],
+          scannedCount: 1,
           scannedAt: null,
         };
         const state: ScanState = { kind: "ok", entry, at: new Date().toISOString() };
@@ -191,6 +339,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
         void playBeep(true);
         return;
       }
+      const code = scannedValue.toLowerCase();
       const entry = lookupMap.get(code);
       if (!entry) {
         setScanState({ kind: "unknown", code });
@@ -198,39 +347,43 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
         return;
       }
 
-      // 1) server เคย scan ไปแล้ว (จาก whitelist หรือเครื่องอื่น)
-      if (entry.scannedAt) {
-        const state: ScanState = {
-          kind: "duplicate",
-          entry,
-          previousAt: entry.scannedAt,
-          source: "server",
-        };
-        setScanState(state);
-        addRecent(state);
-        return;
-      }
-
-      // 2) เครื่องนี้เคย scan ไปแล้ว (local)
-      const local = await getScan(activeMatchId, entry.bookingCode);
-      if (local) {
-        const state: ScanState = {
-          kind: "duplicate",
-          entry,
-          previousAt: local.scannedAt,
-          source: "local",
-        };
-        setScanState(state);
-        addRecent(state);
-        return;
-      }
-
-      // 3) สแกนใหม่ → บันทึก local
+      // Reserve one admission slot in a single IndexedDB transaction. This
+      // lets the same booking code enter up to quantity times while preventing
+      // rapid scans/tabs on this device from allocating the same slot twice.
       const at = new Date().toISOString();
-      await recordScan(activeMatchId, entry.bookingCode, at);
+      const reservation = await reserveAdmissionScan(
+        activeMatchId,
+        entry.bookingCode,
+        entry.scannedCount,
+        entry.quantity,
+        at,
+      );
+      if (!reservation.ok) {
+        const state: ScanState = {
+          kind: "duplicate",
+          entry: {
+            ...entry,
+            scannedCount: Math.min(entry.quantity, reservation.currentCount),
+          },
+          previousAt: reservation.previousAt ?? entry.scannedAt ?? at,
+          source: reservation.previousAt ? "local" : "server",
+        };
+        setScanState(state);
+        addRecent(state);
+        return;
+      }
+
       setUnsyncedCount((n) => n + 1);
       setScannedCount((n) => n + 1);
-      const state: ScanState = { kind: "ok", entry, at };
+      const state: ScanState = {
+        kind: "ok",
+        entry: {
+          ...entry,
+          scannedCount: reservation.scan.admissionNumber,
+          scannedAt: at,
+        },
+        at,
+      };
       setScanState(state);
       addRecent(state);
 
@@ -243,6 +396,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
   // ─── ดาวน์โหลด whitelist (online เท่านั้น) ─────────
   const handleDownload = useCallback(
     async (matchId: string) => {
+      if (storageState !== "ready") return;
       setIsDownloading(true);
       try {
         const result = await downloadWhitelist(matchId);
@@ -252,7 +406,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
         }
         const match = initialMatches.find((m) => m.id === matchId);
         if (!match) return;
-        const stored: StoredWhitelist = {
+        const stored = await saveWhitelist({
           matchId: result.matchId,
           matchInfo: {
             homeTeam: match.homeTeam,
@@ -262,15 +416,14 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
           },
           entries: result.entries,
           generatedAt: result.generatedAt,
-        };
-        await saveWhitelist(stored);
+        });
         setWhitelist(stored);
         setActiveMatchId(matchId);
       } finally {
         setIsDownloading(false);
       }
     },
-    [initialMatches]
+    [initialMatches, storageState]
   );
 
   // ─── sync scan กลับ server (auto + manual) ────────
@@ -284,10 +437,13 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
         setSyncMessage("ไม่มีรายการต้อง sync");
         return;
       }
+      const batch = pending.slice(0, 500);
       const result = await syncScans({
         matchId: activeMatchId,
-        records: pending.map((p) => ({
+        records: batch.map((p) => ({
+          scanId: p.scanId,
           bookingCode: p.bookingCode,
+          admissionNumber: p.admissionNumber,
           scannedAt: p.scannedAt,
         })),
       });
@@ -297,24 +453,28 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
       }
       const synced = [
         ...result.accepted,
-        ...result.conflicts.map((c) => c.bookingCode),
+        ...result.duplicates,
+        ...result.conflicts.map((c) => c.scanId),
         ...result.unknown,
       ];
       await markSynced(activeMatchId, synced);
-      // อัปเดต whitelist local: conflict + accepted → markScanned
-      for (const code of result.accepted) {
-        const p = pending.find((x) => x.bookingCode === code);
-        if (p) await markWhitelistScanned(activeMatchId, code, p.scannedAt);
-      }
-      for (const c of result.conflicts) {
-        await markWhitelistScanned(activeMatchId, c.bookingCode, c.serverScannedAt);
+      for (const state of result.bookingStates) {
+        await updateWhitelistBookingState(
+          activeMatchId,
+          state.bookingCode,
+          state.scannedCount,
+          state.latestScannedAt,
+        );
       }
       const w = await loadWhitelist(activeMatchId);
       if (w) setWhitelist(w);
       const remain = await listUnsyncedScans(activeMatchId);
       setUnsyncedCount(remain.length);
+      if (w) {
+        setScannedCount(await countEffectiveAdmissions(activeMatchId, w.entries));
+      }
       setSyncMessage(
-        `Sync เสร็จ — รับ ${result.accepted.length} · ซ้ำ ${result.conflicts.length} · ไม่พบ ${result.unknown.length}`
+        `Sync เสร็จ — รับ ${result.accepted.length} · ซ้ำ ${result.duplicates.length} · ชนกับประตูอื่น ${result.conflicts.length} · ไม่พบ ${result.unknown.length}${remain.length > 0 ? ` · เหลือ ${remain.length}` : ""}`
       );
     } finally {
       setIsSyncing(false);
@@ -350,6 +510,10 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
   }, [activeMatchId, unsyncedCount]);
 
   // ─── RENDER ─────────────────────────────────────
+  if (storageState !== "ready") {
+    return <GateStorageGuard state={storageState} online={online} />;
+  }
+
   if (!activeMatchId || !whitelist) {
     return (
       <MatchPicker
@@ -357,6 +521,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
         onDownload={handleDownload}
         isDownloading={isDownloading}
         online={online}
+        offlineExpiresAt={offlineSession.expiresAt}
         onResume={async (mid) => {
           const w = await loadWhitelist(mid);
           if (w) {
@@ -370,7 +535,10 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
     );
   }
 
-  const total = whitelist.entries.length;
+  const total = whitelist.entries.reduce(
+    (sum, entry) => sum + entry.quantity,
+    0,
+  );
   return (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
@@ -393,6 +561,9 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
                 {whitelist.matchInfo.kickoffAt
                   ? new Date(whitelist.matchInfo.kickoffAt).toLocaleString("th-TH")
                   : "—"}
+              </p>
+              <p className="mt-0.5 text-[10px] text-amber-300/80">
+                ข้อมูลออฟไลน์ใช้ได้ถึง {new Date(offlineSession.expiresAt).toLocaleString("th-TH")}
               </p>
             </div>
           </div>
@@ -427,7 +598,7 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
               autoComplete="off"
               spellCheck={false}
               inputMode="text"
-              maxLength={60}
+              maxLength={256}
               onKeyDown={async (e) => {
                 if (e.key !== "Enter") return;
                 const v = e.currentTarget.value;
@@ -511,18 +682,72 @@ export default function GateCheckClient({ initialMatches }: { initialMatches: Ma
 
 // ─── sub-components ─────────────────────────────────
 
+function GateStorageGuard({
+  state,
+  online,
+}: {
+  state: Exclude<GateStorageState, "ready">;
+  online: boolean;
+}) {
+  const messages = {
+    initializing: {
+      title: "กำลังเตรียมข้อมูล Gate ที่ปลอดภัย",
+      detail: "กำลังตรวจอายุและเจ้าของข้อมูลออฟไลน์บนเครื่องนี้…",
+    },
+    expired: {
+      title: "เซสชัน Gate หมดอายุแล้ว",
+      detail: "ข้อมูลตั๋วออฟไลน์ถูกล้างแล้ว กรุณาเข้าสู่ระบบและดาวน์โหลดใหม่",
+    },
+    revoked: {
+      title: "ออกจากระบบแล้ว",
+      detail: "ข้อมูลตั๋วออฟไลน์บนเครื่องนี้ถูกล้างเพื่อความปลอดภัย",
+    },
+    error: {
+      title: "ไม่สามารถเปิดพื้นที่ข้อมูล Gate ได้",
+      detail: "ระบบปิดการสแกนไว้ก่อนเพื่อไม่ให้ใช้ข้อมูลที่ไม่ยืนยัน",
+    },
+  } as const;
+  const message = messages[state];
+
+  return (
+    <main className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-amber-700/60 bg-slate-900 p-6 text-center shadow-xl">
+        {state === "initializing" ? (
+          <Loader2 className="mx-auto size-10 animate-spin text-yellow-300" />
+        ) : (
+          <ShieldAlert className="mx-auto size-10 text-amber-300" />
+        )}
+        <h1 className="mt-4 text-xl font-bold text-yellow-200">
+          {message.title}
+        </h1>
+        <p className="mt-2 text-sm text-green-100/80">{message.detail}</p>
+        {state !== "initializing" && (
+          <a
+            href="/login"
+            className="mt-5 inline-flex rounded-full bg-yellow-400 px-5 py-2 text-sm font-bold text-green-950 hover:bg-yellow-300"
+          >
+            {online ? "เข้าสู่ระบบใหม่" : "เชื่อมต่ออินเทอร์เน็ตเพื่อเข้าสู่ระบบ"}
+          </a>
+        )}
+      </div>
+    </main>
+  );
+}
+
 function MatchPicker({
   matches,
   onDownload,
   onResume,
   isDownloading,
   online,
+  offlineExpiresAt,
 }: {
   matches: Match[];
   onDownload: (id: string) => void;
   onResume: (id: string) => void;
   isDownloading: boolean;
   online: boolean;
+  offlineExpiresAt: number;
 }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-10 md:px-8">
@@ -540,6 +765,9 @@ function MatchPicker({
         </div>
         <p className="mt-2 text-sm text-green-200">
           เลือกแมตช์ที่จะคุมประตู → ดาวน์โหลด whitelist (ต้องมีเน็ต) → ใช้งานออฟไลน์ได้
+        </p>
+        <p className="mt-1 text-xs text-amber-300/80">
+          ข้อมูลออฟไลน์ของรอบนี้หมดอายุ {new Date(offlineExpiresAt).toLocaleString("th-TH")}
         </p>
         <a
           href="/admin"
@@ -728,6 +956,12 @@ function Detail({ entry }: { entry: WhitelistEntry }) {
       <div className="flex gap-2">
         <dt className="w-20 text-slate-400">จำนวน</dt>
         <dd className="flex-1">{entry.quantity} ใบ</dd>
+      </div>
+      <div className="flex gap-2">
+        <dt className="w-20 text-slate-400">ใช้แล้ว</dt>
+        <dd className="flex-1">
+          {entry.scannedCount}/{entry.quantity} ใบ
+        </dd>
       </div>
       <div className="flex gap-2">
         <dt className="w-20 text-slate-400">ที่นั่ง</dt>

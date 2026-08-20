@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Shield } from "lucide-react";
-import { readCustomerSession } from "@/lib/customer-session";
+import { getOptionalCustomer } from "@/lib/customer-dal";
 import { getSafeReturnTo } from "@/lib/oauth";
 import MemberLoginForm from "./MemberLoginForm";
 
@@ -26,7 +26,7 @@ export default async function MemberLoginPage(props: {
 }) {
   const sp = await props.searchParams;
   const returnTo = getSafeReturnTo(sp.returnTo);
-  const session = await readCustomerSession();
+  const session = await getOptionalCustomer();
   if (session) redirect(returnTo ?? "/member");
   const errorMessage = sp.error ? ERROR_MESSAGES[sp.error] : undefined;
 

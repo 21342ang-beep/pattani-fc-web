@@ -7,6 +7,7 @@ import { verifyCustomer } from "@/lib/customer-dal";
 import { formatDateTime } from "@/lib/format";
 import { getMemberTicketIds } from "@/lib/member-tickets";
 import { getSeasonTier } from "@/lib/season-pass-tiers";
+import { createSeasonPassBarcodeAccessToken } from "@/lib/season-pass-barcode-access";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,16 @@ export default async function SeasonPassTicketPage({ params }: { params: Promise
     select: {
       passCode: true, customerName: true, seatZone: true, seasonLabel: true, tierId: true,
       status: true, createdAt: true,
-      barcode: { select: { barcode: true, usesRemaining: true } },
+      barcode: {
+        select: {
+          id: true,
+          barcode: true,
+          usesRemaining: true,
+          gateVersion: true,
+          gateNonce: true,
+          orderId: true,
+        },
+      },
     },
   });
   if (!pass) notFound();
@@ -52,6 +62,16 @@ export default async function SeasonPassTicketPage({ params }: { params: Promise
 
   const tier = getSeasonTier(pass.tierId);
   const gate = getGateForSeatZone(pass.seatZone);
+  const barcodeToken = await createSeasonPassBarcodeAccessToken(
+    {
+      barcodeId: pass.barcode.id,
+      barcode: pass.barcode.barcode,
+      gateVersion: pass.barcode.gateVersion,
+      gateNonce: pass.barcode.gateNonce,
+      orderId: pass.barcode.orderId,
+    },
+  );
+  const barcodeUrl = `/api/season-passes/${encodeURIComponent(pass.barcode.barcode)}/barcode?token=${encodeURIComponent(barcodeToken)}`;
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:py-12">
       <Link href="/member/bookings" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-green-800 hover:underline"><ArrowLeft className="size-4" /> กลับไปบัตรของฉัน</Link>
@@ -64,7 +84,7 @@ export default async function SeasonPassTicketPage({ params }: { params: Promise
           <div><p className="text-sm text-green-200">ผู้ถือบัตร</p><p className="mt-1 text-2xl font-black">{pass.customerName}</p>
             <div className="mt-6 space-y-3 border-y border-white/15 py-5 text-sm"><p className="flex items-center gap-2"><MapPin className="size-4 text-yellow-300" /> โซนที่นั่ง: <strong>{pass.seatZone}</strong></p><p className="flex items-center gap-2"><DoorOpen className="size-4 text-yellow-300" /> ประตูเข้าสนาม: <strong>Gate {gate}</strong></p><p className="flex items-center gap-2"><CalendarDays className="size-4 text-yellow-300" /> สมัครเมื่อ: {formatDateTime(pass.createdAt)}</p><p className="font-mono text-xs text-green-200">Pass no. {pass.passCode}</p></div>
             <p className="mt-5 text-sm text-green-100">คงสิทธิ์เข้าสนาม {pass.barcode.usesRemaining} นัด</p></div>
-          <div className="rounded-2xl bg-white p-4 text-green-950 shadow-inner"><div className="flex items-center justify-center gap-2 text-sm font-bold"><Barcode className="size-5" /> บาร์โค้ดสำหรับเข้าสนาม</div><img src={`/api/season-passes/${encodeURIComponent(pass.barcode.barcode)}/barcode`} alt={`บาร์โค้ด ${pass.barcode.barcode}`} className="mt-3 h-auto w-full" /><p className="mt-2 text-center font-mono text-xs font-bold tracking-wider">{pass.barcode.barcode}</p></div>
+          <div className="rounded-2xl bg-white p-4 text-green-950 shadow-inner"><div className="flex items-center justify-center gap-2 text-sm font-bold"><Barcode className="size-5" /> บาร์โค้ดสำหรับเข้าสนาม</div><img src={barcodeUrl} alt={`บาร์โค้ด ${pass.barcode.barcode}`} className="mt-3 h-auto w-full" /><p className="mt-2 text-center font-mono text-xs font-bold tracking-wider">{pass.barcode.barcode}</p></div>
         </div>
       </article>
     </div>

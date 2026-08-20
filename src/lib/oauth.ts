@@ -1,16 +1,19 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { SignJWT, jwtVerify } from "jose";
+import { CompactEncrypt, compactDecrypt } from "jose";
 import type { AuthProvider } from "@prisma/client";
+import { deriveSecurityKey } from "@/lib/security-keys";
 
 // helper กลางสำหรับ OAuth (Google + Line)
 // - build redirect URI จาก NEXT_PUBLIC_APP_URL
 // - sign state JWT (cookie) กัน CSRF และเก็บ intent (register/login)
 
-if (!process.env.SESSION_SECRET) {
-  throw new Error("SESSION_SECRET ต้องตั้งค่าใน .env.local");
-}
-const secretKey = new TextEncoder().encode(process.env.SESSION_SECRET);
+const secretKey = deriveSecurityKey(
+  "pattani-fc/oauth-state/v1",
+  process.env.OAUTH_STATE_SECRET,
+);
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
 const STATE_COOKIE_PREFIX = "oauth_state:";
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 นาที
@@ -74,18 +77,21 @@ export function buildRedirectUri(provider: AuthProvider): string {
 }
 
 async function signState(payload: OAuthState): Promise<string> {
-  return new SignJWT({ ...payload })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(new Date(payload.expiresAt))
-    .sign(secretKey);
+  // OAuth registration state contains personal data and a password hash. JWE
+  // keeps the cookie authenticated *and encrypted* instead of merely signed.
+  return new CompactEncrypt(encoder.encode(JSON.stringify(payload)))
+    .setProtectedHeader({ alg: "dir", enc: "A256GCM", typ: "oauth-state+jwe" })
+    .encrypt(secretKey);
 }
 
 async function verifyState(token: string): Promise<OAuthState | null> {
   try {
-    const { payload } = await jwtVerify(token, secretKey, {
-      algorithms: ["HS256"],
+    const { plaintext, protectedHeader } = await compactDecrypt(token, secretKey, {
+      keyManagementAlgorithms: ["dir"],
+      contentEncryptionAlgorithms: ["A256GCM"],
     });
+    if (protectedHeader.typ !== "oauth-state+jwe") return null;
+    const payload = JSON.parse(decoder.decode(plaintext)) as Record<string, unknown>;
     if (
       typeof payload.provider !== "string" ||
       typeof payload.intent !== "string" ||

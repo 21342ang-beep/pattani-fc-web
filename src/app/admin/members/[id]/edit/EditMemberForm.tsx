@@ -10,6 +10,7 @@ type Props = {
   email: string;
   phone: string;
   hasPassword: boolean;
+  canResetPassword: boolean;
 };
 
 export default function EditMemberForm({
@@ -18,6 +19,7 @@ export default function EditMemberForm({
   email,
   phone,
   hasPassword,
+  canResetPassword,
 }: Props) {
   const boundAction = updateMember.bind(null, memberId);
   const [state, formAction, pending] = useActionState<MemberFormState, FormData>(
@@ -26,11 +28,13 @@ export default function EditMemberForm({
   );
   const passwordRef = useRef<HTMLInputElement>(null);
   const confirmPasswordRef = useRef<HTMLInputElement>(null);
+  const adminPasswordRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!state?.ok) return;
     if (passwordRef.current) passwordRef.current.value = "";
     if (confirmPasswordRef.current) confirmPasswordRef.current.value = "";
+    if (adminPasswordRef.current) adminPasswordRef.current.value = "";
   }, [state]);
 
   return (
@@ -44,6 +48,14 @@ export default function EditMemberForm({
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
           บันทึกข้อมูลสมาชิกเรียบร้อยแล้ว
         </div>
+      ) : null}
+
+      {!canResetPassword ? (
+        <>
+          <input type="hidden" name="password" value="" />
+          <input type="hidden" name="confirmPassword" value="" />
+          <input type="hidden" name="adminPassword" value="" />
+        </>
       ) : null}
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
@@ -94,6 +106,7 @@ export default function EditMemberForm({
         </div>
       </section>
 
+      {canResetPassword ? (
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
         <h2 className="text-lg font-bold text-green-900">ตั้งรหัสผ่านใหม่</h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -124,8 +137,24 @@ export default function EditMemberForm({
               placeholder="กรอกให้ตรงกับรหัสผ่านใหม่"
             />
           </Field>
+
+          <div className="md:col-span-2">
+            <Field
+              label="รหัสผ่านปัจจุบันของผู้ดูแล"
+              error={state?.fieldErrors?.adminPassword?.[0]}
+            >
+              <PasswordInput
+                ref={adminPasswordRef}
+                name="adminPassword"
+                maxLength={200}
+                autoComplete="current-password"
+                placeholder="กรอกเมื่อกำหนดรหัสผ่านใหม่ให้สมาชิก"
+              />
+            </Field>
+          </div>
         </div>
       </section>
+      ) : null}
 
       <div className="flex justify-end">
         <button

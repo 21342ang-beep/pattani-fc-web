@@ -1,10 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  cancelCustomerRegistrationChallenge,
   registerCustomer,
+  verifyCustomerRegistrationOtp,
   type CustomerAuthState,
 } from "@/app/actions/customer-auth";
 import PasswordInput from "@/components/PasswordInput";
@@ -33,11 +35,16 @@ export default function RegisterForm({
   const [postalCode, setPostalCode] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [resettingRegistration, startRegistrationReset] = useTransition();
   const router = useRouter();
   const [state, formAction, pending] = useActionState<CustomerAuthState, FormData>(
     registerCustomer,
     undefined,
   );
+  const [otpState, otpAction, verifyingOtp] = useActionState<
+    CustomerAuthState,
+    FormData
+  >(verifyCustomerRegistrationOtp, undefined);
   const fe = state?.fieldErrors ?? {};
   const selectedProvince = shippingProvinces.find((item) => item.name === province);
   const selectedDistrict = selectedProvince?.districts.find((item) => item.name === district);
@@ -45,6 +52,10 @@ export default function RegisterForm({
   useEffect(() => {
     if (state?.redirectTo) router.replace(state.redirectTo);
   }, [router, state?.redirectTo]);
+
+  useEffect(() => {
+    if (otpState?.redirectTo) router.replace(otpState.redirectTo);
+  }, [otpState?.redirectTo, router]);
 
   useEffect(() => {
     if (!state) return;
@@ -62,6 +73,88 @@ export default function RegisterForm({
     const nextDistrict = selectedProvince?.districts.find((item) => item.name === value);
     setDistrict(value);
     setPostalCode(nextDistrict?.postalCodes.length === 1 ? nextDistrict.postalCodes[0] : "");
+  }
+
+  if (state?.otpRequired) {
+    return (
+      <div className="space-y-5">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-sm font-bold uppercase tracking-wider text-emerald-800">
+            ขั้นตอนที่ 2 จาก 2
+          </p>
+          <h2 className="mt-1 text-xl font-black text-green-950">
+            ยืนยันเบอร์มือถือด้วย OTP
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-emerald-900">
+            ส่งรหัสไปที่ {state.maskedPhone ?? "เบอร์ที่กรอก"}
+            {state.reference ? ` · Ref ${state.reference}` : ""}
+          </p>
+          <p className="mt-2 text-sm font-medium text-amber-900">
+            บัญชียังไม่ถูกเปิดและยังไม่มีการเข้าสู่ระบบ จนกว่าจะยืนยันรหัสสำเร็จ
+          </p>
+        </div>
+
+        <form action={otpAction} className="space-y-4">
+          <div>
+            <label className="block text-base font-semibold text-green-900">
+              รหัส OTP <span className="text-sm text-red-600">* จำเป็น</span>
+            </label>
+            <input
+              name="pin"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{4,8}"
+              minLength={4}
+              maxLength={8}
+              autoComplete="one-time-code"
+              required
+              autoFocus
+              className="mt-1.5 w-full rounded-md border border-green-200 px-4 py-3 text-center text-xl tracking-[0.35em] outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+              placeholder="••••••"
+            />
+          </div>
+          {otpState?.error && (
+            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+              {otpState.error}
+            </p>
+          )}
+          {otpState?.registered && (
+            <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              ยืนยันสำเร็จ กำลังเข้าสู่หน้าสมาชิก…
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={verifyingOtp || Boolean(otpState?.registered)}
+            className="w-full rounded-md bg-green-800 px-4 py-3 text-base font-bold text-yellow-300 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-white md:text-lg"
+          >
+            {verifyingOtp ? "กำลังยืนยัน..." : "ยืนยันและเปิดบัญชี"}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          disabled={resettingRegistration || verifyingOtp}
+          onClick={() => {
+            startRegistrationReset(async () => {
+              try {
+                await cancelCustomerRegistrationChallenge();
+              } finally {
+                window.location.reload();
+              }
+            });
+          }}
+          className="w-full text-sm font-semibold text-green-800 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+        >
+          {resettingRegistration
+            ? "กำลังล้างคำขอเดิม..."
+            : "แก้เบอร์/ข้อมูล หรือขอ OTP ใหม่"}
+        </button>
+        <p className="text-center text-xs text-slate-500">
+          รหัสและคำขอนี้หมดอายุภายใน 10 นาที การออกจากหน้านี้จะไม่สร้างบัญชีค้างไว้
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -95,6 +188,7 @@ export default function RegisterForm({
           name="email"
           type="email"
           autoComplete="email"
+          required
           error={fe.email}
         />
         <Field

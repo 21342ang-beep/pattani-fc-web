@@ -1,4 +1,9 @@
 import type { CollectionConfig } from "payload";
+import {
+  contentManagersOnly,
+  hideFromNonContentManagers,
+  activeContentRead,
+} from "../access";
 
 export const Players: CollectionConfig = {
   slug: "players",
@@ -7,12 +12,13 @@ export const Players: CollectionConfig = {
     useAsTitle: "name",
     group: "เนื้อหา",
     defaultColumns: ["jerseyNumber", "name", "position", "active"],
+    hidden: hideFromNonContentManagers,
   },
   access: {
-    read: () => true,
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: activeContentRead,
+    create: contentManagersOnly,
+    update: contentManagersOnly,
+    delete: contentManagersOnly,
   },
   fields: [
     { name: "name", type: "text", label: "ชื่อ-นามสกุล", required: true },

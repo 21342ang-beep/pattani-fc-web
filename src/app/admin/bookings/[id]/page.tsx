@@ -23,11 +23,28 @@ export default async function AdminBookingDetailPage({ params }: { params: Promi
   const booking = await prisma.booking.findUnique({
     where: { id },
     include: {
-      match: { select: { homeTeam: true, awayTeam: true, kickoffAt: true, venue: true } },
+      match: { select: { homeTeam: true, awayTeam: true, kickoffAt: true, venue: true, status: true } },
       auditLogs: { orderBy: { createdAt: "desc" } },
+      beamPayments: { where: { status: "SUCCEEDED" }, select: { id: true }, take: 1 },
+      xenditPayments: { where: { status: "SUCCEEDED" }, select: { id: true }, take: 1 },
+      _count: { select: { gateScans: true } },
     },
   });
   if (!booking) notFound();
+
+  const onlinePaymentVerified = booking.beamPayments.length > 0 || booking.xenditPayments.length > 0;
+  const canChangeZone =
+    booking.status === "CONFIRMED" &&
+    booking.paidAt != null &&
+    booking.zone != null &&
+    booking.seatNumbers.length === 0 &&
+    booking.scannedAt == null &&
+    booking._count.gateScans === 0 &&
+    (booking.salesChannel === "STAFF" || onlinePaymentVerified) &&
+    booking.match.status !== "CANCELLED" &&
+    booking.match.status !== "FINISHED" &&
+    booking.match.kickoffAt != null &&
+    booking.match.kickoffAt > new Date();
 
   const seller = booking.soldById
     ? await prisma.user.findUnique({ where: { id: booking.soldById }, select: { name: true, email: true } })
@@ -46,6 +63,9 @@ export default async function AdminBookingDetailPage({ params }: { params: Promi
             </label>
             {booking.status !== "CANCELLED" && booking.status !== "REFUNDED" && (
               <Link href={`/admin/bookings/${booking.id}/edit`} className="rounded-lg bg-green-800 px-4 py-2.5 font-bold text-yellow-300 hover:bg-green-900">แก้ไขข้อมูล</Link>
+            )}
+            {canChangeZone && (
+              <Link href={`/admin/bookings/${booking.id}/change-zone`} className="rounded-lg bg-violet-700 px-4 py-2.5 font-bold text-white hover:bg-violet-800">เปลี่ยนโซน</Link>
             )}
             <DeleteBookingButton
               bookingId={booking.id}

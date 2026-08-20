@@ -19,23 +19,41 @@ const ALL_PERMISSIONS: Permission[] = [
 async function main() {
   const email = process.env.SEED_ADMIN_EMAIL;
   const password = process.env.SEED_ADMIN_PASSWORD;
-  if (!email || !password) {
-    throw new Error("ตั้งค่า SEED_ADMIN_EMAIL และ SEED_ADMIN_PASSWORD ใน .env.local ก่อน");
+  if (!email) {
+    throw new Error("ตั้งค่า SEED_ADMIN_EMAIL ใน .env.local ก่อน");
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  const admin = await prisma.user.upsert({
-    where: { email: email.toLowerCase() },
-    update: { permissions: ALL_PERMISSIONS },
-    create: {
-      email: email.toLowerCase(),
-      passwordHash,
-      name: "Administrator",
-      role: "SUPER_ADMIN",
-      permissions: ALL_PERMISSIONS,
-    },
+  const normalizedEmail = email.toLowerCase();
+  const existingAdmin = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true },
   });
+
+  let admin;
+  if (existingAdmin) {
+    // A deploy must never rotate an existing administrator's password from an
+    // environment variable. Credential changes belong in the audited UI.
+    admin = await prisma.user.update({
+      where: { id: existingAdmin.id },
+      data: { permissions: ALL_PERMISSIONS },
+    });
+  } else {
+    if (!password) {
+      throw new Error(
+        "ตั้งค่า SEED_ADMIN_PASSWORD ชั่วคราวสำหรับการสร้างผู้ดูแลครั้งแรก",
+      );
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    admin = await prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        passwordHash,
+        name: "Administrator",
+        role: "SUPER_ADMIN",
+        permissions: ALL_PERMISSIONS,
+      },
+    });
+  }
   console.log(`✓ Admin พร้อมใช้: ${admin.email}`);
 
   const existing = await prisma.match.count();

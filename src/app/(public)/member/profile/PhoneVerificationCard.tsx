@@ -25,7 +25,13 @@ export default function PhoneVerificationCard({
   );
 
   useEffect(() => {
-    if (verifyState && "verified" in verifyState) router.refresh();
+    if (
+      verifyState &&
+      "verified" in verifyState &&
+      !verifyState.phoneLinkWarning
+    ) {
+      router.refresh();
+    }
   }, [router, verifyState]);
 
   if (verifiedAtLabel) {
@@ -77,6 +83,13 @@ export default function PhoneVerificationCard({
         {verifyState && "error" in verifyState && (
           <p className="mt-2 text-sm text-red-700">{verifyState.error}</p>
         )}
+        {verifyState &&
+          "verified" in verifyState &&
+          verifyState.phoneLinkWarning && (
+            <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {verifyState.phoneLinkWarning}
+            </p>
+          )}
       </section>
     );
   }

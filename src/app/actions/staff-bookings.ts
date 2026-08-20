@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { activeBookingStatusWhere } from "@/lib/booking-expiry";
+import { cancellablePendingBookingWhere } from "@/lib/booking-expiry-policy";
 import { normalizeBookingSearchPhone } from "@/lib/booking-search-otp";
 import { verifyPermission } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
@@ -110,7 +111,7 @@ export async function createStaffBooking(
       await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${match.id}`}))`);
       const now = new Date();
       await tx.booking.updateMany({
-        where: { matchId: match.id, status: "PENDING", paymentExpiresAt: { lte: now } },
+        where: { matchId: match.id, ...cancellablePendingBookingWhere(now) },
         data: { status: "CANCELLED" },
       });
 

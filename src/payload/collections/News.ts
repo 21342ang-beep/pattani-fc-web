@@ -1,16 +1,26 @@
 import type { CollectionConfig } from "payload";
+import {
+  contentManagersOnly,
+  hideFromNonContentManagers,
+  publishedContentRead,
+} from "../access";
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,99}$/;
 
 export const News: CollectionConfig = {
   slug: "news",
   labels: { singular: "ข่าวสาร", plural: "ข่าวสาร" },
-  admin: { useAsTitle: "title", group: "เนื้อหา", defaultColumns: ["title", "publishedAt", "status"] },
+  admin: {
+    useAsTitle: "title",
+    group: "เนื้อหา",
+    defaultColumns: ["title", "publishedAt", "status"],
+    hidden: hideFromNonContentManagers,
+  },
   access: {
-    read: () => true,
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: publishedContentRead,
+    create: contentManagersOnly,
+    update: contentManagersOnly,
+    delete: contentManagersOnly,
   },
   fields: [
     { name: "title", type: "text", label: "หัวข้อ", required: true },

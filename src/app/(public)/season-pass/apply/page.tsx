@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getAllProvinces } from "geothai";
 import { prisma } from "@/lib/prisma";
-import { readCustomerSession } from "@/lib/customer-session";
+import { getOptionalCustomer } from "@/lib/customer-dal";
 import { SEASON_LABEL, getSeasonTier } from "@/lib/season-pass-tiers";
 import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
@@ -30,15 +30,15 @@ export default async function SeasonPassApplyPage(props: {
 
   // ⚠️ mock flow — ไม่มีการเขียน DB ใด ๆ
   // session ใช้แค่ auto-fill ฟอร์มให้สมาชิก (guest กรอกเองได้)
-  const session = await readCustomerSession();
-  if (!session) {
+  const identity = await getOptionalCustomer();
+  if (!identity) {
     // ต้องเป็นสมาชิกก่อนจอง — เข้าสู่ระบบ (หรือกดสมัครจากหน้า login) แล้วเด้งกลับมาต่อ
     redirect(`/member/login?returnTo=${encodeURIComponent(`/tickets/season/apply?tier=${tier.id}`)}`);
   }
   await expirePendingSeasonPassPurchases();
   const [customer, quotas, soldGroups] = await Promise.all([
     prisma.customer.findUnique({
-      where: { id: session.customerId },
+      where: { id: identity.id },
       select: {
         name: true,
         email: true,
@@ -73,7 +73,7 @@ export default async function SeasonPassApplyPage(props: {
   });
   const memberEmail = customer?.email.endsWith("@accounts.pattanifc.local")
     ? null
-    : (customer?.email ?? session.email);
+    : (customer?.email ?? identity.email);
   const shippingProvinces: ShippingProvince[] = getAllProvinces()
     .map((province) => ({
       name: province.name_th,
@@ -98,14 +98,14 @@ export default async function SeasonPassApplyPage(props: {
           สมัคร {tier.name}
         </h1>
         <p className="mt-2 text-base text-slate-600">
-          {`ยินดีต้อนรับกลับ ${session.name} — เราเติมข้อมูลสมาชิกให้แล้ว`}
+          {`ยินดีต้อนรับกลับ ${identity.name} — เราเติมข้อมูลสมาชิกให้แล้ว`}
         </p>
       </div>
 
       <SeasonPassWizard
         tier={tier}
         memberEmail={memberEmail}
-        defaultName={customer?.name ?? session.name}
+        defaultName={customer?.name ?? identity.name}
         defaultPhone={customer?.phone ?? ""}
         defaultAddress={customer?.address ?? ""}
         defaultProvince={customer?.province ?? ""}

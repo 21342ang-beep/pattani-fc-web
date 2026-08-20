@@ -1,4 +1,9 @@
 import type { CollectionConfig } from "payload";
+import {
+  contentManagersOnly,
+  hideFromNonContentManagers,
+  activeContentRead,
+} from "../access";
 
 export const Products: CollectionConfig = {
   slug: "products",
@@ -7,12 +12,13 @@ export const Products: CollectionConfig = {
     useAsTitle: "name",
     group: "ร้านค้า",
     defaultColumns: ["name", "price", "category", "active"],
+    hidden: hideFromNonContentManagers,
   },
   access: {
-    read: () => true,
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: activeContentRead,
+    create: contentManagersOnly,
+    update: contentManagersOnly,
+    delete: contentManagersOnly,
   },
   fields: [
     { name: "name", type: "text", label: "ชื่อสินค้า", required: true },

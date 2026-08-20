@@ -12,7 +12,7 @@ export default async function EditMemberPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await verifyPermission("MEMBER_DATA");
+  const actor = await verifyPermission("MEMBER_DATA");
   const { id } = await params;
   if (!/^[a-z0-9]+$/i.test(id)) notFound();
 
@@ -49,6 +49,7 @@ export default async function EditMemberPage({
         email={member.email}
         phone={member.phone ?? ""}
         hasPassword={Boolean(member.passwordHash)}
+        canResetPassword={actor.role === "SUPER_ADMIN"}
       />
     </div>
   );

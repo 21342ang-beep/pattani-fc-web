@@ -7,6 +7,10 @@ import type { Permission } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifySuperAdmin } from "@/lib/dal";
 import { ALL_PERMISSIONS } from "@/lib/admin-permissions";
+import {
+  canChangeAdminRole,
+  canDeleteAdminRole,
+} from "@/lib/admin-user-policy";
 
 // Server actions สำหรับหน้า /admin/users
 // ทุก action ต้องเป็น SUPER_ADMIN เท่านั้น
@@ -124,14 +128,10 @@ export async function updateAdmin(
     };
   }
 
-  // ถ้ากำลังจะลด role คนอื่นจาก SUPER_ADMIN → ต้องเหลือ SUPER_ADMIN อย่างน้อย 1 คน
-  if (target.role === "SUPER_ADMIN" && parsed.data.role !== "SUPER_ADMIN") {
-    const remaining = await prisma.user.count({
-      where: { role: "SUPER_ADMIN", NOT: { id: target.id } },
-    });
-    if (remaining === 0) {
-      return { error: "ต้องมี SUPER_ADMIN อย่างน้อย 1 คนในระบบ" };
-    }
+  // A recovery script with an explicit database lock is required to demote a
+  // SUPER_ADMIN. This removes the concurrent last-admin race from the web UI.
+  if (!canChangeAdminRole(target.role, parsed.data.role)) {
+    return { error: "ไม่สามารถลดสิทธิ์ SUPER_ADMIN ผ่านหน้าเว็บได้" };
   }
 
   await prisma.user.update({
@@ -140,6 +140,7 @@ export async function updateAdmin(
       name: parsed.data.name ?? null,
       role: parsed.data.role,
       permissions: parsed.data.permissions,
+      authVersion: { increment: 1 },
     },
   });
 
@@ -172,7 +173,7 @@ export async function resetAdminPassword(
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash },
+    data: { passwordHash, authVersion: { increment: 1 } },
   });
   return { ok: true };
 }
@@ -193,13 +194,8 @@ export async function deleteAdmin(
   });
   if (!target) return { error: "ไม่พบผู้ดูแลรายนี้" };
 
-  if (target.role === "SUPER_ADMIN") {
-    const remaining = await prisma.user.count({
-      where: { role: "SUPER_ADMIN", NOT: { id: target.id } },
-    });
-    if (remaining === 0) {
-      return { error: "ต้องมี SUPER_ADMIN อย่างน้อย 1 คนในระบบ" };
-    }
+  if (!canDeleteAdminRole(target.role)) {
+    return { error: "ไม่สามารถลบ SUPER_ADMIN ผ่านหน้าเว็บได้" };
   }
 
   await prisma.user.delete({ where: { id: userId } });

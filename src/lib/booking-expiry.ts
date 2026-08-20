@@ -1,13 +1,19 @@
 import "server-only";
 
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { PAYMENT_EVIDENCE_RETENTION_STATUSES } from "@/lib/payment-state";
 import { prisma } from "@/lib/prisma";
+import {
+  bookingProviderGraceCutoff,
+  cancellablePendingBookingWhere,
+} from "@/lib/booking-expiry-policy";
 
 export const BOOKING_RESERVATION_MS = 5 * 60 * 1000;
 
 // Keep expired online bookings that reached a payment provider for a short
-// reconciliation window. They are hidden from the admin list immediately,
-// but retaining them lets a delayed, valid webhook confirm an on-time payment.
+// reconciliation window. Successful or review-required payment evidence is
+// retained indefinitely; other provider attempts may be cleaned after this
+// window once their QR can no longer be paid.
 export const BOOKING_PAYMENT_RECONCILIATION_MS = 24 * 60 * 60 * 1000;
 
 export function newBookingPaymentDeadline(now = new Date()) {
@@ -15,10 +21,33 @@ export function newBookingPaymentDeadline(now = new Date()) {
 }
 
 export function activeBookingStatusWhere(now = new Date()): Prisma.BookingWhereInput {
+  const providerGraceCutoff = bookingProviderGraceCutoff(now);
   return {
     OR: [
       { status: "CONFIRMED" },
       { status: "PENDING", paymentExpiresAt: { gt: now } },
+      {
+        status: "PENDING",
+        OR: [
+          {
+            beamPayments: {
+              some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } },
+            },
+          },
+          {
+            xenditPayments: {
+              some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } },
+            },
+          },
+          {
+            paymentExpiresAt: { gt: providerGraceCutoff },
+            OR: [
+              { beamPayments: { some: { status: { in: ["INITIATED", "PENDING"] } } } },
+              { xenditPayments: { some: { status: "PENDING" } } },
+            ],
+          },
+        ],
+      },
     ],
   };
 }
@@ -35,14 +64,52 @@ export async function expirePendingBookings(input: {
   };
 
   return prisma.$transaction(async (tx) => {
+    const reconciliationCutoff = new Date(
+      now.getTime() - BOOKING_PAYMENT_RECONCILIATION_MS,
+    );
+    const matchIds = (await tx.booking.findMany({
+      where: {
+        ...target,
+        salesChannel: "ONLINE",
+        paidAt: null,
+        OR: [
+          {
+            ...cancellablePendingBookingWhere(now),
+          },
+          {
+            status: "CANCELLED",
+            paymentExpiresAt: { lte: now },
+            beamPayments: { none: {} },
+            xenditPayments: { none: {} },
+          },
+          {
+            status: "CANCELLED",
+            paymentExpiresAt: { lte: reconciliationCutoff },
+            beamPayments: {
+              none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } },
+            },
+            xenditPayments: {
+              none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } },
+            },
+          },
+        ],
+      },
+      distinct: ["matchId"],
+      select: { matchId: true },
+    })).map((booking) => booking.matchId);
+    // Use the same ordered advisory locks as booking creation and payment
+    // confirmation. This prevents cleanup from deleting a payment row while a
+    // signed provider webhook is moving it to SUCCEEDED/REVIEW_REQUIRED.
+    for (const matchId of matchIds.sort()) {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${matchId}`}))`,
+      );
+    }
+
     const expired = await tx.booking.updateMany({
       where: {
-        status: "PENDING",
+        ...cancellablePendingBookingWhere(now),
         salesChannel: "ONLINE",
-        paymentExpiresAt: { lte: now },
-        paidAt: null,
-        beamPayments: { none: { status: "SUCCEEDED" } },
-        xenditPayments: { none: { status: "SUCCEEDED" } },
         ...target,
       },
       data: { status: "CANCELLED" },
@@ -68,10 +135,10 @@ export async function expirePendingBookings(input: {
         salesChannel: "ONLINE",
         paidAt: null,
         paymentExpiresAt: {
-          lte: new Date(now.getTime() - BOOKING_PAYMENT_RECONCILIATION_MS),
+          lte: reconciliationCutoff,
         },
-        beamPayments: { none: { status: "SUCCEEDED" } },
-        xenditPayments: { none: { status: "SUCCEEDED" } },
+        beamPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
+        xenditPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
         ...target,
       },
     });

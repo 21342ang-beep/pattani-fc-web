@@ -5,12 +5,18 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { readCustomerSession } from "@/lib/customer-session";
+import { getOptionalCustomer } from "@/lib/customer-dal";
+import { createSeasonPassBarcodeAccessToken } from "@/lib/season-pass-barcode-access";
+import { grantBookingRecoveryAccess } from "@/lib/booking-access";
 import {
   BOOKING_SEARCH_OTP_COOKIE,
   bookingSearchPhoneVariants,
   normalizeBookingSearchPhone,
 } from "@/lib/booking-search-otp";
+import {
+  claimVerifiedPhoneForCustomer,
+  type VerifiedPhoneClaimResult,
+} from "@/lib/customer-phone-ownership";
 
 const OTP_TTL_MS = 10 * 60_000;
 const phoneSchema = z.string().trim().regex(/^[0-9+\-\s()]{6,20}$/);
@@ -27,6 +33,7 @@ export type BookingSearchResult = {
 
 export type SeasonPassSearchResult = {
   passCode: string;
+  barcodeAccessToken?: string;
   status: string;
   tierId: string;
   priceBaht: number;
@@ -45,7 +52,11 @@ export type BookingSearchResults = {
 
 export type VerifyBookingSearchOtpState =
   | { error: string }
-  | { verified: true; results: BookingSearchResults }
+  | {
+      verified: true;
+      results: BookingSearchResults;
+      phoneLinkWarning?: string;
+    }
   | undefined;
 
 function getCredentials() {
@@ -81,12 +92,21 @@ function logOtpProviderFailure(status: number, data: unknown) {
   });
 }
 
-async function findBookings(phone: string): Promise<BookingSearchResult[]> {
+async function findBookings(
+  phone: string,
+  currentCustomerId: string | null,
+): Promise<BookingSearchResult[]> {
   const [domesticPhone, internationalPhone] = bookingSearchPhoneVariants(phone);
   const bookingRows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM "Booking"
-    WHERE regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
-       OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}
+    WHERE (
+      regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
+      OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}
+    )
+      AND (
+        "customerId" IS NULL
+        OR "customerId" = ${currentCustomerId}
+      )
   `;
   if (bookingRows.length === 0) return [];
 
@@ -119,12 +139,21 @@ async function findBookings(phone: string): Promise<BookingSearchResult[]> {
   }));
 }
 
-async function findSeasonPasses(phone: string): Promise<SeasonPassSearchResult[]> {
+async function findSeasonPasses(
+  phone: string,
+  currentCustomerId: string | null,
+): Promise<SeasonPassSearchResult[]> {
   const [domesticPhone, internationalPhone] = bookingSearchPhoneVariants(phone);
   const orderRows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM "SeasonPassOrder"
-    WHERE regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
-       OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}
+    WHERE (
+      regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
+      OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}
+    )
+      AND (
+        "customerId" IS NULL
+        OR "customerId" = ${currentCustomerId}
+      )
   `;
   if (orderRows.length === 0) return [];
 
@@ -139,38 +168,53 @@ async function findSeasonPasses(phone: string): Promise<SeasonPassSearchResult[]
       tierId: true,
       priceBaht: true,
       createdAt: true,
+      barcode: {
+        select: {
+          id: true,
+          barcode: true,
+          gateVersion: true,
+          gateNonce: true,
+          orderId: true,
+        },
+      },
     },
   });
 
-  return orders.map((order) => ({
-    passCode: order.passCode,
-    status: order.status,
-    tierId: order.tierId,
-    priceBaht: order.priceBaht,
-    createdAt: order.createdAt.toISOString(),
-  }));
+  return Promise.all(
+    orders.map(async (order) => ({
+      passCode: order.passCode,
+      ...(order.status === "CONFIRMED" && order.barcode
+        ? {
+            barcodeAccessToken:
+              await createSeasonPassBarcodeAccessToken({
+                barcodeId: order.barcode.id,
+                barcode: order.barcode.barcode,
+                gateVersion: order.barcode.gateVersion,
+                gateNonce: order.barcode.gateNonce,
+                orderId: order.barcode.orderId,
+              }),
+          }
+        : {}),
+      status: order.status,
+      tierId: order.tierId,
+      priceBaht: order.priceBaht,
+      createdAt: order.createdAt.toISOString(),
+    })),
+  );
 }
 
-async function markCurrentCustomerPhoneVerified(phone: string): Promise<void> {
-  const session = await readCustomerSession();
-  if (!session) return;
-  const customer = await prisma.customer.findUnique({
-    where: { id: session.customerId },
-    select: { id: true, phone: true, phoneVerifiedAt: true },
-  });
-  if (
-    !customer?.phone ||
-    normalizeBookingSearchPhone(customer.phone) !== normalizeBookingSearchPhone(phone)
-  ) {
-    return;
-  }
-  if (!customer.phoneVerifiedAt) {
-    await prisma.customer.update({
-      where: { id: customer.id },
-      data: { phoneVerifiedAt: new Date() },
-    });
+async function markCurrentCustomerPhoneVerified(
+  phone: string,
+): Promise<VerifiedPhoneClaimResult> {
+  const customer = await getOptionalCustomer();
+  if (!customer) return "not_applicable";
+  const result = await claimVerifiedPhoneForCustomer(customer.id, phone);
+  if (result === "verified") {
     revalidatePath("/member/profile");
+    revalidatePath("/member");
+    revalidatePath("/member/bookings");
   }
+  return result;
 }
 
 export async function requestBookingSearchOtp(
@@ -198,13 +242,15 @@ export async function requestBookingSearchOtp(
   if (!/^0[689]\d{8}$/.test(phone)) {
     return { error: "กรุณากรอกเบอร์มือถือไทย 10 หลัก เช่น 0929810552" };
   }
-  const recentRows = await prisma.$queryRaw<{ count: number }[]>`
-    SELECT COUNT(*)::int AS "count" FROM "BookingSearchOtp"
-    WHERE "phone" = ${phone}
-      AND "createdAt" > ${new Date(Date.now() - 15 * 60_000)}
-  `;
-  const recentForPhone = recentRows[0]?.count ?? 0;
-  if (recentForPhone >= 3) {
+  // Consume the per-phone quota atomically before contacting the SMS provider.
+  // A COUNT followed by INSERT lets simultaneous requests from many IPs all
+  // pass the same check and spam one customer/consume SMS credit.
+  const phoneLimit = await rateLimit("booking_search_otp_phone", {
+    max: 3,
+    windowMs: 15 * 60_000,
+    ip: phone,
+  });
+  if (!phoneLimit.ok) {
     return { error: "ส่งรหัสไปยังเบอร์นี้บ่อยเกินไป กรุณาลองใหม่ภายหลัง" };
   }
 
@@ -273,22 +319,16 @@ export async function verifyBookingSearchOtp(
     providerToken: string;
     attempts: number;
   }[]>`
-    SELECT "id", "phone", "providerToken", "attempts"
-    FROM "BookingSearchOtp"
+    UPDATE "BookingSearchOtp"
+    SET "attempts" = "attempts" + 1
     WHERE "id" = ${requestId}
       AND "expiresAt" > NOW()
       AND "verifiedAt" IS NULL
-    LIMIT 1
+      AND "attempts" < 5
+    RETURNING "id", "phone", "providerToken", "attempts"
   `;
   const request = requests[0];
-  if (!request) return { error: "รหัส OTP หมดอายุ กรุณาส่งรหัสใหม่" };
-  if (request.attempts >= 5) return { error: "กรอกรหัสไม่ถูกต้องหลายครั้ง กรุณาส่งรหัสใหม่" };
-
-  await prisma.$executeRaw`
-    UPDATE "BookingSearchOtp"
-    SET "attempts" = "attempts" + 1
-    WHERE "id" = ${request.id}
-  `;
+  if (!request) return { error: "รหัส OTP หมดอายุหรือกรอกไม่ถูกต้องหลายครั้ง กรุณาส่งรหัสใหม่" };
 
   try {
     const { ok, data } = await thaiBulkSmsRequest("/v2/otp/verify", {
@@ -308,16 +348,32 @@ export async function verifyBookingSearchOtp(
     `;
     // ไม่ส่ง OTP เพิ่ม: ถ้าผู้ใช้ล็อกอินอยู่และเบอร์ตรงกับโปรไฟล์
     // ให้ OTP ที่เพิ่งผ่านนี้ยืนยันเบอร์สมาชิกไปพร้อมกัน
-    await markCurrentCustomerPhoneVerified(request.phone).catch((error) => {
+    let phoneLinkWarning: string | undefined;
+    try {
+      const linkResult = await markCurrentCustomerPhoneVerified(request.phone);
+      if (linkResult === "conflict") {
+        phoneLinkWarning =
+          "เบอร์นี้ถูกยืนยันกับบัญชีสมาชิกอื่นแล้ว จึงยังไม่ผูกตั๋วกับบัญชีนี้ กรุณาติดต่อทีมงาน";
+      }
+    } catch (error) {
       console.error("Failed to mark customer phone as verified", {
         error: error instanceof Error ? error.message : "unknown",
       });
-    });
+    }
+    const currentCustomer = await getOptionalCustomer();
     const [bookings, seasonPasses] = await Promise.all([
-      findBookings(request.phone),
-      findSeasonPasses(request.phone),
+      findBookings(request.phone, currentCustomer?.id ?? null),
+      findSeasonPasses(request.phone, currentCustomer?.id ?? null),
     ]);
-    return { verified: true, results: { bookings, seasonPasses } };
+    await grantBookingRecoveryAccess({
+      phone: request.phone,
+      customerId: currentCustomer?.id ?? null,
+    });
+    return {
+      verified: true,
+      results: { bookings, seasonPasses },
+      phoneLinkWarning,
+    };
   } catch {
     return { error: "ไม่สามารถยืนยันรหัส OTP ได้ กรุณาลองใหม่" };
   }

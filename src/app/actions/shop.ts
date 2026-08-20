@@ -1,9 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { payload } from "@/lib/payload";
+import { rateLimit } from "@/lib/rate-limit";
+import {
+  createShopOrderAccessToken,
+  SHOP_ORDER_ACCESS_COOKIE,
+} from "@/lib/shop-order-access";
 
 // ---- safety design notes ----
 // 1) ทุกราคาคำนวณใหม่จาก Payload (CMS) — ห้ามเชื่อ unitPrice จาก client
@@ -146,6 +152,19 @@ export async function createShopOrder(
   _prev: ShopOrderState,
   formData: FormData
 ): Promise<ShopOrderState> {
+  if (process.env.SHOP_CHECKOUT_ENABLED !== "true") {
+    return {
+      error:
+        "ระบบสั่งซื้อสินค้ายังไม่เปิดใช้งาน กรุณาติดต่อทีมงานก่อนทำรายการ",
+    };
+  }
+  const ipLimit = await rateLimit("shop_order_create_ip", {
+    max: 5,
+    windowMs: 10 * 60_000,
+  });
+  if (!ipLimit.ok) {
+    return { error: "ทำรายการบ่อยเกินไป กรุณาลองใหม่ภายหลัง" };
+  }
   // 1) แกะ items JSON จาก hidden field — กัน input ใหญ่เกิน 50KB
   const itemsRaw = String(formData.get("items") ?? "");
   if (itemsRaw.length > 50_000) {
@@ -181,6 +200,14 @@ export async function createShopOrder(
     return { error: "ข้อมูลไม่ถูกต้อง", fieldErrors };
   }
   const data = parsed.data;
+  const identityLimit = await rateLimit("shop_order_create_phone", {
+    max: 3,
+    windowMs: 30 * 60_000,
+    ip: data.customerPhone.replace(/\D/g, ""),
+  });
+  if (!identityLimit.ok) {
+    return { error: "ทำรายการจากข้อมูลนี้บ่อยเกินไป กรุณาลองใหม่ภายหลัง" };
+  }
 
   // 3) ดึงสินค้าจาก Payload ตามรายการใน cart — verify ราคาและ active ใหม่
   const cms = await payload();
@@ -289,7 +316,7 @@ export async function createShopOrder(
               },
             },
           },
-          select: { orderCode: true, customerPhone: true },
+          select: { orderCode: true },
         });
         return order;
       },
@@ -297,65 +324,19 @@ export async function createShopOrder(
     );
 
     revalidatePath("/shop");
+    const accessToken = await createShopOrderAccessToken(created.orderCode);
+    (await cookies()).set(SHOP_ORDER_ACCESS_COOKIE, accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/shop/order",
+      maxAge: 24 * 60 * 60,
+    });
     return {
       orderCode: created.orderCode,
-      redirectTo: `/shop/order/${created.orderCode}?phone=${encodeURIComponent(created.customerPhone)}`,
+      redirectTo: `/shop/order/${created.orderCode}`,
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "สร้างออเดอร์ไม่สำเร็จ" };
-  }
-}
-
-// ปุ่ม "ฉันชำระแล้ว" บนหน้าออเดอร์ — เปลี่ยน status เป็น PAID
-// production: ควรเป็น webhook จาก payment gateway ไม่ใช่ปุ่มจาก client
-const confirmSchema = z.object({
-  orderCode: z.string().trim().min(8).max(50).regex(/^[a-z0-9]+$/i),
-  phone: z.string().trim().regex(/^[0-9+\-\s()]{6,20}$/),
-});
-
-function normalizePhone(p: string): string {
-  return p.replace(/\D/g, "");
-}
-
-export async function confirmShopPayment(
-  _prev: ShopOrderState,
-  formData: FormData
-): Promise<ShopOrderState> {
-  const parsed = confirmSchema.safeParse({
-    orderCode: formData.get("orderCode"),
-    phone: formData.get("phone"),
-  });
-  if (!parsed.success) return { error: "ข้อมูลไม่ถูกต้อง" };
-
-  try {
-    await prisma.$transaction(
-      async (tx) => {
-        const o = await tx.shopOrder.findUnique({
-          where: { orderCode: parsed.data.orderCode },
-          select: { id: true, customerPhone: true, status: true, paymentMethod: true },
-        });
-        if (!o || normalizePhone(o.customerPhone) !== normalizePhone(parsed.data.phone)) {
-          throw new Error("ไม่พบออเดอร์ที่ตรงกับข้อมูล");
-        }
-        if (o.status !== "PENDING") return;
-        if (o.paymentMethod === "COD") {
-          // COD ห้ามกดยืนยันชำระเอง
-          throw new Error("ออเดอร์เก็บปลายทาง ไม่ต้องยืนยันการชำระล่วงหน้า");
-        }
-        await tx.shopOrder.update({
-          where: { id: o.id },
-          data: { status: "PAID", paidAt: new Date() },
-        });
-      },
-      { maxWait: 10_000, timeout: 15_000 }
-    );
-
-    revalidatePath(`/shop/order/${parsed.data.orderCode}`);
-    return {
-      orderCode: parsed.data.orderCode,
-      redirectTo: `/shop/order/${parsed.data.orderCode}?phone=${encodeURIComponent(parsed.data.phone)}`,
-    };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "ยืนยันไม่สำเร็จ" };
   }
 }

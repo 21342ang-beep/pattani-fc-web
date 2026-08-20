@@ -1,18 +1,29 @@
-// IndexedDB wrapper สำหรับ /gate-check
-// - ไม่พึ่ง library เพิ่ม เพื่อ bundle เล็กและ offline-ready
-// - 2 stores:
-//     whitelists  (keyPath: matchId)     — snapshot ของ CONFIRMED bookings ต่อแมตช์
-//     localScans  (keyPath: [matchId, bookingCode]) — บันทึก scan ฝั่งเครื่อง
-//                 + index "unsynced" สำหรับ sync ตอนกลับมาออนไลน์
+// IndexedDB storage for /gate-check. Gate data contains customer names and
+// ticket credentials, so every record is bound to one short-lived admin
+// session and is rejected after that session expires.
 
 import type { WhitelistEntry } from "@/app/actions/gate-check";
+import {
+  decideGateStorageTransition,
+  isGateOfflineSessionValid,
+  isGateRecordUsable,
+  nextGateAdmissionNumber,
+  type GateOfflineSession,
+} from "./offline-policy";
 
 const DB_NAME = "pattani-gate-check";
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 const STORE_WHITELIST = "whitelists";
 const STORE_SCANS = "localScans";
+const STORE_META = "metadata";
+const ACTIVE_SESSION_KEY = "active-session";
 
-export type StoredWhitelist = {
+type SessionBound = {
+  sessionId: string;
+  expiresAt: number;
+};
+
+export type StoredWhitelist = SessionBound & {
   matchId: string;
   matchInfo: {
     homeTeam: string;
@@ -21,37 +32,89 @@ export type StoredWhitelist = {
     kickoffAt: string | null;
   };
   entries: WhitelistEntry[];
-  generatedAt: string; // ISO
+  generatedAt: string;
 };
 
-export type LocalScan = {
+export type WhitelistSnapshot = Omit<
+  StoredWhitelist,
+  "sessionId" | "expiresAt"
+>;
+
+export type LocalScan = SessionBound & {
   matchId: string;
+  scanId: string;
   bookingCode: string;
-  scannedAt: string; // ISO
-  synced: 0 | 1; // ใช้ number → ทำ index ได้ (IDB ไม่รองรับ boolean ใน index)
+  admissionNumber: number;
+  scannedAt: string;
+  synced: 0 | 1;
+};
+
+export type ReserveAdmissionResult =
+  | { ok: true; scan: LocalScan }
+  | { ok: false; previousAt: string | null; currentCount: number };
+
+type StoredSessionMeta = {
+  key: typeof ACTIVE_SESSION_KEY;
+  sessionId: string;
+  expiresAt: number;
+};
+
+export type GateStorageInitResult = {
+  clearedLegacyData: boolean;
+  clearedPreviousSession: boolean;
 };
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+let activeSession: GateOfflineSession | null = null;
 
 function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
+      // v2 stored only one record per booking code. It cannot safely represent
+      // quantity > 1, so do not adopt those ambiguous offline records. Clearing
+      // all session-bound stores also ensures the operator must download a
+      // fresh whitelist before scanning with the v3 admission-slot format.
+      if ((event as IDBVersionChangeEvent).oldVersion < 3) {
+        for (const storeName of [STORE_WHITELIST, STORE_SCANS, STORE_META]) {
+          if (db.objectStoreNames.contains(storeName)) {
+            db.deleteObjectStore(storeName);
+          }
+        }
+      }
       if (!db.objectStoreNames.contains(STORE_WHITELIST)) {
         db.createObjectStore(STORE_WHITELIST, { keyPath: "matchId" });
       }
       if (!db.objectStoreNames.contains(STORE_SCANS)) {
         const scans = db.createObjectStore(STORE_SCANS, {
-          keyPath: ["matchId", "bookingCode"],
+          keyPath: ["matchId", "scanId"],
         });
         scans.createIndex("by_synced", ["matchId", "synced"]);
         scans.createIndex("by_match", "matchId");
+        scans.createIndex("by_booking", ["matchId", "bookingCode"]);
+      }
+      if (!db.objectStoreNames.contains(STORE_META)) {
+        db.createObjectStore(STORE_META, { keyPath: "key" });
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error);
+    };
+    req.onblocked = () => {
+      dbPromise = null;
+      reject(new Error("Gate offline database upgrade is blocked"));
+    };
   });
   return dbPromise;
 }
@@ -63,37 +126,148 @@ function wrap<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
+function txDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+function updateEveryRecord<T extends object>(
+  store: IDBObjectStore,
+  update: (record: T) => T | null,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = store.openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve();
+        return;
+      }
+      const next = update(cursor.value as T);
+      if (next) cursor.update(next);
+      else cursor.delete();
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function requireActiveSession(): GateOfflineSession {
+  if (!activeSession || !isGateOfflineSessionValid(activeSession)) {
+    activeSession = null;
+    throw new Error("Gate offline session has expired");
+  }
+  return activeSession;
+}
+
+/**
+ * Prepare the database for the server-authenticated session rendered into the
+ * page. Legacy v1 records have no trustworthy owner and are purged. A
+ * different or expired session is also purged rather than adopted.
+ */
+export async function initializeGateStorage(
+  session: GateOfflineSession,
+): Promise<GateStorageInitResult> {
+  if (!isGateOfflineSessionValid(session)) {
+    throw new Error("Gate offline session has expired");
+  }
+
+  const db = await openDb();
+  const tx = db.transaction(
+    [STORE_WHITELIST, STORE_SCANS, STORE_META],
+    "readwrite",
+  );
+  const whitelistStore = tx.objectStore(STORE_WHITELIST);
+  const scanStore = tx.objectStore(STORE_SCANS);
+  const metaStore = tx.objectStore(STORE_META);
+  const previous = await wrap<StoredSessionMeta | undefined>(
+    metaStore.get(ACTIVE_SESSION_KEY),
+  );
+
+  let clearedLegacyData = false;
+  let clearedPreviousSession = false;
+  const transition = decideGateStorageTransition(previous, session);
+
+  if (transition === "clear-legacy" || transition === "clear-session") {
+    clearedLegacyData = transition === "clear-legacy";
+    clearedPreviousSession = transition === "clear-session";
+    await Promise.all([
+      wrap(whitelistStore.clear()),
+      wrap(scanStore.clear()),
+    ]);
+  } else {
+    await updateEveryRecord<StoredWhitelist>(whitelistStore, (record) =>
+      isGateRecordUsable(record, session) ? record : null,
+    );
+    await updateEveryRecord<LocalScan>(scanStore, (record) =>
+      isGateRecordUsable(record, session) ? record : null,
+    );
+  }
+
+  await wrap(
+    metaStore.put({
+      key: ACTIVE_SESSION_KEY,
+      sessionId: session.id,
+      expiresAt: session.expiresAt,
+    } satisfies StoredSessionMeta),
+  );
+  await txDone(tx);
+  activeSession = session;
+
+  return { clearedLegacyData, clearedPreviousSession };
+}
+
+export async function clearAllGateStorage(): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction(
+    [STORE_WHITELIST, STORE_SCANS, STORE_META],
+    "readwrite",
+  );
+  tx.objectStore(STORE_WHITELIST).clear();
+  tx.objectStore(STORE_SCANS).clear();
+  tx.objectStore(STORE_META).clear();
+  await txDone(tx);
+  activeSession = null;
+}
+
 // ─── whitelist ─────────────────────────────────────────────
 
-export async function saveWhitelist(w: StoredWhitelist): Promise<void> {
+export async function saveWhitelist(
+  snapshot: WhitelistSnapshot,
+): Promise<StoredWhitelist> {
+  const session = requireActiveSession();
+  const stored: StoredWhitelist = {
+    ...snapshot,
+    sessionId: session.id,
+    expiresAt: session.expiresAt,
+  };
   const db = await openDb();
   const tx = db.transaction(STORE_WHITELIST, "readwrite");
-  await wrap(tx.objectStore(STORE_WHITELIST).put(w));
+  await wrap(tx.objectStore(STORE_WHITELIST).put(stored));
   await txDone(tx);
+  return stored;
 }
 
 export async function loadWhitelist(
-  matchId: string
+  matchId: string,
 ): Promise<StoredWhitelist | undefined> {
+  const session = requireActiveSession();
   const db = await openDb();
   const tx = db.transaction(STORE_WHITELIST, "readonly");
   const result = await wrap<StoredWhitelist | undefined>(
-    tx.objectStore(STORE_WHITELIST).get(matchId)
+    tx.objectStore(STORE_WHITELIST).get(matchId),
   );
-  return result;
-}
-
-export async function listWhitelists(): Promise<StoredWhitelist[]> {
-  const db = await openDb();
-  const tx = db.transaction(STORE_WHITELIST, "readonly");
-  return wrap(tx.objectStore(STORE_WHITELIST).getAll());
+  return result && isGateRecordUsable(result, session) ? result : undefined;
 }
 
 export async function deleteWhitelist(matchId: string): Promise<void> {
+  requireActiveSession();
   const db = await openDb();
   const tx = db.transaction([STORE_WHITELIST, STORE_SCANS], "readwrite");
   tx.objectStore(STORE_WHITELIST).delete(matchId);
-  // ล้าง localScans ของแมตช์นี้ด้วย
   const scanIdx = tx.objectStore(STORE_SCANS).index("by_match");
   const cursorReq = scanIdx.openCursor(IDBKeyRange.only(matchId));
   await new Promise<void>((resolve, reject) => {
@@ -102,71 +276,140 @@ export async function deleteWhitelist(matchId: string): Promise<void> {
       if (cursor) {
         cursor.delete();
         cursor.continue();
-      } else {
-        resolve();
-      }
+      } else resolve();
     };
     cursorReq.onerror = () => reject(cursorReq.error);
   });
   await txDone(tx);
 }
 
-// ─── local scans ─────────────────────────────────────────────
+// ─── local scans ────────────────────────────────────────────
 
-export async function recordScan(
+export async function reserveAdmissionScan(
   matchId: string,
   bookingCode: string,
-  scannedAt: string
-): Promise<void> {
+  serverScannedCount: number,
+  quantity: number,
+  scannedAt: string,
+): Promise<ReserveAdmissionResult> {
+  const session = requireActiveSession();
+  if (
+    !Number.isInteger(serverScannedCount) ||
+    serverScannedCount < 0 ||
+    !Number.isInteger(quantity) ||
+    quantity < 1
+  ) {
+    throw new Error("Invalid gate admission state");
+  }
   const db = await openDb();
   const tx = db.transaction(STORE_SCANS, "readwrite");
+  const store = tx.objectStore(STORE_SCANS);
+  const existing = await wrap<LocalScan[]>(
+    store
+      .index("by_booking")
+      .getAll(IDBKeyRange.only([matchId, bookingCode])),
+  );
+  const usable = existing.filter((record) => isGateRecordUsable(record, session));
+  const localAdmissionFloor = usable.reduce(
+    (highest, record) => Math.max(highest, record.admissionNumber),
+    0,
+  );
+  const admissionNumber = nextGateAdmissionNumber(
+    serverScannedCount,
+    localAdmissionFloor,
+    quantity,
+  );
+  if (admissionNumber == null) {
+    const previousAt = usable.reduce<string | null>((latest, record) => {
+      if (!latest || record.scannedAt > latest) return record.scannedAt;
+      return latest;
+    }, null);
+    await txDone(tx);
+    return {
+      ok: false,
+      previousAt,
+      currentCount: Math.max(serverScannedCount, localAdmissionFloor),
+    };
+  }
+
+  const scan: LocalScan = {
+    matchId,
+    scanId: crypto.randomUUID().replaceAll("-", ""),
+    bookingCode,
+    admissionNumber,
+    scannedAt,
+    synced: 0,
+    sessionId: session.id,
+    expiresAt: session.expiresAt,
+  };
   await wrap(
-    tx.objectStore(STORE_SCANS).put({
-      matchId,
-      bookingCode,
-      scannedAt,
-      synced: 0,
-    } satisfies LocalScan)
+    store.add(scan),
   );
   await txDone(tx);
+  return { ok: true, scan };
 }
 
-export async function getScan(
+export async function listUnsyncedScans(
   matchId: string,
-  bookingCode: string
-): Promise<LocalScan | undefined> {
-  const db = await openDb();
-  const tx = db.transaction(STORE_SCANS, "readonly");
-  return wrap(tx.objectStore(STORE_SCANS).get([matchId, bookingCode]));
-}
-
-export async function listUnsyncedScans(matchId: string): Promise<LocalScan[]> {
+): Promise<LocalScan[]> {
+  const session = requireActiveSession();
   const db = await openDb();
   const tx = db.transaction(STORE_SCANS, "readonly");
   const idx = tx.objectStore(STORE_SCANS).index("by_synced");
-  return wrap(idx.getAll(IDBKeyRange.only([matchId, 0])));
+  const records = await wrap<LocalScan[]>(
+    idx.getAll(IDBKeyRange.only([matchId, 0])),
+  );
+  return records
+    .filter((record) => isGateRecordUsable(record, session))
+    .sort(
+      (a, b) =>
+        a.bookingCode.localeCompare(b.bookingCode) ||
+        a.admissionNumber - b.admissionNumber ||
+        a.scannedAt.localeCompare(b.scannedAt) ||
+        a.scanId.localeCompare(b.scanId),
+    );
 }
 
-export async function countScans(matchId: string): Promise<number> {
+export async function countEffectiveAdmissions(
+  matchId: string,
+  entries: WhitelistEntry[],
+): Promise<number> {
+  const session = requireActiveSession();
   const db = await openDb();
   const tx = db.transaction(STORE_SCANS, "readonly");
   const idx = tx.objectStore(STORE_SCANS).index("by_match");
-  return wrap(idx.count(IDBKeyRange.only(matchId)));
+  const records = await wrap<LocalScan[]>(
+    idx.getAll(IDBKeyRange.only(matchId)),
+  );
+  const localFloors = new Map<string, number>();
+  for (const record of records) {
+    if (!isGateRecordUsable(record, session)) continue;
+    localFloors.set(
+      record.bookingCode,
+      Math.max(localFloors.get(record.bookingCode) ?? 0, record.admissionNumber),
+    );
+  }
+  return entries.reduce(
+    (total, entry) =>
+      total + Math.max(entry.scannedCount, localFloors.get(entry.bookingCode) ?? 0),
+    0,
+  );
 }
 
 export async function markSynced(
   matchId: string,
-  bookingCodes: string[]
+  scanIds: string[],
 ): Promise<void> {
-  if (bookingCodes.length === 0) return;
+  if (scanIds.length === 0) return;
+  const session = requireActiveSession();
   const db = await openDb();
   const tx = db.transaction(STORE_SCANS, "readwrite");
   const store = tx.objectStore(STORE_SCANS);
-  for (const code of bookingCodes) {
+  for (const scanId of scanIds) {
     const existing = await wrap<LocalScan | undefined>(
-      store.get([matchId, code])
+      store.get([matchId, scanId]),
     );
-    if (existing) {
+    if (existing && isGateRecordUsable(existing, session)) {
       existing.synced = 1;
       await wrap(store.put(existing));
     }
@@ -174,29 +417,28 @@ export async function markSynced(
   await txDone(tx);
 }
 
-// อัปเดต whitelist entry → mark ว่าฝั่ง server scan ไปแล้ว
-export async function markWhitelistScanned(
+export async function updateWhitelistBookingState(
   matchId: string,
   bookingCode: string,
-  scannedAt: string
+  scannedCount: number,
+  scannedAt: string | null,
 ): Promise<void> {
+  const session = requireActiveSession();
   const db = await openDb();
   const tx = db.transaction(STORE_WHITELIST, "readwrite");
   const store = tx.objectStore(STORE_WHITELIST);
-  const w = await wrap<StoredWhitelist | undefined>(store.get(matchId));
-  if (!w) return;
-  const entry = w.entries.find((e) => e.bookingCode === bookingCode);
-  if (entry && !entry.scannedAt) {
+  const whitelist = await wrap<StoredWhitelist | undefined>(store.get(matchId));
+  if (!whitelist || !isGateRecordUsable(whitelist, session)) {
+    await txDone(tx);
+    return;
+  }
+  const entry = whitelist.entries.find(
+    (candidate) => candidate.bookingCode === bookingCode,
+  );
+  if (entry) {
+    entry.scannedCount = Math.max(0, Math.min(entry.quantity, scannedCount));
     entry.scannedAt = scannedAt;
-    await wrap(store.put(w));
+    await wrap(store.put(whitelist));
   }
   await txDone(tx);
-}
-
-function txDone(tx: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
 }

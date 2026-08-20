@@ -4,6 +4,7 @@ import { buildConfig } from "payload";
 import { postgresAdapter } from "@payloadcms/db-postgres";
 import { pushDevSchema } from "@payloadcms/drizzle";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
+import sharp from "sharp";
 
 import { Users } from "./payload/collections/Users";
 import { News } from "./payload/collections/News";
@@ -21,6 +22,7 @@ import { HomePage } from "./payload/globals/HomePage";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
+const MAX_MEDIA_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 if (!process.env.PAYLOAD_SECRET) {
   throw new Error("PAYLOAD_SECRET ต้องตั้งค่าใน .env.local ก่อนรัน Payload");
@@ -31,73 +33,24 @@ if (!process.env.DATABASE_URL) {
 
 export default buildConfig({
   serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL || "http://localhost:3000",
-  // Payload's connect() skips pushDevSchema when NODE_ENV=production
-  // (see @payloadcms/db-postgres/dist/connect.js). We run the app in
-  // production, so tables like payload.sponsors never get created.
-  // Trigger the push explicitly in onInit — idempotent, drizzle-kit compares
-  // schema and only applies deltas.
+  // Runtime schema pushes are for local development or a fresh, explicitly
+  // approved initialization window only. Normal production starts use reviewed
+  // migrations and do not grant the app permission to alter its own schema.
   onInit: async (payload) => {
-    if (process.env.PAYLOAD_SKIP_INIT_PUSH === "true") return;
-    // One-off self-healing migration: sponsors.logoUrl (text) was replaced by a
-    // logo upload relation (logo_id). Doing the DROP + ADD together makes
-    // drizzle-kit push ask an interactive "is this a rename?" prompt, which
-    // hangs a non-TTY server (prod/PM2) forever. Pre-apply the column change
-    // idempotently so the push below finds no ambiguity and only adds the
-    // FK/index silently. All statements are IF EXISTS / IF NOT EXISTS, so this
-    // is a no-op on a fresh DB and safe to leave in place; remove once every
-    // environment has migrated.
-    try {
-      const db = payload.db as unknown as {
-        drizzle: unknown;
-        execute: (args: {
-          drizzle: unknown;
-          raw: string;
-        }) => Promise<unknown>;
-      };
-      // execute() runs on `db ?? drizzle` internally, so the drizzle handle
-      // must be passed explicitly or it dereferences undefined.
-      await db.execute({
-        drizzle: db.drizzle,
-        raw: "ALTER TABLE IF EXISTS payload.sponsors DROP COLUMN IF EXISTS logo_url",
-      });
-      await db.execute({
-        drizzle: db.drizzle,
-        raw: "ALTER TABLE IF EXISTS payload.sponsors ADD COLUMN IF NOT EXISTS logo_id integer",
-      });
-    } catch (err) {
-      payload.logger.warn({
-        err,
-        msg: "sponsors logo column pre-migration skipped",
-      });
+    const allowRuntimeSchemaPush =
+      process.env.NODE_ENV !== "production" ||
+      process.env.PAYLOAD_ALLOW_SCHEMA_PUSH === "true";
+    if (!allowRuntimeSchemaPush) {
+      payload.logger.info(
+        "Payload runtime schema push disabled; use a controlled migration window",
+      );
+      return;
     }
-    try {
-      const db = payload.db as unknown as {
-        drizzle: unknown;
-        execute: (args: {
-          drizzle: unknown;
-          raw: string;
-        }) => Promise<unknown>;
-      };
-      await db.execute({
-        drizzle: db.drizzle,
-        raw: "ALTER TABLE IF EXISTS payload.players DROP COLUMN IF EXISTS photo_url",
-      });
-      await db.execute({
-        drizzle: db.drizzle,
-        raw: "ALTER TABLE IF EXISTS payload.players ADD COLUMN IF NOT EXISTS photo_id integer",
-      });
-    } catch (err) {
-      payload.logger.warn({
-        err,
-        msg: "players photo column pre-migration skipped",
-      });
-    }
-    try {
-      await pushDevSchema(payload.db as never);
-      payload.logger.info("✓ Payload schema push (onInit) complete");
-    } catch (err) {
-      payload.logger.error({ err, msg: "Payload schema push failed" });
-    }
+    // Never DROP or rename media columns during application startup. Production
+    // schema changes belong in a reviewed migration window, where a failure can
+    // stop the release instead of leaving the CMS partially migrated.
+    await pushDevSchema(payload.db as never);
+    payload.logger.info("Payload schema push (explicitly enabled) complete");
   },
   admin: {
     user: Users.slug,
@@ -113,6 +66,11 @@ export default buildConfig({
     api: "/payload-api",
     graphQL: "/payload-api/graphql",
     graphQLPlayground: "/payload-api/graphql-playground",
+  },
+  graphQL: {
+    // Payload defaults this to true, but keep it explicit so a future default
+    // change cannot expose the interactive explorer in production.
+    disablePlaygroundInProduction: true,
   },
   collections: [
     Users,
@@ -130,16 +88,29 @@ export default buildConfig({
   ],
   globals: [HomePage],
   editor: lexicalEditor(),
+  sharp,
   secret: process.env.PAYLOAD_SECRET,
   typescript: {
     outputFile: path.resolve(dirname, "payload-types.ts"),
+  },
+  upload: {
+    abortOnLimit: true,
+    limits: {
+      fileSize: MAX_MEDIA_UPLOAD_BYTES,
+      files: 10,
+      parts: 50,
+    },
+    responseOnLimit: "File size limit has been reached",
+    uploadTimeout: 180_000,
   },
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URL,
     },
     schemaName: "payload",
-    push: true,
+    push:
+      process.env.NODE_ENV !== "production" ||
+      process.env.PAYLOAD_ALLOW_SCHEMA_PUSH === "true",
   }),
   telemetry: false,
 });

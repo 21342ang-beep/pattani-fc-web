@@ -3,6 +3,7 @@ import type { AuthProvider } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createCustomerSession } from "@/lib/customer-session";
 import type { OAuthPendingProfile } from "@/lib/oauth";
+import { canAutoLinkOAuthCustomer } from "@/lib/oauth-link-policy";
 
 // รวม logic upsert Customer + CustomerAccount + สร้าง session
 // - ถ้า providerAccountId มีอยู่แล้ว → login
@@ -28,7 +29,15 @@ export type OAuthSignInInput = {
 
 export type OAuthSignInResult =
   | { ok: true; customerId: string; emailChanged: boolean }
-  | { ok: false; code: "no_account" | "no_email" | "missing_consent" | "conflict" };
+  | {
+      ok: false;
+      code:
+        | "no_account"
+        | "no_email"
+        | "missing_consent"
+        | "link_verification_required"
+        | "conflict";
+    };
 
 export async function oauthSignIn(
   input: OAuthSignInInput,
@@ -69,12 +78,14 @@ export async function oauthSignIn(
 
   // 4) ตัดสินอีเมลที่จะใช้ — ยึดอีเมล verified ของ provider ก่อนเสมอ
   //    (กันคนกรอกอีเมลที่ตัวเองไม่ได้เป็นเจ้าของ แล้วผูก social ของตัวเองมาสวม)
-  const providerEmail = email; // verified โดย provider (Google เช็ค emailVerified มาแล้ว)
+  const providerEmail = email?.trim().toLowerCase() ?? null;
   const typedEmail = profile?.email ?? null;
-  const finalEmail = providerEmail ?? typedEmail;
-  if (!finalEmail) {
+  // A typed address is not proof of ownership. In particular, LINE may omit
+  // its verified email claim; falling back here would allow account takeover.
+  if (!providerEmail) {
     return { ok: false, code: "no_email" };
   }
+  const finalEmail = providerEmail;
   // อีเมลถูก "เปลี่ยน" ก็ต่อเมื่อ provider ส่งอีเมลมา และไม่ตรงกับที่กรอก
   const emailChanged = !!(
     providerEmail &&
@@ -85,41 +96,64 @@ export async function oauthSignIn(
   const now = new Date();
 
   // 5) มี Customer ที่อีเมลนั้นอยู่แล้วไหม → auto-link (ไม่แตะข้อมูลเดิมของเขา)
-  const existingCustomer = await prisma.customer.findUnique({
-    where: { email: finalEmail },
+  const existingCustomer = await prisma.customer.findFirst({
+    where: { email: { equals: finalEmail, mode: "insensitive" } },
   });
 
   if (existingCustomer) {
+    // A matching address that was merely typed during password registration
+    // is not proof of ownership. Linking it would let a pre-registration
+    // attacker keep password access after the real owner signs in with OAuth.
+    if (!canAutoLinkOAuthCustomer(existingCustomer.emailVerifiedAt)) {
+      return { ok: false, code: "link_verification_required" };
+    }
+
     try {
-      await prisma.customerAccount.create({
-        data: {
-          customerId: existingCustomer.id,
-          provider,
-          providerAccountId,
-          providerEmail,
-        },
+      const linkedCustomer = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${existingCustomer.id} FOR UPDATE`;
+        const lockedCustomer = await tx.customer.findUnique({
+          where: { id: existingCustomer.id },
+        });
+        if (
+          !lockedCustomer ||
+          lockedCustomer.email.trim().toLowerCase() !== finalEmail ||
+          !canAutoLinkOAuthCustomer(lockedCustomer.emailVerifiedAt)
+        ) {
+          throw new Error("OAuth link owner changed during verification");
+        }
+
+        await tx.customerAccount.create({
+          data: {
+            customerId: existingCustomer.id,
+            provider,
+            providerAccountId,
+            providerEmail,
+          },
+        });
+
+        return tx.customer.update({
+          where: { id: existingCustomer.id },
+          data: {
+            lastLoginAt: now,
+            pdpaConsentAt: lockedCustomer.pdpaConsentAt ?? now,
+            // Invalidate sessions issued before this new login method was
+            // attached. The session created below gets the new auth version.
+            authVersion: { increment: 1 },
+            ...(lockedCustomer.passwordHash == null && profile?.passwordHash
+              ? { passwordHash: profile.passwordHash }
+              : {}),
+          },
+        });
       });
+
+      await createCustomerSession(
+        linkedCustomer.id,
+        linkedCustomer.email,
+        linkedCustomer.name,
+      );
     } catch {
       return { ok: false, code: "conflict" };
     }
-    await prisma.customer.update({
-      where: { id: existingCustomer.id },
-      data: {
-        lastLoginAt: now,
-        // ตั้ง pdpaConsentAt เผื่อคนเก่ายังไม่ได้ยิน
-        pdpaConsentAt: existingCustomer.pdpaConsentAt ?? now,
-        // ถ้าบัญชีเดิมเป็น social-only (ยังไม่มีรหัสผ่าน) และลูกค้ากรอกรหัสมา → เพิ่มให้
-        // ไม่ overwrite รหัสผ่านเดิมเด็ดขาด (กัน takeover)
-        ...(existingCustomer.passwordHash == null && profile?.passwordHash
-          ? { passwordHash: profile.passwordHash }
-          : {}),
-      },
-    });
-    await createCustomerSession(
-      existingCustomer.id,
-      existingCustomer.email,
-      existingCustomer.name,
-    );
     return { ok: true, customerId: existingCustomer.id, emailChanged };
   }
 

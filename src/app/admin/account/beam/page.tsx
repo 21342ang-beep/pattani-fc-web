@@ -132,6 +132,7 @@ export default async function BeamTransactionsPage(props: { searchParams: Promis
           referenceId: true,
           booking: {
             select: {
+              id: true,
               bookingCode: true,
               customerName: true,
               match: { select: { homeTeam: true, awayTeam: true } },
@@ -158,7 +159,7 @@ export default async function BeamTransactionsPage(props: { searchParams: Promis
         label: `${payment.booking.match.homeTeam} vs ${payment.booking.match.awayTeam}`,
         code: payment.booking.bookingCode,
         customer: payment.booking.customerName,
-        href: `/tickets/${payment.booking.bookingCode}`,
+        href: `/admin/bookings/${payment.booking.id}`,
       });
     } else if (payment.seasonPassOrder) {
       linkedByReference.set(payment.referenceId, {

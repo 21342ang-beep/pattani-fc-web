@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { SEASON_LABEL, SEASON_TIERS } from "@/lib/season-pass-tiers";
+import { createSeasonPassBarcodeAccessToken } from "@/lib/season-pass-barcode-access";
 
 const createBarcodeSchema = z.object({
   tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"]),
@@ -21,6 +22,7 @@ export type CreateBarcodesState =
       barcodes: {
         sequence: number;
         barcode: string;
+        barcodeAccessToken: string;
         packagePrice: number;
         tierId: BarcodeTierId;
       }[];
@@ -113,12 +115,42 @@ export async function createSeasonPassBarcodes(
       }));
     });
 
+    const credentialRows = await prisma.seasonPassBarcode.findMany({
+      where: { barcode: { in: barcodes.map((item) => item.barcode) } },
+      select: {
+        id: true,
+        barcode: true,
+        gateVersion: true,
+        gateNonce: true,
+        orderId: true,
+      },
+    });
+    const credentialsByBarcode = new Map(
+      credentialRows.map((row) => [row.barcode, row]),
+    );
+    const securedBarcodes = await Promise.all(
+      barcodes.map(async (barcode) => {
+        const credential = credentialsByBarcode.get(barcode.barcode);
+        if (!credential) throw new Error("BARCODE_CONFLICT");
+        return {
+          ...barcode,
+          barcodeAccessToken: await createSeasonPassBarcodeAccessToken({
+            barcodeId: credential.id,
+            barcode: credential.barcode,
+            gateVersion: credential.gateVersion,
+            gateNonce: credential.gateNonce,
+            orderId: credential.orderId,
+          }),
+        };
+      }),
+    );
+
     revalidatePath("/admin/barcodes/create");
     revalidatePath("/admin/season-passes");
     return {
       ok: true,
       message: `สร้างบาร์โค้ดแพ็กเกจ ${tier.priceBaht.toLocaleString("th-TH")} จำนวน ${barcodes.length.toLocaleString("th-TH")} ใบแล้ว`,
-      barcodes,
+      barcodes: securedBarcodes,
     };
   } catch (error) {
     if (error instanceof Error && error.message === "BARCODE_LIMIT") {

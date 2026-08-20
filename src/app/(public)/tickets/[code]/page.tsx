@@ -3,6 +3,7 @@ import Link from "next/link";
 import bwipjs from "bwip-js/node";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDateTime } from "@/lib/format";
+import { hasBookingAccess } from "@/lib/booking-access";
 import TicketCard from "./TicketCard";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,9 @@ export default async function TicketPage({
   const booking = await prisma.booking.findUnique({
     where: { bookingCode: code },
     select: {
+      id: true,
       bookingCode: true,
+      customerId: true,
       customerName: true,
       customerPhone: true,
       quantity: true,
@@ -43,6 +46,7 @@ export default async function TicketPage({
   });
 
   if (!booking) notFound();
+  if (!(await hasBookingAccess(booking))) notFound();
 
   if (booking.status !== "CONFIRMED") {
     return (

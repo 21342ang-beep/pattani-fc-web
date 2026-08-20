@@ -1,5 +1,4 @@
-import { readCustomerSession } from "@/lib/customer-session";
-import { prisma } from "@/lib/prisma";
+import { getOptionalCustomer } from "@/lib/customer-dal";
 import PageHero from "../../_components/PageHero";
 import CheckoutForm from "./CheckoutForm";
 
@@ -8,14 +7,14 @@ export const metadata = { title: "ชำระเงิน — Pattani FC Shop" 
 
 export default async function ShopCheckoutPage() {
   // pre-fill จาก session (ถ้าเป็นสมาชิก)
-  const session = await readCustomerSession();
+  const customer = await getOptionalCustomer();
   let prefill = { name: "", phone: "", email: "" };
-  if (session?.customerId) {
-    const c = await prisma.customer.findUnique({
-      where: { id: session.customerId },
-      select: { name: true, phone: true, email: true },
-    });
-    if (c) prefill = { name: c.name, phone: c.phone ?? "", email: c.email };
+  if (customer) {
+    prefill = {
+      name: customer.name,
+      phone: customer.phone ?? "",
+      email: customer.email,
+    };
   }
 
   return (

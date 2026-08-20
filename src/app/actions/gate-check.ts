@@ -3,7 +3,16 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyPermission } from "@/lib/dal";
+import {
+  resolveSeasonPassGateCredential,
+  seasonPassGateCredentialMatchesRow,
+} from "@/lib/season-pass-gate-token";
+import {
+  GATE_LOCAL_SCAN_ID_PATTERN,
+  isGateScanTimestampAcceptable,
+  planGateAdmissionSync,
+} from "@/lib/gate-sync-policy";
+import { verifyPermission, verifySuperAdmin } from "@/lib/dal";
 import {
   isSeasonPassEligibleMatch,
   seasonPassScanConsumesLeagueUse,
@@ -67,6 +76,7 @@ export type WhitelistEntry = {
   customerName: string;
   quantity: number;
   seatNumbers: string[];
+  scannedCount: number;
   scannedAt: string | null;
 };
 
@@ -96,6 +106,12 @@ export async function downloadWhitelist(
       quantity: true,
       seatNumbers: true,
       scannedAt: true,
+      _count: { select: { gateScans: true } },
+      gateScans: {
+        orderBy: { scannedAt: "desc" },
+        take: 1,
+        select: { scannedAt: true },
+      },
     },
   });
 
@@ -107,7 +123,11 @@ export async function downloadWhitelist(
       customerName: b.customerName,
       quantity: b.quantity,
       seatNumbers: b.seatNumbers,
-      scannedAt: b.scannedAt?.toISOString() ?? null,
+      scannedCount: Math.min(b.quantity, b._count.gateScans),
+      scannedAt:
+        b.gateScans[0]?.scannedAt.toISOString() ??
+        b.scannedAt?.toISOString() ??
+        null,
     })),
     generatedAt: new Date().toISOString(),
   };
@@ -122,11 +142,13 @@ const syncBatchSchema = z.object({
   records: z
     .array(
       z.object({
+        scanId: z.string().regex(GATE_LOCAL_SCAN_ID_PATTERN),
         bookingCode: z
           .string()
           .min(8)
           .max(50)
           .regex(/^[a-z0-9]+$/i),
+        admissionNumber: z.number().int().positive().max(1_000_000),
         scannedAt: z.string().datetime(),
       })
     )
@@ -137,9 +159,19 @@ const syncBatchSchema = z.object({
 export type SyncScansResult =
   | {
       ok: true;
-      accepted: string[]; // bookingCodes ที่ server ยอมรับ (ครั้งแรกที่ scan)
-      conflicts: { bookingCode: string; serverScannedAt: string }[]; // ถูกสแกนซ้ำที่อื่นแล้ว
-      unknown: string[]; // ไม่พบใน DB หรือไม่ใช่ของแมตช์นี้
+      accepted: string[];
+      duplicates: string[];
+      conflicts: {
+        scanId: string;
+        bookingCode: string;
+        serverScannedAt: string | null;
+      }[];
+      unknown: string[];
+      bookingStates: {
+        bookingCode: string;
+        scannedCount: number;
+        latestScannedAt: string | null;
+      }[];
     }
   | { ok: false; error: string };
 
@@ -150,66 +182,174 @@ export async function syncScans(input: unknown): Promise<SyncScansResult> {
   if (!parsed.success) return { ok: false, error: "ข้อมูล sync ไม่ถูกต้อง" };
 
   const { matchId, records } = parsed.data;
+  const now = new Date();
+  if (
+    records.some(
+      (record) =>
+        !isGateScanTimestampAcceptable(new Date(record.scannedAt), now),
+    )
+  ) {
+    return { ok: false, error: "เวลา scan ไม่ถูกต้องหรือข้อมูล offline หมดอายุแล้ว" };
+  }
+
+  // A local scan id is an idempotency key. A duplicated HTTP payload can
+  // therefore never consume two admission slots.
+  const uniqueByScanId = new Map<string, (typeof records)[number]>();
+  for (const record of records) {
+    if (!uniqueByScanId.has(record.scanId)) {
+      uniqueByScanId.set(record.scanId, record);
+    }
+  }
+  const uniqueRecords = [...uniqueByScanId.values()];
 
   // โหลด booking ที่เกี่ยวข้องครั้งเดียว → ลด round-trip
   const existing = await prisma.booking.findMany({
     where: {
       matchId,
-      bookingCode: { in: records.map((r) => r.bookingCode) },
+      bookingCode: { in: uniqueRecords.map((r) => r.bookingCode) },
       status: "CONFIRMED",
     },
-    select: { bookingCode: true, scannedAt: true },
+    select: { id: true, bookingCode: true },
   });
-  const existingMap = new Map(existing.map((b) => [b.bookingCode, b]));
+  const existingMap = new Map(
+    existing.map((booking) => [booking.bookingCode, booking]),
+  );
 
   const accepted: string[] = [];
-  const conflicts: { bookingCode: string; serverScannedAt: string }[] = [];
+  const duplicates: string[] = [];
+  const conflicts: {
+    scanId: string;
+    bookingCode: string;
+    serverScannedAt: string | null;
+  }[] = [];
   const unknown: string[] = [];
-  const toWrite: { bookingCode: string; scannedAt: Date }[] = [];
+  const bookingStates: {
+    bookingCode: string;
+    scannedCount: number;
+    latestScannedAt: string | null;
+  }[] = [];
+  const grouped = new Map<string, (typeof uniqueRecords)[number][]>();
 
-  for (const r of records) {
-    const found = existingMap.get(r.bookingCode);
-    if (!found) {
-      unknown.push(r.bookingCode);
+  for (const record of uniqueRecords) {
+    const booking = existingMap.get(record.bookingCode);
+    if (!booking) {
+      unknown.push(record.scanId);
       continue;
     }
-    if (found.scannedAt) {
-      conflicts.push({
-        bookingCode: r.bookingCode,
-        serverScannedAt: found.scannedAt.toISOString(),
-      });
-      continue;
-    }
-    toWrite.push({ bookingCode: r.bookingCode, scannedAt: new Date(r.scannedAt) });
-    accepted.push(r.bookingCode);
+    const group = grouped.get(booking.id) ?? [];
+    group.push(record);
+    grouped.set(booking.id, group);
   }
 
-  if (toWrite.length > 0) {
-    // อัปเดตเฉพาะที่ยังไม่ scannedAt (race-safe — ใช้ where ห้าม scannedAt ที่ไม่ใช่ null)
-    await prisma.$transaction(
-      toWrite.map((w) =>
-        prisma.booking.updateMany({
-          where: {
-            bookingCode: w.bookingCode,
-            matchId,
-            status: "CONFIRMED",
-            scannedAt: null,
-          },
+  // Lock booking rows in a deterministic order. The row update serializes two
+  // gates that reconnect together, so count + insert is one atomic quota use.
+  await prisma.$transaction(async (tx) => {
+    for (const bookingId of [...grouped.keys()].sort()) {
+      const group = grouped.get(bookingId) ?? [];
+      const lock = await tx.booking.updateMany({
+        where: { id: bookingId },
+        data: { updatedAt: now },
+      });
+      if (lock.count !== 1) {
+        unknown.push(...group.map((record) => record.scanId));
+        continue;
+      }
+
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: {
+          id: true,
+          bookingCode: true,
+          matchId: true,
+          status: true,
+          quantity: true,
+          scannedAt: true,
+        },
+      });
+      if (!booking || booking.matchId !== matchId || booking.status !== "CONFIRMED") {
+        unknown.push(...group.map((record) => record.scanId));
+        continue;
+      }
+
+      const existingCount = await tx.bookingGateScan.count({
+        where: { bookingId: booking.id },
+      });
+      const plan = planGateAdmissionSync(
+        booking.quantity,
+        existingCount,
+        group.map((record) => ({
+          scanId: record.scanId,
+          admissionNumber: record.admissionNumber,
+        })),
+      );
+      const acceptedSet = new Set(plan.accepted);
+      const acceptedRecords = group
+        .filter((record) => acceptedSet.has(record.scanId))
+        .sort(
+          (a, b) =>
+            a.admissionNumber - b.admissionNumber ||
+            a.scanId.localeCompare(b.scanId),
+        );
+
+      for (const record of acceptedRecords) {
+        await tx.bookingGateScan.create({
           data: {
-            scannedAt: w.scannedAt,
+            bookingId: booking.id,
+            scannedAt: new Date(record.scannedAt),
             scannedBy: currentUser.id,
           },
-        })
-      )
-    );
-  }
+        });
+      }
+      if (acceptedRecords.length > 0 && !booking.scannedAt) {
+        await tx.booking.updateMany({
+          where: { id: booking.id, scannedAt: null },
+          data: {
+            scannedAt: new Date(acceptedRecords[0].scannedAt),
+            scannedBy: currentUser.id,
+          },
+        });
+      }
 
-  return { ok: true, accepted, conflicts, unknown };
+      const latest = await tx.bookingGateScan.findFirst({
+        where: { bookingId: booking.id },
+        orderBy: { scannedAt: "desc" },
+        select: { scannedAt: true },
+      });
+      const latestScannedAt = latest?.scannedAt.toISOString() ?? null;
+      accepted.push(...plan.accepted);
+      duplicates.push(...plan.duplicates);
+      conflicts.push(
+        ...plan.conflicts.map((scanId) => ({
+          scanId,
+          bookingCode: booking.bookingCode,
+          serverScannedAt: latestScannedAt,
+        })),
+      );
+      bookingStates.push({
+        bookingCode: booking.bookingCode,
+        scannedCount: plan.finalCount,
+        latestScannedAt,
+      });
+    }
+  });
+
+  if (accepted.length > 0) {
+    revalidatePath("/admin/bookings");
+    revalidatePath("/gate-check");
+  }
+  return {
+    ok: true,
+    accepted,
+    duplicates,
+    conflicts,
+    unknown,
+    bookingStates,
+  };
 }
 
 const seasonPassScanSchema = z.object({
   matchId: z.string().min(1).max(50),
-  barcode: z.string().trim().regex(/^(PFC26-(4000|2500|2000|1500)-\d{4}|SP-[A-Z]+-[A-Z0-9]{8})$/i),
+  barcode: z.string().trim().min(1).max(256),
 });
 
 type SeasonPassScanError = "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "UNREGISTERED" | "INVALID" | "MATCH_NOT_ELIGIBLE";
@@ -218,6 +358,7 @@ export type LookupSeasonPassResult =
   | {
       ok: true;
       barcode: string;
+      scanCredential: string;
       passCode: string;
       customerName: string;
       customerPhoneLast4: string;
@@ -255,7 +396,8 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
   const parsed = seasonPassScanSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "INVALID" };
 
-  const barcode = parsed.data.barcode.toUpperCase();
+  const credential = resolveSeasonPassGateCredential(parsed.data.barcode);
+  if (!credential) return { ok: false, error: "INVALID" };
   const match = await prisma.match.findUnique({
     where: { id: parsed.data.matchId },
     select: { competitionType: true, homeTeam: true, seasonPassEligible: true },
@@ -265,7 +407,12 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
   }
 
   const pass = await prisma.seasonPassBarcode.findUnique({
-    where: { barcode },
+    // SPG2 is an opaque capability: only its unique nonce may locate a row.
+    // Never fall back to the visible sequential barcode for a current token.
+    where:
+      credential.kind === "current"
+        ? { gateNonce: credential.gateNonce }
+        : { barcode: credential.barcode },
     include: {
       order: {
         select: {
@@ -284,6 +431,9 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
     },
   });
   if (!pass) return { ok: false, error: "NOT_FOUND" };
+  if (!seasonPassGateCredentialMatchesRow(credential, pass)) {
+    return { ok: false, error: "INVALID" };
+  }
 
   const order = pass.order;
   if (pass.tierId === "vvip-elite" && pass.isGenerated && !order) {
@@ -299,7 +449,8 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
 
   return {
     ok: true,
-    barcode,
+    barcode: pass.barcode,
+    scanCredential: parsed.data.barcode,
     passCode: order.passCode,
     customerName: order.customerName,
     customerPhoneLast4: phoneLast4(order.customerPhone),
@@ -317,7 +468,9 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
   const parsed = seasonPassScanSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "INVALID" };
 
-  const { barcode, matchId } = parsed.data;
+  const { matchId } = parsed.data;
+  const credential = resolveSeasonPassGateCredential(parsed.data.barcode);
+  if (!credential) return { ok: false, error: "INVALID" };
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     select: { competitionType: true, homeTeam: true, seasonPassEligible: true },
@@ -326,7 +479,10 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
     return { ok: false, error: "MATCH_NOT_ELIGIBLE" };
   }
   const pass = await prisma.seasonPassBarcode.findUnique({
-    where: { barcode: barcode.toUpperCase() },
+    where:
+      credential.kind === "current"
+        ? { gateNonce: credential.gateNonce }
+        : { barcode: credential.barcode },
     include: {
       order: {
         select: {
@@ -341,6 +497,9 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
     },
   });
   if (!pass) return { ok: false, error: "NOT_FOUND" };
+  if (!seasonPassGateCredentialMatchesRow(credential, pass)) {
+    return { ok: false, error: "INVALID" };
+  }
   const order = pass.order;
   if (pass.tierId === "vvip-elite" && pass.isGenerated && !order) {
     return { ok: false, error: "UNREGISTERED" };
@@ -353,8 +512,11 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const barcodeLockKey = `season-pass-barcode:${pass.id}`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${barcodeLockKey}))::text AS lock_result`;
+      await tx.$queryRaw`
+        SELECT "id" FROM "SeasonPassBarcode"
+        WHERE "id" = ${pass.id}
+        FOR UPDATE
+      `;
       const currentPass = await tx.seasonPassBarcode.findUnique({
         where: { id: pass.id },
         include: {
@@ -372,6 +534,9 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
         },
       });
       if (!currentPass) throw new Error("NOT_FOUND");
+      if (!seasonPassGateCredentialMatchesRow(credential, currentPass)) {
+        throw new Error("INVALID_CREDENTIAL");
+      }
       if (currentPass.tierId === "vvip-elite" && currentPass.isGenerated && !currentPass.order) {
         throw new Error("UNREGISTERED");
       }
@@ -425,6 +590,7 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
     if (error instanceof Error && error.message === "NOT_FOUND") return { ok: false, error: "NOT_FOUND" };
     if (error instanceof Error && error.message === "UNREGISTERED") return { ok: false, error: "UNREGISTERED" };
     if (error instanceof Error && error.message === "INACTIVE") return { ok: false, error: "INACTIVE" };
+    if (error instanceof Error && error.message === "INVALID_CREDENTIAL") return { ok: false, error: "INVALID" };
     // PostgreSQL unique index [barcodeId, matchId] is the final duplicate guard.
     return { ok: false, error: "DUPLICATE" };
   }
@@ -433,7 +599,7 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
 // ใช้สำหรับล้างรายการทดสอบจากหน้าผู้ดูแลบัตรรายปีเท่านั้น
 // เมื่อลบ scan จะคืนสิทธิ์เฉพาะรายการบอลลีก บอลถ้วยไม่เคยหักสิทธิ์จึงไม่คืนเพิ่ม
 export async function deleteSeasonPassScan(scanId: string): Promise<{ ok: true } | { error: string }> {
-  await verifyPermission("SEASON_PASSES");
+  await verifySuperAdmin();
   if (!z.string().regex(/^[a-z0-9]+$/i).safeParse(scanId).success) {
     return { error: "รหัสรายการสแกนไม่ถูกต้อง" };
   }
@@ -461,7 +627,10 @@ export async function deleteSeasonPassScan(scanId: string): Promise<{ ok: true }
 }
 
 export async function deleteAllSeasonPassScans(): Promise<{ ok: true; deleted: number } | { error: string }> {
-  await verifyPermission("SEASON_PASSES");
+  await verifySuperAdmin();
+  if (process.env.NODE_ENV === "production") {
+    return { error: "ปิดการล้างประวัติสแกนทั้งหมดบนระบบจริง" };
+  }
 
   try {
     const deleted = await prisma.$transaction(async (tx) => {
@@ -493,7 +662,10 @@ export async function deleteAllSeasonPassScans(): Promise<{ ok: true; deleted: n
 }
 
 export async function deleteSeasonPassScansByTier(tierId: string): Promise<{ ok: true; deleted: number } | { error: string }> {
-  await verifyPermission("SEASON_PASSES");
+  await verifySuperAdmin();
+  if (process.env.NODE_ENV === "production") {
+    return { error: "ปิดการล้างประวัติสแกนเป็นชุดบนระบบจริง" };
+  }
   if (!z.enum(["vvip-elite", "vip-advanced", "premium", "gold"]).safeParse(tierId).success) {
     return { error: "แพ็กเกจบัตรไม่ถูกต้อง" };
   }

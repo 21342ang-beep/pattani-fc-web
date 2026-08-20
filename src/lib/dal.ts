@@ -37,6 +37,7 @@ export const getAdminUser = cache(async (): Promise<AdminUser> => {
       name: true,
       role: true,
       permissions: true,
+      authVersion: true,
       updatedAt: true,
     },
   });
@@ -45,9 +46,17 @@ export const getAdminUser = cache(async (): Promise<AdminUser> => {
   // JWT เป็นเพียงหลักฐานการเข้าสู่ระบบ ณ เวลาหนึ่ง ส่วน role/permission
   // ต้องเชื่อฐานข้อมูลปัจจุบันเสมอ และเพิกถอน session เดิมเมื่อบัญชี
   // ถูกแก้ไข (เช่น เปลี่ยนรหัสผ่าน ลด role หรือปรับ permissions)
-  const issuedAtMs = typeof session.iat === "number" ? session.iat * 1000 : 0;
-  if (issuedAtMs + 1000 < user.updatedAt.getTime()) {
-    redirect("/login?reauth=1");
+  if (typeof session.authVersion === "number") {
+    if (session.authVersion !== user.authVersion) redirect("/login?reauth=1");
+  } else {
+    // Compatibility applies only to pre-hardening cookies. New sessions always
+    // carry authVersion. Fail closed on equal-second timestamps: a legacy user
+    // may need to sign in again, but a credential/role change can never leave
+    // an old eight-hour session alive because of JWT second precision.
+    const issuedAtMs = typeof session.iat === "number" ? session.iat * 1000 : 0;
+    if (issuedAtMs <= user.updatedAt.getTime()) {
+      redirect("/login?reauth=1");
+    }
   }
 
   return {

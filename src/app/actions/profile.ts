@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { verifyAdmin } from "@/lib/dal";
 import { changePasswordSchema } from "@/lib/validations";
+import { rateLimit } from "@/lib/rate-limit";
+import { createSession } from "@/lib/session";
 
 export type ChangePasswordState =
   | { error?: string; fieldErrors?: Record<string, string[]>; ok?: boolean }
@@ -14,6 +16,14 @@ export async function changePassword(
   formData: FormData
 ): Promise<ChangePasswordState> {
   const session = await verifyAdmin();
+  const attemptLimit = await rateLimit("admin_change_password", {
+    max: 5,
+    windowMs: 15 * 60_000,
+    ip: session.userId,
+  });
+  if (!attemptLimit.ok) {
+    return { error: "ลองยืนยันรหัสผ่านบ่อยเกินไป กรุณารอสักครู่" };
+  }
 
   const parsed = changePasswordSchema.safeParse({
     currentPassword: formData.get("currentPassword"),
@@ -35,10 +45,14 @@ export async function changePassword(
   }
 
   const newHash = await bcrypt.hash(parsed.data.newPassword, 12);
-  await prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: newHash },
+    data: { passwordHash: newHash, authVersion: { increment: 1 } },
+    select: { id: true, role: true, authVersion: true },
   });
+
+  // Keep this verified browser signed in while revoking every other cookie.
+  await createSession(updated.id, updated.role, updated.authVersion);
 
   return { ok: true };
 }

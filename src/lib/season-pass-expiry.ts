@@ -1,7 +1,10 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
+import { PAYMENT_EVIDENCE_RETENTION_STATUSES } from "@/lib/payment-state";
 import { prisma } from "@/lib/prisma";
+import { rotateSeasonPassGateCredential } from "@/lib/season-pass-gate-state";
+import { seasonPaymentGraceCutoff } from "@/lib/season-payment-grace";
 
 // Hold a newly created online reservation only long enough for the customer to
 // continue to payment. Once Beam creates a QR, the payment route replaces this
@@ -17,6 +20,7 @@ export function newSeasonPassPaymentDeadline(now = new Date()) {
  * pending orders whose cleanup has not completed yet.
  */
 export function activeSeasonPassOrderWhere(now = new Date()): Prisma.SeasonPassOrderWhereInput {
+  const providerGraceCutoff = seasonPaymentGraceCutoff(now);
   return {
     OR: [
       { status: "CONFIRMED" },
@@ -25,14 +29,29 @@ export function activeSeasonPassOrderWhere(now = new Date()): Prisma.SeasonPassO
       {
         status: "PENDING",
         salesChannel: "ONLINE",
-        purchase: {
-          is: {
-            OR: [
-              { paymentExpiresAt: null },
-              { paymentExpiresAt: { gt: now } },
-            ],
+        OR: [
+          { beamPayments: { some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } } },
+          { xenditPayments: { some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } } },
+          {
+            purchase: {
+              is: {
+                OR: [
+                  { paymentExpiresAt: null },
+                  { paymentExpiresAt: { gt: now } },
+                  { beamPayments: { some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } } },
+                  { xenditPayments: { some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } } },
+                  {
+                    paymentExpiresAt: { gt: providerGraceCutoff },
+                    OR: [
+                      { beamPayments: { some: { status: { in: ["INITIATED", "PENDING"] } } } },
+                      { xenditPayments: { some: { status: "PENDING" } } },
+                    ],
+                  },
+                ],
+              },
+            },
           },
-        },
+        ],
       },
     ],
   };
@@ -45,10 +64,16 @@ export async function expirePendingSeasonPassPurchases(input: {
 } = {}) {
   const now = input.now ?? new Date();
   const qrCreationDeadline = new Date(now.getTime() - SEASON_PASS_RESERVATION_MS);
+  const providerGraceCutoff = seasonPaymentGraceCutoff(now);
   const deadlineWhere: Prisma.SeasonPassPurchaseWhereInput = {
     OR: [
-      { paymentExpiresAt: null },
-      { paymentExpiresAt: { lte: now } },
+      { paymentExpiresAt: null, createdAt: { lte: qrCreationDeadline } },
+      {
+        paymentExpiresAt: { lte: now },
+        beamPayments: { none: { status: { in: ["INITIATED", "PENDING"] } } },
+        xenditPayments: { none: { status: "PENDING" } },
+      },
+      { paymentExpiresAt: { lte: providerGraceCutoff } },
       {
         createdAt: { lte: qrCreationDeadline },
         beamPayments: { none: { qrImageBase64: { not: null } } },
@@ -75,14 +100,14 @@ export async function expirePendingSeasonPassPurchases(input: {
         some: { status: "PENDING", salesChannel: "ONLINE" },
         none: {
           OR: [
-            { beamPayments: { some: { status: "SUCCEEDED" } } },
-            { xenditPayments: { some: { status: "SUCCEEDED" } } },
+            { beamPayments: { some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } } },
+            { xenditPayments: { some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } } },
           ],
         },
       },
       ...deadlineWhere,
-      beamPayments: { none: { status: "SUCCEEDED" } },
-      xenditPayments: { none: { status: "SUCCEEDED" } },
+      beamPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
+      xenditPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
       ...targetWhere,
     },
     select: { id: true },
@@ -100,16 +125,16 @@ export async function expirePendingSeasonPassPurchases(input: {
             some: { status: "PENDING", salesChannel: "ONLINE" },
             none: {
               OR: [
-                { beamPayments: { some: { status: "SUCCEEDED" } } },
-                { xenditPayments: { some: { status: "SUCCEEDED" } } },
+                { beamPayments: { some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } } },
+                { xenditPayments: { some: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } } },
               ],
             },
           },
           ...deadlineWhere,
-          // Re-check payment evidence after acquiring the same purchase lock
-          // used by the webhook. Paid customers must never be cancelled.
-          beamPayments: { none: { status: "SUCCEEDED" } },
-          xenditPayments: { none: { status: "SUCCEEDED" } },
+          // Re-check after acquiring the same purchase lock used by webhooks.
+          // Paid and manual-review inventory must never be cancelled/released.
+          beamPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
+          xenditPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
         },
         data: { status: "CANCELLED" },
       });
@@ -131,7 +156,11 @@ export async function expirePendingSeasonPassPurchases(input: {
         });
         await tx.seasonPassBarcode.updateMany({
           where: { orderId: order.id },
-          data: { orderId: null, assignedAt: null },
+          data: {
+            orderId: null,
+            assignedAt: null,
+            ...rotateSeasonPassGateCredential(),
+          },
         });
       }
       await tx.beamPayment.updateMany({
@@ -162,8 +191,8 @@ export async function expirePendingSeasonPassPurchases(input: {
       salesChannel: "ONLINE",
       purchaseId: null,
       ...(input.passCode ? { passCode: input.passCode } : {}),
-      beamPayments: { none: { status: "SUCCEEDED" } },
-      xenditPayments: { none: { status: "SUCCEEDED" } },
+      beamPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
+      xenditPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
     },
     select: { id: true },
       });
@@ -176,8 +205,8 @@ export async function expirePendingSeasonPassPurchases(input: {
           status: "PENDING",
           salesChannel: "ONLINE",
           purchaseId: null,
-          beamPayments: { none: { status: "SUCCEEDED" } },
-          xenditPayments: { none: { status: "SUCCEEDED" } },
+          beamPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
+          xenditPayments: { none: { status: { in: [...PAYMENT_EVIDENCE_RETENTION_STATUSES] } } },
         },
         select: { id: true, passCode: true },
       });
@@ -188,7 +217,11 @@ export async function expirePendingSeasonPassPurchases(input: {
       });
       await tx.seasonPassBarcode.updateMany({
         where: { orderId: order.id },
-        data: { orderId: null, assignedAt: null },
+        data: {
+          orderId: null,
+          assignedAt: null,
+          ...rotateSeasonPassGateCredential(),
+        },
       });
       await tx.beamPayment.updateMany({
         where: { seasonPassOrderId: order.id, status: { in: ["INITIATED", "PENDING"] } },

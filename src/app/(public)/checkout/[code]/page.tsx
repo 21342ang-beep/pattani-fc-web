@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { expirePendingBookings } from "@/lib/booking-expiry";
 import { formatBaht, formatDateTime } from "@/lib/format";
+import { hasBookingAccess } from "@/lib/booking-access";
 import PaymentGateway from "./PaymentGateway";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function CheckoutPage({
     select: {
       id: true,
       bookingCode: true,
+      customerId: true,
       customerName: true,
       customerPhone: true,
       quantity: true,
@@ -32,6 +34,7 @@ export default async function CheckoutPage({
   });
 
   if (!booking) notFound();
+  if (!(await hasBookingAccess(booking))) notFound();
 
   if (booking.status === "CONFIRMED") {
     redirect(`/tickets/${code}`);

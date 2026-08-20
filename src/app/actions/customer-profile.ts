@@ -11,7 +11,8 @@ import {
   deleteCustomerSession,
 } from "@/lib/customer-session";
 import { rateLimit } from "@/lib/rate-limit";
-import { normalizeBookingSearchPhone } from "@/lib/booking-search-otp";
+import { getPhoneChangeStepUp } from "@/lib/customer-profile-policy";
+import { hasRetainedCustomerHistory } from "@/lib/customer-deletion-policy";
 
 export type ProfileState =
   | { error?: string; success?: string; fieldErrors?: Record<string, string> }
@@ -25,6 +26,7 @@ const profileSchema = z.object({
     .regex(/^[0-9+\-\s]{9,15}$/, "เบอร์โทรไม่ถูกต้อง")
     .optional()
     .or(z.literal("")),
+  currentPassword: z.string().max(200).optional().or(z.literal("")),
 });
 
 export async function updateProfile(
@@ -36,6 +38,7 @@ export async function updateProfile(
   const parsed = profileSchema.safeParse({
     name: formData.get("name"),
     phone: formData.get("phone") || "",
+    currentPassword: formData.get("currentPassword") || "",
   });
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -46,26 +49,140 @@ export async function updateProfile(
     return { error: "ข้อมูลไม่ถูกต้อง", fieldErrors };
   }
 
-  const { name, phone } = parsed.data;
+  const { name, phone, currentPassword } = parsed.data;
   const nextPhone = phone || null;
-  const phoneChanged =
-    normalizeBookingSearchPhone(customer.phone ?? "") !==
-    normalizeBookingSearchPhone(nextPhone ?? "");
-  const updated = await prisma.customer.update({
+  const current = await prisma.customer.findUnique({
     where: { id: customer.id },
-    data: {
-      name,
-      phone: nextPhone,
-      // การยืนยันผูกกับหมายเลขเดิมเท่านั้น เปลี่ยนเบอร์แล้วต้องยืนยันใหม่
-      ...(phoneChanged ? { phoneVerifiedAt: null } : {}),
+    select: {
+      id: true,
+      email: true,
+      phone: true,
+      passwordHash: true,
+      authVersion: true,
     },
   });
+  if (!current || current.authVersion !== customer.authVersion) {
+    await deleteCustomerSession();
+    return { error: "ข้อมูลความปลอดภัยของบัญชีเปลี่ยนแล้ว กรุณาเข้าสู่ระบบใหม่" };
+  }
 
-  // ชื่อเปลี่ยน → refresh session token ให้ avatar/nav แสดงชื่อใหม่
-  await createCustomerSession(updated.id, updated.email, updated.name);
+  const stepUp = getPhoneChangeStepUp({
+    currentPhone: current.phone,
+    nextPhone,
+    hasPassword: Boolean(current.passwordHash),
+    currentPassword,
+  });
+
+  let nextAuthVersion = current.authVersion;
+  if (stepUp !== "not-required") {
+    // Limit both the source network and the account. This makes password
+    // guessing ineffective even when an attacker rotates either dimension.
+    const [ipLimit, accountLimit] = await Promise.all([
+      rateLimit("profile_phone_change", {
+        max: 5,
+        windowMs: 15 * 60_000,
+      }),
+      rateLimit("profile_phone_change_customer", {
+        max: 5,
+        windowMs: 30 * 60_000,
+        ip: current.id,
+      }),
+    ]);
+    if (!ipLimit.ok || !accountLimit.ok) {
+      return {
+        error: `ยืนยันการเปลี่ยนเบอร์บ่อยเกินไป ลองใหม่ใน ${Math.max(
+          ipLimit.retryAfterSec,
+          accountLimit.retryAfterSec,
+        )} วินาที`,
+      };
+    }
+    if (stepUp === "blocked-social-only") {
+      return {
+        error: "ไม่สามารถเปลี่ยนเบอร์โทรได้",
+        fieldErrors: {
+          phone:
+            "บัญชี Google/LINE ที่ยังไม่มีรหัสผ่านไม่สามารถเปลี่ยนเบอร์ด้วยตนเอง กรุณาตั้งรหัสผ่านผ่านการกู้บัญชีที่ยืนยันแล้วหรือติดต่อทีมงาน",
+        },
+      };
+    }
+    if (stepUp === "password-required") {
+      return {
+        error: "กรุณายืนยันรหัสผ่านปัจจุบัน",
+        fieldErrors: { currentPassword: "กรุณากรอกรหัสผ่านปัจจุบัน" },
+      };
+    }
+    if (
+      stepUp !== "verify-password" ||
+      typeof currentPassword !== "string" ||
+      !current.passwordHash
+    ) {
+      return { error: "ไม่สามารถยืนยันการเปลี่ยนเบอร์ได้ กรุณาลองใหม่" };
+    }
+
+    const passwordOk = await bcrypt.compare(currentPassword, current.passwordHash);
+    if (!passwordOk) {
+      return {
+        error: "รหัสผ่านปัจจุบันไม่ถูกต้อง",
+        fieldErrors: { currentPassword: "รหัสผ่านปัจจุบันไม่ถูกต้อง" },
+      };
+    }
+
+    nextAuthVersion += 1;
+    const result = await prisma.customer.updateMany({
+      where: {
+        id: current.id,
+        authVersion: current.authVersion,
+        passwordHash: current.passwordHash,
+        phone: current.phone,
+      },
+      data: {
+        name,
+        phone: nextPhone,
+        phoneVerifiedAt: null,
+        authVersion: { increment: 1 },
+      },
+    });
+    if (result.count !== 1) {
+      await deleteCustomerSession();
+      return { error: "ข้อมูลบัญชีเปลี่ยนระหว่างบันทึก กรุณาเข้าสู่ระบบใหม่" };
+    }
+  } else {
+    // Do not write the submitted phone on a name-only save. Otherwise a stale
+    // tab could restore an old phone without completing the step-up check.
+    const result = await prisma.customer.updateMany({
+      where: { id: current.id, authVersion: current.authVersion },
+      data: { name },
+    });
+    if (result.count !== 1) {
+      await deleteCustomerSession();
+      return { error: "ข้อมูลบัญชีเปลี่ยนระหว่างบันทึก กรุณาเข้าสู่ระบบใหม่" };
+    }
+  }
+
+  try {
+    // Pin the replacement cookie to the security version authorized above.
+    // If a password reset races this request, the new cookie is not issued.
+    await createCustomerSession(
+      current.id,
+      current.email,
+      name,
+      nextAuthVersion,
+    );
+  } catch {
+    await deleteCustomerSession();
+    return {
+      error:
+        "บันทึกข้อมูลแล้ว แต่สถานะความปลอดภัยของบัญชีเปลี่ยน กรุณาเข้าสู่ระบบใหม่",
+    };
+  }
 
   revalidatePath("/member", "layout");
-  return { success: "บันทึกโปรไฟล์เรียบร้อย" };
+  return {
+    success:
+      stepUp === "not-required"
+        ? "บันทึกโปรไฟล์เรียบร้อย"
+        : "เปลี่ยนเบอร์แล้ว กรุณายืนยันเบอร์ใหม่ด้วย OTP ก่อนใช้เข้าสู่ระบบหรือกู้รหัสผ่าน",
+  };
 }
 
 const passwordSchema = z
@@ -142,10 +259,16 @@ export async function changePassword(
   }
 
   const newHash = await bcrypt.hash(parsed.data.newPassword, 12);
-  await prisma.customer.update({
+  const updated = await prisma.customer.update({
     where: { id: customer.id },
-    data: { passwordHash: newHash },
+    data: {
+      passwordHash: newHash,
+      authVersion: { increment: 1 },
+      passwordResetOtps: { deleteMany: {} },
+    },
+    select: { id: true, email: true, name: true },
   });
+  await createCustomerSession(updated.id, updated.email, updated.name);
 
   return { success: "เปลี่ยนรหัสผ่านเรียบร้อย" };
 }
@@ -187,23 +310,98 @@ export async function deleteAccount(
 
   const row = await prisma.customer.findUnique({
     where: { id: customer.id },
-    select: { passwordHash: true },
+    select: { passwordHash: true, authVersion: true },
   });
   if (!row) {
     return { error: "ไม่พบบัญชี" };
   }
-  // บัญชี social-only ไม่มีรหัสผ่าน → skip password check
-  if (row.passwordHash) {
-    const ok = await bcrypt.compare(parsed.data.password, row.passwordHash);
-    if (!ok) {
-      return {
-        error: "รหัสผ่านไม่ถูกต้อง",
-        fieldErrors: { password: "รหัสผ่านไม่ถูกต้อง" },
-      };
-    }
+  // A 30-day social session alone is not enough proof for irreversible
+  // deletion. Social-only customers must establish a password first.
+  if (!row.passwordHash) {
+    return {
+      error:
+        "เพื่อความปลอดภัย กรุณาตั้งรหัสผ่านในหน้าโปรไฟล์ก่อนลบบัญชี",
+    };
+  }
+  const ok = await bcrypt.compare(parsed.data.password, row.passwordHash);
+  if (!ok) {
+    return {
+      error: "รหัสผ่านไม่ถูกต้อง",
+      fieldErrors: { password: "รหัสผ่านไม่ถูกต้อง" },
+    };
   }
 
-  await prisma.customer.delete({ where: { id: customer.id } });
+  // Lock and re-check the credential version before deleting. The legacy
+  // season-pass customerId fields have no FK, so briefly block writes to every
+  // retained-history table while count + delete run atomically.
+  let outcome:
+    | "not-found"
+    | "security-changed"
+    | "has-history"
+    | "deleted";
+  try {
+    outcome = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SET LOCAL lock_timeout TO '3s'`;
+      await tx.$executeRaw`
+        LOCK TABLE "Booking", "SeasonPassPurchase", "SeasonPassOrder"
+        IN SHARE ROW EXCLUSIVE MODE
+      `;
+      const owners = await tx.$queryRaw<
+        { id: string; passwordHash: string | null; authVersion: number }[]
+      >`
+        SELECT "id", "passwordHash", "authVersion" FROM "Customer"
+        WHERE "id" = ${customer.id}
+        FOR UPDATE
+      `;
+      const owner = owners[0];
+      if (!owner) return "not-found" as const;
+      if (
+        owner.authVersion !== customer.authVersion ||
+        owner.authVersion !== row.authVersion ||
+        owner.passwordHash !== row.passwordHash
+      ) {
+        return "security-changed" as const;
+      }
+
+      const [bookings, seasonPassOrders, seasonPassPurchases] = await Promise.all([
+        tx.booking.count({ where: { customerId: customer.id } }),
+        tx.seasonPassOrder.count({ where: { customerId: customer.id } }),
+        tx.seasonPassPurchase.count({ where: { customerId: customer.id } }),
+      ]);
+      if (
+        hasRetainedCustomerHistory({
+          bookings,
+          seasonPassOrders,
+          seasonPassPurchases,
+        })
+      ) {
+        return "has-history" as const;
+      }
+      await tx.customer.delete({ where: { id: customer.id } });
+      return "deleted" as const;
+    });
+  } catch {
+    return {
+      error:
+        "ยังไม่สามารถตรวจสอบประวัติทั้งหมดได้ จึงยังไม่ลบบัญชี กรุณาลองใหม่ภายหลัง",
+    };
+  }
+  if (outcome === "has-history") {
+    return {
+      error:
+        "บัญชีนี้มีประวัติการจองหรือตั๋ว กรุณาติดต่อทีมงานเพื่อดำเนินการตามนโยบายเก็บรักษาข้อมูล",
+    };
+  }
+  if (outcome !== "deleted") {
+    await deleteCustomerSession();
+    return {
+      error:
+        outcome === "not-found"
+          ? "ไม่พบบัญชี"
+          : "ข้อมูลความปลอดภัยของบัญชีเปลี่ยนแล้ว กรุณาเข้าสู่ระบบใหม่",
+    };
+  }
+
   await deleteCustomerSession();
   redirect("/");
 }

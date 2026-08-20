@@ -1,4 +1,5 @@
 import { verifyCustomer } from "@/lib/customer-dal";
+import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/format";
 import ProfileForm from "./ProfileForm";
 import DangerZone from "./DangerZone";
@@ -9,6 +10,11 @@ export const metadata = { title: "โปรไฟล์ — Pattani FC" };
 
 export default async function ProfilePage() {
   const customer = await verifyCustomer();
+  const profileSecurity = await prisma.customer.findUnique({
+    where: { id: customer.id },
+    select: { passwordHash: true },
+  });
+  const canChangePhone = Boolean(profileSecurity?.passwordHash);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -27,6 +33,7 @@ export default async function ProfilePage() {
             email: customer.email,
             phone: customer.phone ?? "",
           }}
+          canChangePhone={canChangePhone}
         />
       </section>
 

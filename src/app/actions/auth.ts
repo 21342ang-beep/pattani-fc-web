@@ -1,11 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createSession, deleteSession } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
+import { GATE_OFFLINE_REVOKED_COOKIE } from "@/app/(gate)/gate-check/offline-policy";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("อีเมลไม่ถูกต้อง"),
@@ -55,11 +57,30 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     return { error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
   }
 
-  await createSession(user.id, user.role);
+  // A successful fresh login is the only place that removes the Gate logout
+  // marker. Cached offline pages cannot silently resurrect the old session.
+  (await cookies()).set(GATE_OFFLINE_REVOKED_COOKIE, "", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: 0,
+  });
+  await createSession(user.id, user.role, user.authVersion);
   redirect("/admin");
 }
 
 export async function logout(): Promise<void> {
+  // The readable marker is not a credential. It is a fail-safe for cached Gate
+  // pages if the browser closes before the cleanup redirect finishes.
+  (await cookies()).set(GATE_OFFLINE_REVOKED_COOKIE, "1", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: 8 * 60 * 60,
+    priority: "high",
+  });
   await deleteSession();
-  redirect("/login");
+  redirect("/gate-offline-logout");
 }

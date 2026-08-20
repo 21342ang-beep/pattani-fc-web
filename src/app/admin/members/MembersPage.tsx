@@ -62,7 +62,7 @@ function formatMemberAddress(member: {
 export default async function MembersPage(props: {
   searchParams: Promise<{ q?: string; tier?: string }>;
 }) {
-  await verifyPermission("MEMBER_DATA");
+  const actor = await verifyPermission("MEMBER_DATA");
   const { q: rawQuery, tier: rawTier } = await props.searchParams;
   const q = (rawQuery ?? "").trim().slice(0, 100);
   const selectedTier: TierFilter = [
@@ -358,7 +358,9 @@ export default async function MembersPage(props: {
                       >
                         แก้ไข
                       </Link>
-                      <DeleteMemberButton memberId={member.id} memberName={member.name} />
+                      {actor.role === "SUPER_ADMIN" ? (
+                        <DeleteMemberButton memberId={member.id} memberName={member.name} />
+                      ) : null}
                     </div>
                   </td>
                 </tr>

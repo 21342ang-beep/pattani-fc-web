@@ -17,6 +17,7 @@ export default async function AdminDashboard() {
 
   const canViewMatches = hasPermission(user, "MATCHES");
   const canViewBookings = hasPermission(user, "BOOKINGS");
+  const canViewSeasonPasses = hasPermission(user, "SEASON_PASSES");
   const canViewRevenue =
     hasPermission(user, "REPORTS") || hasPermission(user, "FINANCE");
   const canViewCustomers =
@@ -35,9 +36,46 @@ export default async function AdminDashboard() {
         ),
       )
     : Promise.resolve(null);
+  const paymentReviewPromise = Promise.all([
+    canViewBookings
+      ? prisma.beamPayment.count({
+          where: { status: "REVIEW_REQUIRED", bookingId: { not: null } },
+        })
+      : Promise.resolve(0),
+    canViewBookings
+      ? prisma.xenditPayment.count({
+          where: { status: "REVIEW_REQUIRED", bookingId: { not: null } },
+        })
+      : Promise.resolve(0),
+    canViewSeasonPasses
+      ? prisma.beamPayment.count({
+          where: {
+            status: "REVIEW_REQUIRED",
+            OR: [
+              { seasonPassOrderId: { not: null } },
+              { seasonPassPurchaseId: { not: null } },
+            ],
+          },
+        })
+      : Promise.resolve(0),
+    canViewSeasonPasses
+      ? prisma.xenditPayment.count({
+          where: {
+            status: "REVIEW_REQUIRED",
+            OR: [
+              { seasonPassOrderId: { not: null } },
+              { seasonPassPurchaseId: { not: null } },
+            ],
+          },
+        })
+      : Promise.resolve(0),
+  ]).then(([beamBooking, xenditBooking, beamSeason, xenditSeason]) => ({
+    booking: beamBooking + xenditBooking,
+    season: beamSeason + xenditSeason,
+  }));
 
   // อย่าดึงหรือแสดงสถิติที่อยู่นอก permission ของผู้ดูแล แม้จะเป็น dashboard
-  const [matchSummary, activeTicketCount, revenue, customerCount] =
+  const [matchSummary, activeTicketCount, revenue, customerCount, paymentReview] =
     await Promise.all([
       canViewMatches
         ? Promise.all([
@@ -53,7 +91,9 @@ export default async function AdminDashboard() {
           })
         : Promise.resolve(null),
       canViewCustomers ? prisma.customer.count() : Promise.resolve(null),
+      paymentReviewPromise,
     ]);
+  const paymentReviewTotal = paymentReview.booking + paymentReview.season;
 
   // สถิติเสริมต่อการ์ด — SUPER_ADMIN เห็นเสมอ, ADMIN เห็นเฉพาะที่มีสิทธิ์
   const stats: Partial<Record<Permission, string>> = {};
@@ -85,6 +125,39 @@ export default async function AdminDashboard() {
           สวัสดี {user.name || user.email} · เลือกหมวดที่ต้องการจัดการได้จากการ์ดด้านล่าง
         </p>
       </div>
+
+      {paymentReviewTotal > 0 && (
+        <section
+          role="alert"
+          className="mb-8 rounded-xl border-2 border-amber-400 bg-amber-50 p-5 text-amber-950 shadow-sm"
+        >
+          <h2 className="text-lg font-bold">
+            พบรายการชำระเงินที่ต้องตรวจสอบ {paymentReviewTotal.toLocaleString("th-TH")} รายการ
+          </h2>
+          <p className="mt-1 text-sm leading-6">
+            ระบบเก็บหลักฐานไว้และจะไม่ยืนยันการชำระเงินรายการเหล่านี้อัตโนมัติ
+            กรุณาตรวจยอดกับผู้ให้บริการก่อนแก้สถานะหรือคืนเงิน
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
+            {paymentReview.booking > 0 && canViewBookings && (
+              <Link
+                href="/admin/bookings"
+                className="rounded-lg border border-amber-400 bg-white px-3 py-2 hover:bg-amber-100"
+              >
+                รายแมตช์ {paymentReview.booking.toLocaleString("th-TH")}
+              </Link>
+            )}
+            {paymentReview.season > 0 && canViewSeasonPasses && (
+              <Link
+                href="/admin/season-passes"
+                className="rounded-lg border border-amber-400 bg-white px-3 py-2 hover:bg-amber-100"
+              >
+                บัตรรายปี {paymentReview.season.toLocaleString("th-TH")}
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* สรุปตัวเลขรวม — แสดงเฉพาะข้อมูลที่บัญชีนี้มีสิทธิ์ */}
       {(matchSummary || activeTicketCount != null || revenue) && (

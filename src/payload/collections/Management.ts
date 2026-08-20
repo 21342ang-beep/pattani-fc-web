@@ -1,14 +1,24 @@
 import type { CollectionConfig } from "payload";
+import {
+  contentManagersOnly,
+  hideFromNonContentManagers,
+  publicRead,
+} from "../access";
 
 export const Management: CollectionConfig = {
   slug: "management",
   labels: { singular: "ผู้บริหาร", plural: "ผู้บริหาร" },
-  admin: { useAsTitle: "name", group: "เนื้อหา", defaultColumns: ["name", "position", "order"] },
+  admin: {
+    useAsTitle: "name",
+    group: "เนื้อหา",
+    defaultColumns: ["name", "position", "order"],
+    hidden: hideFromNonContentManagers,
+  },
   access: {
-    read: () => true,
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: publicRead,
+    create: contentManagersOnly,
+    update: contentManagersOnly,
+    delete: contentManagersOnly,
   },
   fields: [
     { name: "name", type: "text", label: "ชื่อ", required: true },

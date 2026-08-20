@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getMatchById } from "@/lib/cached-queries";
-import { readCustomerSession } from "@/lib/customer-session";
+import { getOptionalCustomer } from "@/lib/customer-dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { getSeatAvailabilityForMatches } from "@/lib/seat-availability";
 import BookingForm from "./BookingForm";
@@ -24,9 +24,9 @@ export default async function MatchDetailPage(props: {
     ? normalizedZone
     : undefined;
 
-  const [match, session, purchaseSettings] = await Promise.all([
+  const [match, customer, purchaseSettings] = await Promise.all([
     getMatchById(id),
-    readCustomerSession(),
+    getOptionalCustomer(),
     getTicketPurchaseSettings(),
   ]);
   if (!match) notFound();
@@ -63,14 +63,6 @@ export default async function MatchDetailPage(props: {
     selectedPrice > 0 &&
     match.kickoffAt != null &&
     capacity != null;
-
-  // โหลด customer (name/phone default ใน form) — ถ้ามี session
-  const customer = session
-    ? await prisma.customer.findUnique({
-        where: { id: session.customerId },
-        select: { name: true, phone: true },
-      })
-    : null;
 
   return (
     <>
@@ -146,8 +138,8 @@ export default async function MatchDetailPage(props: {
           matchId={match.id}
           pricePerSeat={selectedPrice!}
           maxQuantity={Math.min(purchaseSettings.matchMaxQuantity, remaining)}
-          customerEmail={session?.email ?? null}
-          customerName={customer?.name ?? session?.name ?? ""}
+          customerEmail={customer?.email ?? null}
+          customerName={customer?.name ?? ""}
           customerPhone={customer?.phone ?? ""}
           zone={zone}
         />

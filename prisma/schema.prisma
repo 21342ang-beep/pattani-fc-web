@@ -16,6 +16,7 @@ model User {
   id           String       @id @default(cuid())
   email        String       @unique
   passwordHash String
+  authVersion  Int          @default(0)
   name         String?
   role         Role         @default(ADMIN)
   permissions  Permission[] @default([])
@@ -50,39 +51,74 @@ enum Permission {
 // passwordHash = nullable เพราะบัญชี social-only ไม่ต้องมีรหัสผ่าน
 // pdpaConsentAt = timestamp ที่ลูกค้ายอมรับนโยบายข้อมูลส่วนบุคคล (บังคับ)
 model Customer {
-  id                String                     @id @default(cuid())
-  email             String                     @unique
-  passwordHash      String?
-  name              String
-  phone             String?
-  phoneVerifiedAt   DateTime?
-  gender            String?
-  birthDate         DateTime?
-  address           String?
-  province          String?
-  district          String?
-  postalCode        String?
-  emailVerifiedAt   DateTime?
-  lastLoginAt       DateTime?
-  pdpaConsentAt     DateTime?
-  accounts          CustomerAccount[]
-  passwordResetOtps CustomerPasswordResetOtp[]
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
+  id                    String                         @id @default(cuid())
+  email                 String                         @unique
+  passwordHash          String?
+  authVersion           Int                            @default(0)
+  name                  String
+  phone                 String?
+  phoneVerifiedAt       DateTime?
+  gender                String?
+  birthDate             DateTime?
+  address               String?
+  province              String?
+  district              String?
+  postalCode            String?
+  emailVerifiedAt       DateTime?
+  lastLoginAt           DateTime?
+  pdpaConsentAt         DateTime?
+  accounts              CustomerAccount[]
+  bookings              Booking[]
+  passwordResetOtps     CustomerPasswordResetOtp[]
+  registrationChallenge CustomerRegistrationChallenge?
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
 
   @@index([email])
 }
 
 model CustomerPasswordResetOtp {
-  id            String   @id @default(cuid())
-  customerId    String
-  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
   providerToken String
-  attempts      Int      @default(0)
+  attempts      Int       @default(0)
   expiresAt     DateTime
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   @@index([customerId, createdAt])
+  @@index([expiresAt])
+}
+
+// Short-lived server-side holding area for password registrations. No Customer
+// row or authenticated session exists until Thai mobile OTP verification has
+// succeeded. The browser receives only the opaque id in an HttpOnly cookie.
+model CustomerRegistrationChallenge {
+  id                 String    @id
+  email              String
+  passwordHash       String
+  name               String
+  phone              String
+  gender             String
+  birthDate          DateTime
+  address            String
+  province           String
+  district           String
+  postalCode         String
+  pdpaConsentAt      DateTime
+  providerToken      String
+  reference          String?
+  returnTo           String?
+  activationEligible Boolean
+  attempts           Int       @default(0)
+  expiresAt          DateTime
+  completedAt        DateTime?
+  customerId         String?   @unique
+  customer           Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt          DateTime  @default(now())
+
+  @@index([email])
+  @@index([phone])
   @@index([expiresAt])
 }
 
@@ -225,17 +261,19 @@ enum MatchStatus {
 // customerEmail = nullable เพื่อรองรับ guest checkout (ไม่ต้องสมัครสมาชิก)
 // member จะมี email จาก session, guest จะเป็น null
 model Booking {
-  id               String            @id @default(cuid())
-  bookingCode      String            @unique @default(cuid())
+  id               String              @id @default(cuid())
+  bookingCode      String              @unique @default(cuid())
   matchId          String
-  match            Match             @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  match            Match               @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  customerId       String?
+  customer         Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerName     String
   customerEmail    String? // guest = null, member = session email
   customerPhone    String
   quantity         Int
   zone             String?
   totalAmount      Int // ราคารวม (สตางค์)
-  status           BookingStatus     @default(PENDING)
+  status           BookingStatus       @default(PENDING)
   paymentMethod    String? // "PROMPTPAY" | "MOBILE_BANKING" | "CREDIT_CARD"
   salesChannel     BookingSalesChannel @default(ONLINE)
   staffRequestId   String?             @unique
@@ -254,8 +292,8 @@ model Booking {
   auditLogs        BookingAuditLog[]
   xenditPayments   XenditPayment[]
   beamPayments     BeamPayment[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   @@index([matchId])
   @@index([matchId, zone])
@@ -263,9 +301,22 @@ model Booking {
   @@index([status, paymentExpiresAt])
   @@index([salesChannel, createdAt])
   @@index([soldById])
+  @@index([customerId])
   @@index([customerEmail])
   @@index([customerPhone])
   @@index([scannedAt])
+}
+
+// Shared, privacy-preserving rate-limit buckets. The raw IP/account/phone is
+// never stored; application code hashes the action + identity before writing.
+model SecurityRateLimit {
+  keyHash         String   @id
+  count           Int      @default(0)
+  windowStartedAt DateTime
+  expiresAt       DateTime
+  updatedAt       DateTime @updatedAt
+
+  @@index([expiresAt])
 }
 
 enum BookingSalesChannel {
@@ -583,17 +634,20 @@ model SeasonPassZoneQuota {
 }
 
 model SeasonPassBarcode {
-  id            String           @id @default(cuid())
-  barcode       String           @unique
-  tierId        String
-  seasonLabel   String
-  isGenerated   Boolean          @default(false)
-  usesRemaining Int              @default(15)
-  orderId       String?          @unique
-  order         SeasonPassOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  assignedAt    DateTime?
-  scans         SeasonPassScan[]
-  createdAt     DateTime         @default(now())
+  id                String           @id @default(cuid())
+  barcode           String           @unique
+  tierId            String
+  seasonLabel       String
+  isGenerated       Boolean          @default(false)
+  usesRemaining     Int              @default(15)
+  orderId           String?          @unique
+  order             SeasonPassOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  assignedAt        DateTime?
+  gateVersion       Int              @default(0)
+  gateNonce         String           @unique @default(dbgenerated("gen_random_uuid()"))
+  legacyGateAllowed Boolean          @default(false)
+  scans             SeasonPassScan[]
+  createdAt         DateTime         @default(now())
 
   @@index([tierId, orderId])
   @@index([tierId, isGenerated, orderId])

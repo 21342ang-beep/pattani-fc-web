@@ -9,7 +9,7 @@ import {
   COOKIE_CONSENT_VALUES,
   type CookieConsentValue,
 } from "@/lib/cookie-consent";
-import { readCustomerSession } from "@/lib/customer-session";
+import { getOptionalCustomer } from "@/lib/customer-dal";
 import { getT } from "@/lib/i18n/server";
 import "../globals.css";
 
@@ -25,7 +25,7 @@ export default async function PublicLayout({
   children: React.ReactNode;
 }) {
   const [customer, { locale, dict }, cookieStore] = await Promise.all([
-    readCustomerSession(),
+    getOptionalCustomer(),
     getT(),
     cookies(),
   ]);

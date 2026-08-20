@@ -181,6 +181,7 @@ export async function createBeamPromptPayCharge(input: {
         skip3dsFlow: false,
       }),
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
   } catch {
     throw new BeamApiError("ไม่สามารถเชื่อมต่อระบบชำระเงิน Beam ได้", true);
