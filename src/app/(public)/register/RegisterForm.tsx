@@ -188,7 +188,6 @@ export default function RegisterForm({
           name="email"
           type="email"
           autoComplete="email"
-          required
           error={fe.email}
         />
         <Field

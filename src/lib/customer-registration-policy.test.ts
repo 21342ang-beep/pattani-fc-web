@@ -12,8 +12,28 @@ import {
   passwordResetCommitAllowed,
   registrationChallengeActivationEligible,
   remainingRecoveryResponseDelayMs,
+  resolveRegistrationAccountEmail,
   uniqueVerifiedPhoneRecoveryOwner,
 } from "./customer-registration-policy";
+
+test("registration keeps a supplied email and generates a unique internal email when omitted", () => {
+  assert.equal(
+    resolveRegistrationAccountEmail(" MEMBER@Example.COM ", "unused"),
+    "member@example.com",
+  );
+  assert.equal(
+    resolveRegistrationAccountEmail("", "first-id"),
+    "member-first-id@accounts.pattanifc.local",
+  );
+  assert.equal(
+    resolveRegistrationAccountEmail("   ", "second-id"),
+    "member-second-id@accounts.pattanifc.local",
+  );
+  assert.notEqual(
+    resolveRegistrationAccountEmail("", "first-id"),
+    resolveRegistrationAccountEmail("", "second-id"),
+  );
+});
 
 test("password registration creates no account or session before OTP", () => {
   const plan = passwordRegistrationSecurityPlan({

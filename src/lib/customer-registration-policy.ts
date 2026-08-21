@@ -1,5 +1,14 @@
 export const CUSTOMER_REGISTRATION_OTP_TTL_MS = 10 * 60_000;
 export const CUSTOMER_REGISTRATION_MAX_OTP_ATTEMPTS = 5;
+export const CUSTOMER_INTERNAL_EMAIL_DOMAIN = "accounts.pattanifc.local";
+
+export function resolveRegistrationAccountEmail(
+  submittedEmail: string | null | undefined,
+  generatedId: string,
+): string {
+  const normalizedEmail = (submittedEmail ?? "").trim().toLowerCase();
+  return normalizedEmail || `member-${generatedId}@${CUSTOMER_INTERNAL_EMAIL_DOMAIN}`;
+}
 
 export function normalizeRegistrationPhone(
   phone: string | null | undefined,

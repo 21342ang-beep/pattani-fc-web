@@ -24,6 +24,7 @@ import {
   normalizeRegistrationPhone,
   passwordRegistrationSecurityPlan,
   registrationChallengeActivationEligible,
+  resolveRegistrationAccountEmail,
 } from "@/lib/customer-registration-policy";
 
 const REGISTRATION_COOKIE = "customer_registration";
@@ -34,12 +35,22 @@ const REGISTRATION_OTP_GENERIC_ERROR =
 
 const registerSchema = z.object({
   name: z.string().trim().min(2, "กรอกชื่อ-นามสกุลให้ครบ").max(100),
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .email("อีเมลไม่ถูกต้อง")
-    .max(200, "อีเมลยาวเกินไป"),
+  email: z.preprocess(
+    (value) =>
+      value == null
+        ? ""
+        : typeof value === "string"
+          ? value.trim().toLowerCase()
+          : value,
+    z
+      .literal("")
+      .or(
+        z
+          .string()
+          .email("อีเมลไม่ถูกต้อง")
+          .max(200, "อีเมลยาวเกินไป"),
+      ),
+  ),
   phone: z
     .string()
     .trim()
@@ -233,11 +244,17 @@ export async function registerCustomer(
   // Hash before the ownership lookups so duplicate/non-duplicate responses do
   // not differ by one expensive bcrypt operation.
   const passwordHash = await bcrypt.hash(password, 12);
+  const accountEmail = resolveRegistrationAccountEmail(
+    email,
+    randomBytes(32).toString("hex"),
+  );
   const [existingEmail, verifiedPhoneOwners] = await Promise.all([
-    prisma.customer.findFirst({
-      where: { email: { equals: email, mode: "insensitive" } },
-      select: { id: true },
-    }),
+    email
+      ? prisma.customer.findFirst({
+          where: { email: { equals: email, mode: "insensitive" } },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
     getVerifiedPhoneOwnerIds(normalizedPhone),
   ]);
   // Never reveal whether either identifier already belongs to an account.
@@ -291,7 +308,7 @@ export async function registerCustomer(
       await tx.customerRegistrationChallenge.create({
         data: {
           id: challengeId,
-          email,
+          email: accountEmail,
           passwordHash,
           name,
           phone: normalizedPhone,
