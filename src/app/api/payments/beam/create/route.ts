@@ -62,9 +62,12 @@ async function preparePayment(input: {
 
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
-    await tx.$executeRaw(Prisma.sql`UPDATE "BeamPayment" SET "status" = 'EXPIRED', "updatedAt" = NOW()
-      WHERE ${target} AND "status" = 'PENDING' AND "expiresAt" <= NOW()`);
-    await tx.$executeRaw(Prisma.sql`UPDATE "BeamPayment" SET "status" = ${PAYMENT_REVIEW_STATUS}, "updatedAt" = NOW()
+    await tx.$executeRaw(Prisma.sql`UPDATE "BeamPayment" SET "status" = 'EXPIRED',
+        "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+      WHERE ${target} AND "status" = 'PENDING'
+        AND "expiresAt" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')`);
+    await tx.$executeRaw(Prisma.sql`UPDATE "BeamPayment" SET "status" = ${PAYMENT_REVIEW_STATUS},
+        "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
       WHERE ${target} AND "status" IN ('INITIATED', 'PENDING') AND "amount" <> ${input.amount}`);
 
     const reusable = await tx.$queryRaw<PaymentRow[]>(Prisma.sql`SELECT "id", "bookingId", "seasonPassOrderId",
@@ -72,8 +75,11 @@ async function preparePayment(input: {
         "amount", "status"
       FROM "BeamPayment"
       WHERE ${target} AND "amount" = ${input.amount} AND (
-        ("status" = 'PENDING' AND "expiresAt" > NOW() + INTERVAL '10 seconds' AND "qrImageBase64" IS NOT NULL)
-        OR ("status" = 'INITIATED' AND "createdAt" > NOW() - INTERVAL '12 hours')
+        ("status" = 'PENDING'
+          AND "expiresAt" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + INTERVAL '10 seconds'
+          AND "qrImageBase64" IS NOT NULL)
+        OR ("status" = 'INITIATED'
+          AND "createdAt" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '12 hours')
       )
       ORDER BY "createdAt" DESC LIMIT 1`);
     if (reusable[0]) return reusable[0];
@@ -82,8 +88,12 @@ async function preparePayment(input: {
     const referenceId = `${input.referencePrefix}_${randomUUID().replace(/-/g, "")}`;
     const idempotencyKey = randomUUID();
     await tx.$executeRaw(Prisma.sql`INSERT INTO "BeamPayment"
-      ("id", "bookingId", "seasonPassOrderId", "seasonPassPurchaseId", "referenceId", "idempotencyKey", "amount", "status", "updatedAt")
-      VALUES (${id}, ${input.bookingId ?? null}, ${input.seasonPassOrderId ?? null}, ${input.seasonPassPurchaseId ?? null}, ${referenceId}, ${idempotencyKey}, ${input.amount}, 'INITIATED', NOW())`);
+      ("id", "bookingId", "seasonPassOrderId", "seasonPassPurchaseId", "referenceId", "idempotencyKey",
+       "amount", "status", "createdAt", "updatedAt")
+      VALUES (${id}, ${input.bookingId ?? null}, ${input.seasonPassOrderId ?? null},
+              ${input.seasonPassPurchaseId ?? null}, ${referenceId}, ${idempotencyKey}, ${input.amount},
+              'INITIATED', (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+              (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))`);
     return {
       id,
       bookingId: input.bookingId ?? null,
@@ -312,7 +322,8 @@ async function finishCharge(
     });
   } catch (error) {
     if (error instanceof BeamApiError && !error.retryable) {
-      await prisma.$executeRaw(Prisma.sql`UPDATE "BeamPayment" SET "status" = 'FAILED', "updatedAt" = NOW()
+      await prisma.$executeRaw(Prisma.sql`UPDATE "BeamPayment" SET "status" = 'FAILED',
+          "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
         WHERE "id" = ${payment.id} AND "status" = 'INITIATED'`);
     }
     console.error("Unable to create Beam PromptPay charge", {

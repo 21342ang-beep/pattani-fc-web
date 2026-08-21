@@ -132,19 +132,20 @@ export default async function AdminDashboard() {
           className="mb-8 rounded-xl border-2 border-amber-400 bg-amber-50 p-5 text-amber-950 shadow-sm"
         >
           <h2 className="text-lg font-bold">
-            พบรายการชำระเงินที่ต้องตรวจสอบ {paymentReviewTotal.toLocaleString("th-TH")} รายการ
+            มีรายการชำระเงินที่ระบบยังยืนยันไม่ได้ {paymentReviewTotal.toLocaleString("th-TH")} รายการ
           </h2>
           <p className="mt-1 text-sm leading-6">
-            ระบบเก็บหลักฐานไว้และจะไม่ยืนยันการชำระเงินรายการเหล่านี้อัตโนมัติ
-            กรุณาตรวจยอดกับผู้ให้บริการก่อนแก้สถานะหรือคืนเงิน
+            รายการเหล่านี้ยังไม่ผ่านการยืนยันอัตโนมัติ แม้ผู้ให้บริการอาจแสดงว่ารับเงินแล้ว
+            ห้ามกดยืนยันชำระหรือคืนเงินด้วยตนเองจนกว่าจะตรวจยอด เลขอ้างอิง
+            และประวัติคืนเงินกับผู้ให้บริการครบถ้วน
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
             {paymentReview.booking > 0 && canViewBookings && (
               <Link
-                href="/admin/bookings"
+                href="/admin/bookings/review"
                 className="rounded-lg border border-amber-400 bg-white px-3 py-2 hover:bg-amber-100"
               >
-                รายแมตช์ {paymentReview.booking.toLocaleString("th-TH")}
+                ตรวจรายการจอง · {paymentReview.booking.toLocaleString("th-TH")}
               </Link>
             )}
             {paymentReview.season > 0 && canViewSeasonPasses && (
@@ -152,7 +153,7 @@ export default async function AdminDashboard() {
                 href="/admin/season-passes"
                 className="rounded-lg border border-amber-400 bg-white px-3 py-2 hover:bg-amber-100"
               >
-                บัตรรายปี {paymentReview.season.toLocaleString("th-TH")}
+                ตรวจบัตรรายปี · {paymentReview.season.toLocaleString("th-TH")}
               </Link>
             )}
           </div>

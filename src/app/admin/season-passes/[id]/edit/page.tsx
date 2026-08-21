@@ -5,6 +5,7 @@ import { verifyPermission } from "@/lib/dal";
 import { SEASON_TIERS } from "@/lib/season-pass-tiers";
 import {
   getSeasonPassZoneBarcodeBounds,
+  resolveSeasonPassBarcodeZoneQuotas,
   seasonPassBarcodeIsWithinBounds,
 } from "@/lib/season-pass-zone-ranges";
 import EditSeasonPassForm from "./EditSeasonPassForm";
@@ -31,7 +32,47 @@ export default async function EditSeasonPassPage({
   const backHref = from === "staff"
     ? "/admin/season-passes/staff"
     : `/admin/season-passes?tier=${returnTier || order.tierId}`;
-  const vvipBarcodeRows = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE"
+  const [zoneQuotas, members] = await Promise.all([
+    prisma.seasonPassZoneQuota.findMany({
+      where: {
+        seasonLabel: order.seasonLabel,
+        tierId: order.tierId,
+        seatZone: { in: [...tier.allowedSeatZones] },
+      },
+      select: { seatZone: true, totalSeats: true, sponsorReserved: true },
+    }),
+    order.salesChannel === "OFFLINE"
+      ? prisma.customer.findMany({
+          orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+          select: { id: true, name: true, phone: true, email: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const barcodePrefix = `PFC26-${tier.priceBaht}-`;
+  const barcodeZoneQuotas = resolveSeasonPassBarcodeZoneQuotas(
+    order.seasonLabel,
+    order.tierId,
+    barcodePrefix,
+    tier.allowedSeatZones,
+    zoneQuotas,
+  );
+  const tierZoneBounds = tier.allowedSeatZones.flatMap((seatZone) => {
+    const bounds = getSeasonPassZoneBarcodeBounds(
+      barcodePrefix,
+      tier.allowedSeatZones,
+      barcodeZoneQuotas,
+      seatZone,
+    );
+    return bounds ? [bounds] : [];
+  });
+  const hasCompleteZoneBarcodeRanges =
+    tierZoneBounds.length === tier.allowedSeatZones.length;
+  const barcodeRangeFilters = tierZoneBounds
+    .filter((bounds) => bounds.publicSeatCount > 0)
+    .map((bounds) => ({
+      barcode: { gte: bounds.lowerBound, lte: bounds.upperBound },
+    }));
+  const availableBarcodeRows = hasCompleteZoneBarcodeRanges && barcodeRangeFilters.length > 0
     ? await prisma.seasonPassBarcode.findMany({
         where: {
           tierId: order.tierId,
@@ -39,44 +80,23 @@ export default async function EditSeasonPassPage({
           isGenerated: true,
           orderId: null,
           scans: { none: {} },
+          OR: barcodeRangeFilters,
         },
         orderBy: { barcode: "asc" },
-        take: 500,
         select: { barcode: true },
       })
     : [];
-  const zoneQuotas = await prisma.seasonPassZoneQuota.findMany({
-    where: {
-      seasonLabel: order.seasonLabel,
-      tierId: order.tierId,
-      seatZone: { in: [...tier.allowedSeatZones] },
-    },
-    select: { seatZone: true, totalSeats: true, sponsorReserved: true },
-  });
-  const barcodePrefix = `PFC26-${tier.priceBaht}-`;
-  const tierZoneBounds = tier.allowedSeatZones.flatMap((seatZone) => {
-    const bounds = getSeasonPassZoneBarcodeBounds(
-      barcodePrefix,
-      tier.allowedSeatZones,
-      zoneQuotas,
-      seatZone,
-    );
-    return bounds ? [bounds] : [];
-  });
-  const canAutomaticallyTransferZoneBarcode = tierZoneBounds.length === tier.allowedSeatZones.length;
-  const vvipBarcodes = vvipBarcodeRows.flatMap((item) => {
+  const availableBarcodes = availableBarcodeRows.flatMap((item) => {
     const bounds = tierZoneBounds.find((candidate) =>
       seasonPassBarcodeIsWithinBounds(item.barcode, candidate),
     );
-    if (bounds) return [{ barcode: item.barcode, seatZone: bounds.seatZone }];
-    return canAutomaticallyTransferZoneBarcode ? [] : [{ barcode: item.barcode, seatZone: "*" }];
+    return bounds ? [{ barcode: item.barcode, seatZone: bounds.seatZone }] : [];
   });
-  const members = order.salesChannel === "OFFLINE"
-    ? await prisma.customer.findMany({
-        orderBy: [{ name: "asc" }, { createdAt: "asc" }],
-        select: { id: true, name: true, phone: true, email: true },
-      })
-    : [];
+  const barcodeSeatZone = order.barcode
+    ? tierZoneBounds.find((bounds) =>
+        seasonPassBarcodeIsWithinBounds(order.barcode!.barcode, bounds),
+      )?.seatZone ?? ""
+    : "";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -95,6 +115,7 @@ export default async function EditSeasonPassPage({
           tierId: order.tierId,
           passCode: order.passCode,
           barcode: order.barcode?.barcode ?? "",
+          barcodeSeatZone,
           customerId: order.customerId ?? "",
           customerName: order.customerName,
           customerPhone: order.customerPhone,
@@ -116,8 +137,8 @@ export default async function EditSeasonPassPage({
         }}
         tierBadge={tier.badge}
         zones={[...tier.allowedSeatZones]}
-        vvipBarcodes={vvipBarcodes}
-        canAutomaticallyTransferZoneBarcode={canAutomaticallyTransferZoneBarcode}
+        availableBarcodes={availableBarcodes}
+        hasCompleteZoneBarcodeRanges={hasCompleteZoneBarcodeRanges}
         members={members}
         backHref={backHref}
       />

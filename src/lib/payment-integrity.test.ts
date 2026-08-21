@@ -11,6 +11,7 @@ import {
 import {
   PAYMENT_REVIEW_STATUS,
   PAYMENT_SUCCESS_STATUS,
+  bookingCanAutomaticallyConfirm,
   paymentCanAutomaticallySucceed,
   paymentEvidenceAllowsTargetDeletion,
   paymentEvidenceMustBeRetained,
@@ -35,6 +36,14 @@ test("payment success and failure transitions are monotonic", () => {
   assert.equal(paymentStatusAfterFailure("EXPIRED"), "EXPIRED");
   assert.equal(paymentStatusAfterFailure(PAYMENT_REVIEW_STATUS), PAYMENT_REVIEW_STATUS);
   assert.equal(paymentStatusAfterFailure(PAYMENT_SUCCESS_STATUS), PAYMENT_SUCCESS_STATUS);
+});
+
+test("on-time Beam payments can confirm pending or recently cancelled bookings", () => {
+  assert.equal(bookingCanAutomaticallyConfirm("PENDING"), true);
+  assert.equal(bookingCanAutomaticallyConfirm("CANCELLED"), true);
+  for (const status of ["CONFIRMED", "REFUNDED", "FAILED", "UNKNOWN"]) {
+    assert.equal(bookingCanAutomaticallyConfirm(status), false);
+  }
 });
 
 test("paid and review-required evidence blocks booking and season inventory cleanup", () => {

@@ -9,6 +9,7 @@ import {
 } from "@/lib/stadium-zones";
 import { isStandaloneSeasonOrder } from "@/lib/season-payment-invariants";
 import { activeBookingStatusWhere } from "@/lib/booking-expiry";
+import { bookingCanAutomaticallyConfirm } from "@/lib/payment-state";
 
 export type StoredPaymentTarget = {
   bookingId: string | null;
@@ -118,10 +119,10 @@ async function confirmBookingPayment(
     return { outcome: "REVIEW_REQUIRED", reason: "booking_reference_mismatch" };
   }
   const base = { kind: "booking" as const, code: booking.bookingCode };
-  if (booking.status !== "PENDING") {
+  if (!bookingCanAutomaticallyConfirm(booking.status)) {
     return {
       outcome: "REVIEW_REQUIRED",
-      reason: booking.status === "CANCELLED" ? "booking_cancelled" : "booking_not_pending",
+      reason: "booking_not_confirmable",
       ...base,
     };
   }
@@ -139,6 +140,9 @@ async function confirmBookingPayment(
   }
   if (!booking.zone) {
     return { outcome: "REVIEW_REQUIRED", reason: "booking_zone_missing", ...base };
+  }
+  if (booking.match.status === "CANCELLED" || booking.match.status === "FINISHED") {
+    return { outcome: "REVIEW_REQUIRED", reason: "booking_match_closed", ...base };
   }
 
   const dynamicZone = booking.match.ticketZones.find((zone) => zone.code === booking.zone);
@@ -172,7 +176,7 @@ async function confirmBookingPayment(
   const updated = await tx.booking.updateMany({
     where: {
       id: booking.id,
-      status: "PENDING",
+      status: { in: ["PENDING", "CANCELLED"] },
       salesChannel: "ONLINE",
       paidAt: null,
       totalAmount: target.amount,
@@ -188,6 +192,26 @@ async function confirmBookingPayment(
   if (updated.count !== 1) {
     return { outcome: "REVIEW_REQUIRED", reason: "booking_changed_during_confirmation", ...base };
   }
+  await tx.bookingAuditLog.create({
+    data: {
+      bookingId: booking.id,
+      bookingCode: booking.bookingCode,
+      action: "STATUS_CHANGED",
+      actorId: "system:payment-webhook",
+      actorLabel: input.paymentMethod.startsWith("BEAM_")
+        ? "ระบบชำระเงิน Beam"
+        : "ระบบชำระเงินออนไลน์",
+      previousStatus: booking.status,
+      nextStatus: "CONFIRMED",
+      details: {
+        reason: "provider_payment_confirmed",
+        referenceId: target.referenceId,
+        paymentMethod: input.paymentMethod,
+        paidAt: input.paidAt.toISOString(),
+        restoredFromCancellation: booking.status === "CANCELLED",
+      },
+    },
+  });
   return { outcome: "CONFIRMED", ...base, matchId: booking.matchId };
 }
 
@@ -204,7 +228,7 @@ async function confirmSeasonPassPurchasePayment(
     Prisma.sql`SELECT "id" FROM "SeasonPassPurchase" WHERE "id" = ${target.seasonPassPurchaseId} FOR UPDATE`,
   );
   await tx.$queryRaw(
-    Prisma.sql`SELECT "id" FROM "SeasonPassOrder" WHERE "purchaseId" = ${target.seasonPassPurchaseId} FOR UPDATE`,
+    Prisma.sql`SELECT "id" FROM "SeasonPassOrder" WHERE "purchaseId" = ${target.seasonPassPurchaseId} ORDER BY "id" FOR UPDATE`,
   );
   const purchase = await tx.seasonPassPurchase.findUnique({
     where: { id: target.seasonPassPurchaseId },

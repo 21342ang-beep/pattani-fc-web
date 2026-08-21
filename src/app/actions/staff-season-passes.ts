@@ -19,6 +19,9 @@ import {
 import {
   calculateSeasonPassZoneRanges,
   formatSeasonPassSequence,
+  getSeasonPassZoneBarcodeBounds,
+  resolveSeasonPassBarcodeZoneQuotas,
+  seasonPassBarcodeIsWithinBounds,
 } from "@/lib/season-pass-zone-ranges";
 import { secureSeasonPassGateAssignment } from "@/lib/season-pass-gate-state";
 
@@ -29,7 +32,14 @@ const staffSeasonPassSchema = z
     newCustomerName: z.string().trim().max(100),
     tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"] as const),
     seatZone: z.union([z.enum(SEASON_PASS_SEAT_ZONES), z.literal("")]),
-    barcode: z.string().trim().toUpperCase().max(50),
+    barcode: z.union([
+      z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^PFC26-(4000|2500|2000|1500)-\d{4}$/, "รูปแบบบาร์โค้ดไม่ถูกต้อง"),
+      z.literal(""),
+    ]),
     seatNumber: z.string().trim().toUpperCase().max(30),
     shirtSize: z.enum(SEASON_PASS_SHIRT_SIZES).optional().or(z.literal("")),
     paymentMethod: z.enum(["OFFLINE_CASH", "OFFLINE_TRANSFER"]),
@@ -51,6 +61,13 @@ const staffSeasonPassSchema = z
         code: "custom",
         path: ["seatZone"],
         message: "โซนที่นั่งไม่ตรงกับแพ็กเกจที่เลือก",
+      });
+    }
+    if (data.barcode && !data.seatZone) {
+      context.addIssue({
+        code: "custom",
+        path: ["seatZone"],
+        message: "กรุณาเลือกโซนก่อนเลือกเลขรันบาร์โค้ด",
       });
     }
   });
@@ -117,15 +134,40 @@ export async function registerStaffSeasonPass(
 
       let barcodeLowerBound: string | null = null;
       let barcodeUpperBound: string | null = null;
+      const configuredQuotas = await tx.seasonPassZoneQuota.findMany({
+        where: {
+          seasonLabel: SEASON_LABEL,
+          tierId: input.tierId,
+          seatZone: { in: [...tier.allowedSeatZones] },
+        },
+      });
+      const barcodeZoneQuotas = resolveSeasonPassBarcodeZoneQuotas(
+        SEASON_LABEL,
+        input.tierId,
+        barcodePrefix,
+        tier.allowedSeatZones,
+        configuredQuotas,
+      );
+      const selectedBarcodeBounds = input.seatZone
+        ? getSeasonPassZoneBarcodeBounds(
+            barcodePrefix,
+            tier.allowedSeatZones,
+            barcodeZoneQuotas,
+            input.seatZone,
+          )
+        : null;
+      if (input.barcode && !selectedBarcodeBounds) {
+        throw new Error("ZONE_BARCODE_RANGE_UNCONFIGURED");
+      }
+      if (
+        input.barcode &&
+        selectedBarcodeBounds &&
+        !seasonPassBarcodeIsWithinBounds(input.barcode, selectedBarcodeBounds)
+      ) {
+        throw new Error("BARCODE_OUTSIDE_ZONE");
+      }
 
       if (input.tierId !== "vvip-elite") {
-        const configuredQuotas = await tx.seasonPassZoneQuota.findMany({
-          where: {
-            seasonLabel: SEASON_LABEL,
-            tierId: input.tierId,
-            seatZone: { in: [...tier.allowedSeatZones] },
-          },
-        });
         const hasCompleteZoneAllocation = configuredQuotas.length === tier.allowedSeatZones.length;
         const zoneRanges = hasCompleteZoneAllocation
           ? calculateSeasonPassZoneRanges(tier.allowedSeatZones, configuredQuotas)
@@ -154,6 +196,18 @@ export async function registerStaffSeasonPass(
           });
           if (activeInZone + 1 > zoneLimit) throw new Error("ZONE_SOLD_OUT");
         }
+      } else if (input.seatZone && selectedBarcodeBounds) {
+        const activeInZone = await tx.seasonPassOrder.count({
+          where: {
+            seasonLabel: SEASON_LABEL,
+            tierId: input.tierId,
+            seatZone: input.seatZone,
+            status: { in: ["PENDING", "CONFIRMED"] },
+          },
+        });
+        if (activeInZone + 1 > selectedBarcodeBounds.publicSeatCount) {
+          throw new Error("ZONE_SOLD_OUT");
+        }
       }
 
       const deferBarcodeAssignment =
@@ -167,6 +221,7 @@ export async function registerStaffSeasonPass(
               seasonLabel: SEASON_LABEL,
               orderId: null,
               isGenerated: true,
+              scans: { none: {} },
               ...(input.tierId === "vvip-elite"
                 ? { barcode: input.barcode }
                 : barcodeUpperBound
@@ -259,7 +314,13 @@ export async function registerStaffSeasonPass(
       return { ok: false, error: "โซนนี้เต็มตามโควตาบัตรรายปีแล้ว กรุณาเลือกโซนอื่น" };
     }
     if (error instanceof Error && error.message === "SOLD_OUT") {
-      return { ok: false, error: "ไม่มีบาร์โค้ดพร้อมใช้ในแพ็กเกจหรือโซนนี้" };
+      return { ok: false, error: "ไม่มีบาร์โค้ดพร้อมใช้ในแพ็กเกจหรือโซนนี้", fieldErrors: { barcode: ["กรุณาเลือกเลขรันที่ยังว่างในโซนนี้"] } };
+    }
+    if (error instanceof Error && error.message === "ZONE_BARCODE_RANGE_UNCONFIGURED") {
+      return { ok: false, error: "ยังไม่ได้กำหนดช่วงเลขรันบาร์โค้ดของโซนนี้" };
+    }
+    if (error instanceof Error && error.message === "BARCODE_OUTSIDE_ZONE") {
+      return { ok: false, error: "เลขรันบาร์โค้ดที่เลือกไม่อยู่ในโซนนี้", fieldErrors: { barcode: ["กรุณาเลือกเลขรันของโซนที่เลือก"] } };
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { ok: false, error: "หมายเลขที่นั่งหรือบาร์โค้ดนี้ถูกจองแล้ว กรุณาตรวจสอบอีกครั้ง" };

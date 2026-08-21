@@ -23,6 +23,13 @@ const statusColor: Record<string, string> = {
   REFUNDED: "bg-blue-100 text-blue-800",
 };
 
+const statusLabel: Record<string, string> = {
+  PENDING: "รอชำระ",
+  CONFIRMED: "ยืนยันแล้ว",
+  CANCELLED: "ยกเลิกแล้ว",
+  REFUNDED: "ทำเครื่องหมายคืนเงินแล้ว",
+};
+
 export default async function AdminBookingsPage(props: { searchParams: Promise<{ name?: string; matchId?: string; zone?: string; view?: string }> }) {
   await verifyPermission("BOOKINGS");
   const { name: rawName, matchId: rawMatchId, zone: rawZone, view: rawView } = await props.searchParams;
@@ -177,6 +184,16 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
           kickoffAt: true,
           ticketZones: { select: { code: true, name: true } },
         },
+      },
+      beamPayments: {
+        where: { status: "REVIEW_REQUIRED" },
+        select: { id: true },
+        take: 1,
+      },
+      xenditPayments: {
+        where: { status: "REVIEW_REQUIRED" },
+        select: { id: true },
+        take: 1,
       },
     },
     take: 100,
@@ -391,9 +408,18 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
                     <span className={`rounded px-2 py-0.5 text-sm ${statusColor[b.status]}`}>
-                      {b.status}
+                      {statusLabel[b.status] ?? b.status}
                     </span>
-                    <BookingStatusSelect bookingId={b.id} currentStatus={b.status} />
+                    {b.beamPayments.length > 0 || b.xenditPayments.length > 0 ? (
+                      <Link
+                        href="/admin/bookings/review"
+                        className="rounded border border-amber-400 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-900 hover:bg-amber-100"
+                      >
+                        ล็อกไว้ตรวจการชำระ
+                      </Link>
+                    ) : (
+                      <BookingStatusSelect bookingId={b.id} currentStatus={b.status} />
+                    )}
                   </div>
                 </td>
                 <td className="px-3 py-2 text-sm text-slate-500 md:text-base">

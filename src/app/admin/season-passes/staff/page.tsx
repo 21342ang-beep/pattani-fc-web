@@ -3,7 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 import { SEASON_LABEL, SEASON_TIERS } from "@/lib/season-pass-tiers";
-import { calculateSeasonPassZoneRanges, formatSeasonPassSequence } from "@/lib/season-pass-zone-ranges";
+import {
+  getSeasonPassZoneBarcodeBounds,
+  resolveSeasonPassBarcodeZoneQuotas,
+  seasonPassBarcodeIsWithinBounds,
+} from "@/lib/season-pass-zone-ranges";
 import StaffSeasonPassForm from "./StaffSeasonPassForm";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +15,7 @@ export const metadata = { title: "จองบัตรรายปีโดย�
 
 export default async function StaffSeasonPassPage() {
   await verifyPermission("SEASON_PASSES");
-  const [quotas, soldGroups, availableBarcodes, vvipBarcodes, recentOrders, members] = await Promise.all([
+  const [quotas, soldGroups, availableBarcodes, recentOrders, members] = await Promise.all([
     prisma.seasonPassZoneQuota.findMany({ where: { seasonLabel: SEASON_LABEL } }),
     prisma.seasonPassOrder.groupBy({
       by: ["tierId", "seatZone"],
@@ -19,14 +23,14 @@ export default async function StaffSeasonPassPage() {
       _count: { _all: true },
     }),
     prisma.seasonPassBarcode.findMany({
-      where: { seasonLabel: SEASON_LABEL, isGenerated: true, orderId: null },
+      where: {
+        seasonLabel: SEASON_LABEL,
+        isGenerated: true,
+        orderId: null,
+        scans: { none: {} },
+      },
+      orderBy: [{ tierId: "asc" }, { barcode: "asc" }],
       select: { tierId: true, barcode: true },
-    }),
-    prisma.seasonPassBarcode.findMany({
-      where: { tierId: "vvip-elite", seasonLabel: SEASON_LABEL, isGenerated: true, orderId: null },
-      orderBy: { barcode: "asc" },
-      take: 500,
-      select: { barcode: true },
     }),
     prisma.seasonPassOrder.findMany({
       where: {
@@ -63,28 +67,34 @@ export default async function StaffSeasonPassPage() {
     : [];
   const sellerById = new Map(sellers.map((seller) => [seller.id, seller.name || seller.email]));
 
+  const vvipTier = SEASON_TIERS.find((tier) => tier.id === "vvip-elite")!;
+  const vvipBarcodePrefix = `PFC26-${vvipTier.priceBaht}-`;
+  const vvipBarcodeQuotas = resolveSeasonPassBarcodeZoneQuotas(
+    SEASON_LABEL,
+    vvipTier.id,
+    vvipBarcodePrefix,
+    vvipTier.allowedSeatZones,
+    quotas.filter((quota) => quota.tierId === vvipTier.id),
+  );
+  const vvipBarcodeBounds = vvipTier.allowedSeatZones.flatMap((seatZone) => {
+    const bounds = getSeasonPassZoneBarcodeBounds(
+      vvipBarcodePrefix,
+      vvipTier.allowedSeatZones,
+      vvipBarcodeQuotas,
+      seatZone,
+    );
+    return bounds ? [bounds] : [];
+  });
+  const vvipBarcodes = availableBarcodes.flatMap((item) => {
+    if (item.tierId !== vvipTier.id) return [];
+    const bounds = vvipBarcodeBounds.find((candidate) =>
+      seasonPassBarcodeIsWithinBounds(item.barcode, candidate),
+    );
+    return bounds ? [{ barcode: item.barcode, seatZone: bounds.seatZone }] : [];
+  });
+
   const tierOptions = SEASON_TIERS.filter((tier) => tier.id === "vvip-elite").map((tier) => {
-    const tierQuotas = quotas.filter((quota) => quota.tierId === tier.id);
-    const hasCompleteAllocation = tier.inventory != null && tierQuotas.length === tier.allowedSeatZones.length;
-    const ranges = hasCompleteAllocation
-      ? calculateSeasonPassZoneRanges(tier.allowedSeatZones, tierQuotas)
-      : [];
-    const barcodePrefix = `PFC26-${tier.priceBaht}-`;
-    const legacyUpperBound = tier.inventory
-      ? `${barcodePrefix}${formatSeasonPassSequence(Math.max(0, tier.inventory.total - tier.inventory.sponsorReserved))}`
-      : null;
-    const availableBarcodeCount = availableBarcodes.filter((barcode) => {
-      if (barcode.tierId !== tier.id) return false;
-      if (tier.id === "vvip-elite") return true;
-      if (ranges.length > 0) {
-        return ranges.some((range) => {
-          const lower = `${barcodePrefix}${formatSeasonPassSequence(range.publicStartSequence)}`;
-          const upper = `${barcodePrefix}${formatSeasonPassSequence(range.publicEndSequence)}`;
-          return barcode.barcode >= lower && barcode.barcode <= upper;
-        });
-      }
-      return barcode.barcode.startsWith(barcodePrefix) && legacyUpperBound != null && barcode.barcode <= legacyUpperBound;
-    }).length;
+    const availableBarcodeCount = vvipBarcodes.length;
     return {
       id: tier.id,
       badge: tier.badge,
@@ -92,10 +102,7 @@ export default async function StaffSeasonPassPage() {
       availableBarcodeCount,
       zones: tier.allowedSeatZones.map((seatZone) => {
         const sold = soldGroups.find((group) => group.tierId === tier.id && group.seatZone === seatZone)?._count._all ?? 0;
-        const quota = tierQuotas.find((item) => item.seatZone === seatZone);
-        const limit = hasCompleteAllocation && quota
-          ? Math.max(0, quota.totalSeats - quota.sponsorReserved)
-          : null;
+        const limit = vvipBarcodeBounds.find((bounds) => bounds.seatZone === seatZone)?.publicSeatCount ?? null;
         return { seatZone, remaining: limit == null ? null : Math.max(0, limit - sold) };
       }),
     };
@@ -120,7 +127,7 @@ export default async function StaffSeasonPassPage() {
 
       <StaffSeasonPassForm
         tiers={tierOptions}
-        vvipBarcodes={vvipBarcodes.map((item) => item.barcode)}
+        vvipBarcodes={vvipBarcodes}
         members={members}
         disabled={false}
       />

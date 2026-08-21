@@ -15,6 +15,13 @@ const actionLabel: Record<string, string> = {
   DELETED: "ลบรายการที่ยกเลิก",
 };
 
+const bookingStatusLabel: Record<string, string> = {
+  PENDING: "รอชำระ",
+  CONFIRMED: "ยืนยันแล้ว",
+  CANCELLED: "ยกเลิกแล้ว",
+  REFUNDED: "ทำเครื่องหมายคืนเงินแล้ว",
+};
+
 export default async function AdminBookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await verifyPermission("BOOKINGS");
   const { id } = await params;
@@ -25,14 +32,23 @@ export default async function AdminBookingDetailPage({ params }: { params: Promi
     include: {
       match: { select: { homeTeam: true, awayTeam: true, kickoffAt: true, venue: true, status: true } },
       auditLogs: { orderBy: { createdAt: "desc" } },
-      beamPayments: { where: { status: "SUCCEEDED" }, select: { id: true }, take: 1 },
-      xenditPayments: { where: { status: "SUCCEEDED" }, select: { id: true }, take: 1 },
+      beamPayments: {
+        where: { status: { in: ["SUCCEEDED", "REVIEW_REQUIRED"] } },
+        select: { id: true, status: true },
+      },
+      xenditPayments: {
+        where: { status: { in: ["SUCCEEDED", "REVIEW_REQUIRED"] } },
+        select: { id: true, status: true },
+      },
       _count: { select: { gateScans: true } },
     },
   });
   if (!booking) notFound();
 
-  const onlinePaymentVerified = booking.beamPayments.length > 0 || booking.xenditPayments.length > 0;
+  const paymentNeedsReview = [...booking.beamPayments, ...booking.xenditPayments]
+    .some((payment) => payment.status === "REVIEW_REQUIRED");
+  const onlinePaymentVerified = [...booking.beamPayments, ...booking.xenditPayments]
+    .some((payment) => payment.status === "SUCCEEDED");
   const canChangeZone =
     booking.status === "CONFIRMED" &&
     booking.paidAt != null &&
@@ -57,10 +73,16 @@ export default async function AdminBookingDetailPage({ params }: { params: Promi
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold text-green-900">รายการ {booking.bookingCode}</h1>
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-              สถานะ
-              <BookingStatusSelect bookingId={booking.id} currentStatus={booking.status} />
-            </label>
+            {paymentNeedsReview ? (
+              <span className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+                ล็อกสถานะไว้เพื่อตรวจสอบการชำระเงิน
+              </span>
+            ) : (
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                สถานะ
+                <BookingStatusSelect bookingId={booking.id} currentStatus={booking.status} />
+              </label>
+            )}
             {booking.status !== "CANCELLED" && booking.status !== "REFUNDED" && (
               <Link href={`/admin/bookings/${booking.id}/edit`} className="rounded-lg bg-green-800 px-4 py-2.5 font-bold text-yellow-300 hover:bg-green-900">แก้ไขข้อมูล</Link>
             )}
@@ -78,6 +100,22 @@ export default async function AdminBookingDetailPage({ params }: { params: Promi
         </div>
       </header>
 
+      {paymentNeedsReview && (
+        <section role="alert" className="rounded-xl border-2 border-amber-400 bg-amber-50 p-5 text-amber-950 shadow-sm">
+          <h2 className="text-lg font-black">รายการนี้ยังยืนยันการชำระเงินอัตโนมัติไม่ได้</h2>
+          <p className="mt-1 leading-7">
+            ระบบล็อกการเปลี่ยนสถานะด้วยมือเพื่อป้องกันการยืนยันหรือคืนเงินผิดรายการ
+            กรุณาตรวจยอด เลขอ้างอิง เวลารับชำระ และประวัติคืนเงินกับผู้ให้บริการก่อน
+          </p>
+          <Link
+            href="/admin/bookings/review"
+            className="mt-3 inline-flex rounded-lg border border-amber-500 bg-white px-3 py-2 text-sm font-bold hover:bg-amber-100"
+          >
+            เปิดรายการที่ต้องตรวจสอบ
+          </Link>
+        </section>
+      )}
+
       <section className="grid gap-4 rounded-xl border bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
         <Detail label="ลูกค้า" value={booking.customerName} />
         <Detail label="เบอร์โทรศัพท์" value={booking.customerPhone} />
@@ -87,7 +125,7 @@ export default async function AdminBookingDetailPage({ params }: { params: Promi
         <Detail label="สนาม" value={booking.match.venue || "—"} />
         <Detail label="โซน / จำนวน" value={`${booking.zone || "—"} / ${booking.quantity} ใบ`} />
         <Detail label="ยอดรวม" value={formatBaht(booking.totalAmount)} />
-        <Detail label="สถานะ" value={booking.status} />
+        <Detail label="สถานะ" value={bookingStatusLabel[booking.status] ?? booking.status} />
         <Detail label="ช่องทาง" value={booking.salesChannel === "STAFF" ? "จองโดยทีมงาน" : "เว็บไซต์"} />
         <Detail label="การรับเงิน" value={paymentLabel(booking.paymentMethod)} />
         <Detail label="เลขอ้างอิง" value={booking.offlineReceiptNo || "—"} />
@@ -110,7 +148,9 @@ export default async function AdminBookingDetailPage({ params }: { params: Promi
               </div>
               {(log.previousStatus || log.nextStatus) && (
                 <p className="mt-2 text-sm text-slate-700">
-                  {log.previousStatus || "—"} → {log.nextStatus || "—"}
+                  {log.previousStatus ? bookingStatusLabel[log.previousStatus] ?? log.previousStatus : "—"}
+                  {" → "}
+                  {log.nextStatus ? bookingStatusLabel[log.nextStatus] ?? log.nextStatus : "—"}
                 </p>
               )}
               {auditChanges(log.details).map((change) => (

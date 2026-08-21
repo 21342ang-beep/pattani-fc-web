@@ -200,12 +200,41 @@ export async function updateBookingStatus(
   }
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const preliminary = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: { matchId: true },
+      });
+      if (!preliminary) throw new Error("BOOKING_NOT_FOUND");
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${preliminary.matchId}`}))
+      `;
+      await tx.$queryRaw`
+        SELECT "id" FROM "BeamPayment"
+        WHERE "bookingId" = ${bookingId}
+        ORDER BY "id" FOR UPDATE
+      `;
+      await tx.$queryRaw`
+        SELECT "id" FROM "XenditPayment"
+        WHERE "bookingId" = ${bookingId}
+        ORDER BY "id" FOR UPDATE
+      `;
       await tx.$queryRaw`
         SELECT "id" FROM "Booking" WHERE "id" = ${bookingId} FOR UPDATE
       `;
       const current = await tx.booking.findUnique({ where: { id: bookingId } });
       if (!current) throw new Error("BOOKING_NOT_FOUND");
       if (current.status === status) return { booking: current, expired: false };
+      const [beamReview, xenditReview] = await Promise.all([
+        tx.beamPayment.findFirst({
+          where: { bookingId, status: "REVIEW_REQUIRED" },
+          select: { id: true },
+        }),
+        tx.xenditPayment.findFirst({
+          where: { bookingId, status: "REVIEW_REQUIRED" },
+          select: { id: true },
+        }),
+      ]);
+      if (beamReview || xenditReview) throw new Error("PAYMENT_REVIEW_REQUIRED");
       if (current.status === "REFUNDED") throw new Error("REFUNDED_IS_FINAL");
       if (current.status === "CANCELLED") throw new Error("CANCELLED_IS_FINAL");
       if (current.status === "CONFIRMED" && status !== "REFUNDED") throw new Error("CONFIRMED_REQUIRES_REFUND");
@@ -269,6 +298,7 @@ export async function updateBookingStatus(
   } catch (error) {
     const messages: Record<string, string> = {
       BOOKING_NOT_FOUND: "ไม่พบรายการจอง",
+      PAYMENT_REVIEW_REQUIRED: "รายการนี้มีหลักฐานชำระเงินที่ต้องตรวจสอบ ระบบจึงล็อกการเปลี่ยนสถานะ กรุณาตรวจยอดกับผู้ให้บริการจากหน้ารายการตรวจสอบก่อน",
       REFUNDED_IS_FINAL: "รายการคืนเงินแล้วไม่สามารถเปลี่ยนสถานะได้",
       CANCELLED_IS_FINAL: "รายการยกเลิกแล้วไม่สามารถเปิดกลับได้ กรุณาสร้างรายการใหม่เพื่อให้ระบบตรวจที่นั่งอีกครั้ง",
       CONFIRMED_REQUIRES_REFUND: "รายการยืนยันรับเงินแล้วต้องเปลี่ยนเป็น REFUNDED เท่านั้น ห้ามยกเลิกข้ามขั้นตอน",

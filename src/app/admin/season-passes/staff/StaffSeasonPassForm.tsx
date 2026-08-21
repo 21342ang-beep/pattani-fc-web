@@ -30,7 +30,7 @@ export default function StaffSeasonPassForm({
   disabled,
 }: {
   tiers: TierOption[];
-  vvipBarcodes: string[];
+  vvipBarcodes: { barcode: string; seatZone: string }[];
   members: MemberOption[];
   disabled: boolean;
 }) {
@@ -39,6 +39,8 @@ export default function StaffSeasonPassForm({
     undefined,
   );
   const [tierId, setTierId] = useState(tiers[0]?.id ?? "");
+  const [selectedZone, setSelectedZone] = useState("");
+  const [selectedBarcode, setSelectedBarcode] = useState("");
   const [memberId, setMemberId] = useState("");
   const [customerMode, setCustomerMode] = useState<"EXISTING" | "NEW_NAME">("EXISTING");
   const formRef = useRef<HTMLFormElement>(null);
@@ -60,11 +62,16 @@ export default function StaffSeasonPassForm({
       formRef.current?.reset();
       setMemberId("");
       setCustomerMode("EXISTING");
+      setSelectedZone("");
+      setSelectedBarcode("");
       router.refresh();
     }
   }, [router, state]);
 
   const errorFor = (field: string) => state && !state.ok ? state.fieldErrors?.[field]?.[0] : undefined;
+  const availableVvipBarcodes = vvipBarcodes.filter(
+    (item) => item.seatZone === selectedZone,
+  );
   const inputClass = "mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20 disabled:bg-slate-100";
 
   return (
@@ -116,7 +123,11 @@ export default function StaffSeasonPassForm({
             name="tierId"
             value={tierId}
             disabled={disabled || pending}
-            onChange={(event) => setTierId(event.target.value)}
+            onChange={(event) => {
+              setTierId(event.target.value);
+              setSelectedZone("");
+              setSelectedBarcode("");
+            }}
             className={inputClass}
           >
             {tiers.map((tier) => (
@@ -133,7 +144,17 @@ export default function StaffSeasonPassForm({
         </Field>
 
         <Field label={canDeferZone ? "โซน (ไม่บังคับ)" : "โซน"} error={errorFor("seatZone")}>
-          <select key={tierId} name="seatZone" required={!canDeferZone} defaultValue="" disabled={disabled || pending} className={inputClass}>
+          <select
+            name="seatZone"
+            required={!canDeferZone}
+            value={selectedZone}
+            disabled={disabled || pending}
+            onChange={(event) => {
+              setSelectedZone(event.target.value);
+              setSelectedBarcode("");
+            }}
+            className={inputClass}
+          >
             <option value="" disabled={!canDeferZone}>{canDeferZone ? "ยังไม่ระบุ — แก้ไขภายหลังได้" : "เลือกโซน"}</option>
             {selectedTier?.zones.map((zone) => (
               <option key={zone.seatZone} value={zone.seatZone} disabled={zone.remaining === 0}>
@@ -145,11 +166,25 @@ export default function StaffSeasonPassForm({
 
         {isVvip && (
           <>
-            <Field label="บาร์โค้ด VVIP (ไม่บังคับ)" error={errorFor("barcode")}>
-              <input name="barcode" list="staff-vvip-barcodes" autoComplete="off" placeholder="ยังไม่ระบุ — แก้ไขภายหลังได้" className={`${inputClass} font-mono uppercase`} />
-              <datalist id="staff-vvip-barcodes">
-                {vvipBarcodes.map((barcode) => <option key={barcode} value={barcode} />)}
-              </datalist>
+            <Field label="เลขรันบาร์โค้ด VVIP (ไม่บังคับ)" error={errorFor("barcode")}>
+              <select
+                name="barcode"
+                value={selectedBarcode}
+                disabled={disabled || pending || !selectedZone}
+                onChange={(event) => setSelectedBarcode(event.target.value)}
+                className={`${inputClass} font-mono uppercase`}
+              >
+                <option value="">
+                  {selectedZone
+                    ? "ยังไม่ระบุ — แก้ไขภายหลังได้"
+                    : "เลือกโซนก่อนเลือกเลขรัน"}
+                </option>
+                {availableVvipBarcodes.map((item) => (
+                  <option key={item.barcode} value={item.barcode}>
+                    {item.barcode}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="หมายเลขที่นั่ง VVIP (ไม่บังคับ)" error={errorFor("seatNumber")}>
               <input name="seatNumber" maxLength={30} placeholder="ยังไม่ระบุ — แก้ไขภายหลังได้" className={inputClass} />

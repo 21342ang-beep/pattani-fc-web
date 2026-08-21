@@ -4,6 +4,43 @@ export type SeasonPassZoneQuotaInput = {
   sponsorReserved: number;
 };
 
+const FIXED_SEASON_PASS_BARCODE_QUOTAS: Readonly<
+  Record<string, readonly SeasonPassZoneQuotaInput[]>
+> = {
+  // These 160 VVIP barcodes have already been printed and assigned in two
+  // stable blocks. VVIP is not managed by SeasonPassZoneQuota, so keep this
+  // physical numbering rule here instead of guessing from missing DB rows.
+  "2026/27:vvip-elite:PFC26-4000-": [
+    { seatZone: "VVIP-A", totalSeats: 80, sponsorReserved: 0 },
+    { seatZone: "VVIP-B", totalSeats: 80, sponsorReserved: 0 },
+  ],
+};
+
+export function resolveSeasonPassBarcodeZoneQuotas(
+  seasonLabel: string,
+  tierId: string,
+  barcodePrefix: string,
+  orderedSeatZones: readonly string[],
+  configuredQuotas: readonly SeasonPassZoneQuotaInput[],
+): SeasonPassZoneQuotaInput[] {
+  const fixedQuotas =
+    FIXED_SEASON_PASS_BARCODE_QUOTAS[
+      `${seasonLabel}:${tierId}:${barcodePrefix}`
+    ];
+  if (
+    fixedQuotas?.length === orderedSeatZones.length &&
+    fixedQuotas.every((quota, index) => quota.seatZone === orderedSeatZones[index])
+  ) {
+    return fixedQuotas.map((quota) => ({ ...quota }));
+  }
+
+  const quotaByZone = new Map(
+    configuredQuotas.map((quota) => [quota.seatZone, quota]),
+  );
+  if (orderedSeatZones.some((seatZone) => !quotaByZone.has(seatZone))) return [];
+  return orderedSeatZones.map((seatZone) => ({ ...quotaByZone.get(seatZone)! }));
+}
+
 export type SeasonPassZoneRange = SeasonPassZoneQuotaInput & {
   startSequence: number;
   endSequence: number;

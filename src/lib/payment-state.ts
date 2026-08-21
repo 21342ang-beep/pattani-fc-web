@@ -11,9 +11,14 @@ const PAYMENT_TARGET_DELETION_SAFE_STATUS_SET = new Set<string>(
 );
 
 const AUTOMATIC_SUCCESS_SOURCE_STATUSES = new Set(["INITIATED", "PENDING"]);
+const AUTOMATIC_BOOKING_CONFIRMATION_STATUSES = new Set(["PENDING", "CANCELLED"]);
 
 export function paymentCanAutomaticallySucceed(status: string): boolean {
   return AUTOMATIC_SUCCESS_SOURCE_STATUSES.has(status);
+}
+
+export function bookingCanAutomaticallyConfirm(status: string): boolean {
+  return AUTOMATIC_BOOKING_CONFIRMATION_STATUSES.has(status);
 }
 
 export function paymentEvidenceMustBeRetained(status: string): boolean {
