@@ -48,6 +48,28 @@ export async function changeConfirmedBookingZone(
   const input = parsed.data;
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const preliminary = await tx.booking.findUnique({
+        where: { id: input.bookingId },
+        select: { matchId: true },
+      });
+      if (!preliminary) throw new Error("BOOKING_NOT_FOUND");
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${preliminary.matchId}`}))`,
+      );
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "Match"
+          WHERE "id" = ${preliminary.matchId} FOR SHARE`,
+      );
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "BeamPayment"
+          WHERE "bookingId" = ${input.bookingId}
+          ORDER BY "id" FOR UPDATE`,
+      );
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "XenditPayment"
+          WHERE "bookingId" = ${input.bookingId}
+          ORDER BY "id" FOR UPDATE`,
+      );
       await tx.$queryRaw(
         Prisma.sql`SELECT "id" FROM "Booking" WHERE "id" = ${input.bookingId} FOR UPDATE`,
       );
@@ -77,12 +99,6 @@ export async function changeConfirmedBookingZone(
         throw new Error("PAYMENT_NOT_VERIFIED");
       }
 
-      await tx.$queryRaw(
-        Prisma.sql`SELECT "id" FROM "Match" WHERE "id" = ${current.matchId} FOR SHARE`,
-      );
-      await tx.$executeRaw(
-        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${current.matchId}`}))`,
-      );
       const match = await tx.match.findUnique({
         where: { id: current.matchId },
         include: { ticketZones: { where: { isActive: true } } },

@@ -56,6 +56,24 @@ export async function updateBookingDetails(
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const preliminary = await tx.booking.findUnique({
+        where: { id: input.bookingId },
+        select: { matchId: true },
+      });
+      if (!preliminary) throw new Error("BOOKING_NOT_FOUND");
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${preliminary.matchId}`}))`,
+      );
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "BeamPayment"
+          WHERE "bookingId" = ${input.bookingId}
+          ORDER BY "id" FOR UPDATE`,
+      );
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "XenditPayment"
+          WHERE "bookingId" = ${input.bookingId}
+          ORDER BY "id" FOR UPDATE`,
+      );
       await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "Booking" WHERE "id" = ${input.bookingId} FOR UPDATE`);
       const current = await tx.booking.findUnique({
         where: { id: input.bookingId },
@@ -95,7 +113,6 @@ export async function updateBookingDetails(
 
       let totalAmount = current.totalAmount;
       if (inventoryChanged) {
-        await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`match-capacity:${current.matchId}`}))`);
         const dynamicZone = current.match.ticketZones.find((zone) => zone.code === input.zone);
         const legacyZone = getStadiumZone(input.zone);
         if (!dynamicZone && !legacyZone) throw new Error("ZONE_NOT_FOUND");

@@ -1390,37 +1390,59 @@ echo ""
 echo "── [4/6] npm ci (this takes 5-8 minutes) ──"
 
 assert_database_quiet() {
-  local counts sale_flags booking_pending season_pending provider_pending review_required invalid_payment_targets
+  local counts sale_flags booking_pending season_pending provider_live review_required expired_beam_pending invalid_payment_targets
   counts=$(runuser -u postgres -- psql -d pattani_ticket -At -F '|' -c \
-    'SELECT
-      (SELECT count(*) FROM "TicketPurchaseSetting" WHERE "leagueBookingOpen" = true OR "seasonPassBookingOpen" = true),
+    'WITH clock AS (
+      SELECT CURRENT_TIMESTAMP AT TIME ZONE '\''UTC'\'' AS now_utc
+    )
+    SELECT
+      (SELECT CASE WHEN EXISTS (
+        SELECT 1 FROM "TicketPurchaseSetting"
+        WHERE "id" = 1
+          AND "leagueBookingOpen" = false
+          AND "seasonPassBookingOpen" = false
+          AND "seasonPassSalePhase" = '\''CLOSED'\''
+      ) THEN 0 ELSE 1 END),
       (SELECT count(*) FROM "Booking" WHERE status = '\''PENDING'\''),
       ((SELECT count(*) FROM "SeasonPassPurchase" WHERE status = '\''PENDING'\'')
         + (SELECT count(*) FROM "SeasonPassOrder" WHERE "purchaseId" IS NULL AND status = '\''PENDING'\'')),
-      ((SELECT count(*) FROM "BeamPayment" WHERE status IN ('\''INITIATED'\'', '\''PENDING'\''))
+      ((SELECT count(*) FROM "BeamPayment"
+          WHERE status = '\''INITIATED'\''
+            OR (status = '\''PENDING'\'' AND (
+              "expiresAt" IS NULL
+              OR "expiresAt" > clock.now_utc - INTERVAL '\''2 minutes'\''
+            )))
         + (SELECT count(*) FROM "XenditPayment" WHERE status = '\''PENDING'\'')),
       ((SELECT count(*) FROM "BeamPayment" WHERE status = '\''REVIEW_REQUIRED'\'')
         + (SELECT count(*) FROM "XenditPayment" WHERE status = '\''REVIEW_REQUIRED'\'')),
+      (SELECT count(*) FROM "BeamPayment"
+        WHERE status = '\''PENDING'\''
+          AND "expiresAt" IS NOT NULL
+          AND "expiresAt" <= clock.now_utc - INTERVAL '\''2 minutes'\''),
       ((SELECT count(*) FROM "BeamPayment"
           WHERE num_nonnulls("bookingId", "seasonPassOrderId", "seasonPassPurchaseId") <> 1)
         + (SELECT count(*) FROM "XenditPayment"
-          WHERE num_nonnulls("bookingId", "seasonPassOrderId", "seasonPassPurchaseId") <> 1));')
-  IFS='|' read -r sale_flags booking_pending season_pending provider_pending review_required invalid_payment_targets <<< "$counts"
+          WHERE num_nonnulls("bookingId", "seasonPassOrderId", "seasonPassPurchaseId") <> 1))
+    FROM clock;')
+  IFS='|' read -r sale_flags booking_pending season_pending provider_live review_required expired_beam_pending invalid_payment_targets <<< "$counts"
   sale_flags="${sale_flags//[[:space:]]/}"
   booking_pending="${booking_pending//[[:space:]]/}"
   season_pending="${season_pending//[[:space:]]/}"
-  provider_pending="${provider_pending//[[:space:]]/}"
+  provider_live="${provider_live//[[:space:]]/}"
   review_required="${review_required//[[:space:]]/}"
+  expired_beam_pending="${expired_beam_pending//[[:space:]]/}"
   invalid_payment_targets="${invalid_payment_targets//[[:space:]]/}"
   if [ "$sale_flags" != "0" ] || [ "$booking_pending" != "0" ] || \
-    [ "$season_pending" != "0" ] || [ "$provider_pending" != "0" ] || \
-    [ "$review_required" != "0" ] || [ "$invalid_payment_targets" != "0" ]; then
+    [ "$season_pending" != "0" ] || [ "$provider_live" != "0" ] || \
+    [ "$invalid_payment_targets" != "0" ]; then
     echo "Production is not quiet enough for a schema deployment."
-    echo "sale_flags=$sale_flags booking_pending=$booking_pending season_pending=$season_pending provider_pending=$provider_pending review_required=$review_required invalid_payment_targets=$invalid_payment_targets"
-    echo "Close both sale systems, wait for every pending provider/booking hold, and resolve manual reviews."
+    echo "sale_flags=$sale_flags booking_pending=$booking_pending season_pending=$season_pending provider_live=$provider_live review_required=$review_required expired_beam_pending=$expired_beam_pending invalid_payment_targets=$invalid_payment_targets"
+    echo "Close both sale systems and wait for every live provider/booking hold."
     echo "Every payment row must also reference exactly one booking, season order, or season purchase."
     exit 1
   fi
+  echo "Payment evidence retained: review_required=$review_required expired_beam_pending=$expired_beam_pending"
+  echo "These report-only statuses are not live provider sessions and do not block deployment."
 }
 
 install_nginx_maintenance_policy() {
