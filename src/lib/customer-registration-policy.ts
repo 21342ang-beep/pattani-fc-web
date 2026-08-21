@@ -30,21 +30,18 @@ export type PasswordRegistrationSecurityPlan = {
 };
 
 /**
- * The password-registration security boundary in one auditable decision. A
- * submitted form or issued SMS never activates an account; only a live
- * challenge plus a provider-verified OTP does.
+ * The password-registration security boundary in one auditable decision.
+ * OTP is optional for account creation, but a phone is trusted for recovery
+ * only after a live challenge and provider verification both succeed.
  */
 export function passwordRegistrationSecurityPlan(input: {
+  verificationRequested: boolean;
   challengeActive: boolean;
   activationEligible: boolean;
   otpVerified: boolean;
   verifiedAt: Date;
 }): PasswordRegistrationSecurityPlan {
-  if (
-    !input.challengeActive ||
-    !input.activationEligible ||
-    !input.otpVerified
-  ) {
+  if (!input.activationEligible) {
     return {
       createCustomer: false,
       issueCustomerSession: false,
@@ -52,6 +49,25 @@ export function passwordRegistrationSecurityPlan(input: {
       phoneVerifiedAt: null,
     };
   }
+
+  if (!input.verificationRequested) {
+    return {
+      createCustomer: true,
+      issueCustomerSession: true,
+      trustPhoneForRecovery: false,
+      phoneVerifiedAt: null,
+    };
+  }
+
+  if (!input.challengeActive || !input.otpVerified) {
+    return {
+      createCustomer: false,
+      issueCustomerSession: false,
+      trustPhoneForRecovery: false,
+      phoneVerifiedAt: null,
+    };
+  }
+
   return {
     createCustomer: true,
     issueCustomerSession: true,
@@ -62,10 +78,10 @@ export function passwordRegistrationSecurityPlan(input: {
 
 export function registrationChallengeActivationEligible(input: {
   emailAlreadyRegistered: boolean;
-  verifiedPhoneOwnerCount: number;
+  phoneOwnerCount: number;
 }): boolean {
   return (
-    !input.emailAlreadyRegistered && input.verifiedPhoneOwnerCount === 0
+    !input.emailAlreadyRegistered && input.phoneOwnerCount === 0
   );
 }
 

@@ -35,6 +35,7 @@ export default function RegisterForm({
   const [postalCode, setPostalCode] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [phoneVerification, setPhoneVerification] = useState<"skip" | "otp">("skip");
   const [resettingRegistration, startRegistrationReset] = useTransition();
   const router = useRouter();
   const [state, formAction, pending] = useActionState<CustomerAuthState, FormData>(
@@ -188,6 +189,7 @@ export default function RegisterForm({
           name="email"
           type="email"
           autoComplete="email"
+          hint="ไม่บังคับ — หากไม่กรอก สามารถเข้าสู่ระบบด้วยเบอร์โทรและรหัสผ่านได้"
           error={fe.email}
         />
         <Field
@@ -198,6 +200,45 @@ export default function RegisterForm({
           required
           error={fe.phone}
         />
+        <fieldset className="rounded-lg border border-green-200 bg-green-50/40 p-4">
+          <legend className="px-1 text-base font-bold text-green-900 md:text-lg">
+            การยืนยันเบอร์โทร <span className="text-sm font-normal text-slate-500">(เลือกได้)</span>
+          </legend>
+          <div className="mt-2 space-y-2.5">
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-green-200 bg-white p-3.5">
+              <input
+                type="radio"
+                name="phoneVerification"
+                value="skip"
+                checked={phoneVerification === "skip"}
+                onChange={() => setPhoneVerification("skip")}
+                className="mt-1 h-5 w-5 accent-green-700"
+              />
+              <span>
+                <span className="block font-bold text-green-950">สมัครเลย ไม่ต้องยืนยัน OTP ตอนนี้</span>
+                <span className="mt-0.5 block text-sm leading-relaxed text-slate-600">
+                  สมัครและเข้าใช้งานได้ทันที ยืนยันเบอร์ภายหลังได้ที่หน้าโปรไฟล์
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-green-200 bg-white p-3.5">
+              <input
+                type="radio"
+                name="phoneVerification"
+                value="otp"
+                checked={phoneVerification === "otp"}
+                onChange={() => setPhoneVerification("otp")}
+                className="mt-1 h-5 w-5 accent-green-700"
+              />
+              <span>
+                <span className="block font-bold text-green-950">ยืนยันด้วย OTP ตอนนี้</span>
+                <span className="mt-0.5 block text-sm leading-relaxed text-slate-600">
+                  ใช้เบอร์ที่ยืนยันแล้วสำหรับกู้รหัสผ่านและยืนยันสิทธิ์ที่ผูกกับเบอร์โทร
+                </span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
         <div className="grid gap-3 sm:grid-cols-2">
           <SelectField label="เพศ" error={fe.gender} required>
             <select name="gender" required defaultValue="" className={selectClassName(!!fe.gender)} suppressHydrationWarning>
@@ -310,7 +351,11 @@ export default function RegisterForm({
           suppressHydrationWarning
           className="w-full rounded-md bg-green-800 px-4 py-3 text-base font-bold text-yellow-300 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-white md:text-lg"
         >
-          {pending ? "กำลังดำเนินการ..." : "สมัครสมาชิก"}
+          {pending
+            ? "กำลังดำเนินการ..."
+            : phoneVerification === "otp"
+              ? "สมัครและยืนยันด้วย OTP"
+              : "สมัครสมาชิกทันที"}
         </button>
 
         {!pdpaChecked && (

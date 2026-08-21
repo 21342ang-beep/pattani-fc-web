@@ -47,6 +47,24 @@ export async function getVerifiedPhoneOwnerIds(phone: string): Promise<string[]>
 }
 
 /**
+ * Returns at most two owners regardless of verification state. This keeps a
+ * phone-only login deterministic without treating an unverified phone as
+ * proof of ownership for password recovery or booking access.
+ */
+export async function getPhoneOwnerIds(phone: string): Promise<string[]> {
+  const normalizedPhone = normalizedThaiMobile(phone);
+  if (!normalizedPhone) return [];
+
+  const rows = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+    SELECT "id" FROM "Customer"
+    WHERE ${phoneMatchSql(normalizedPhone)}
+    ORDER BY "createdAt" ASC, "id" ASC
+    LIMIT 2
+  `);
+  return rows.map(({ id }) => id);
+}
+
+/**
  * Claims a verified phone for one customer. The advisory lock serializes OTP
  * completions for the same phone so two accounts cannot claim it concurrently.
  */

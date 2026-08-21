@@ -35,24 +35,39 @@ test("registration keeps a supplied email and generates a unique internal email 
   );
 });
 
-test("password registration creates no account or session before OTP", () => {
+test("password registration can create an unverified account when OTP is skipped", () => {
   const plan = passwordRegistrationSecurityPlan({
-    challengeActive: true,
+    verificationRequested: false,
+    challengeActive: false,
     activationEligible: true,
     otpVerified: false,
     verifiedAt: new Date("2026-08-20T00:00:00.000Z"),
   });
   assert.deepEqual(plan, {
-    createCustomer: false,
-    issueCustomerSession: false,
+    createCustomer: true,
+    issueCustomerSession: true,
     trustPhoneForRecovery: false,
     phoneVerifiedAt: null,
   });
 });
 
+test("requesting OTP does not create an account before verification", () => {
+  const plan = passwordRegistrationSecurityPlan({
+    verificationRequested: true,
+    challengeActive: true,
+    activationEligible: true,
+    otpVerified: false,
+    verifiedAt: new Date("2026-08-20T00:00:00.000Z"),
+  });
+  assert.equal(plan.createCustomer, false);
+  assert.equal(plan.issueCustomerSession, false);
+  assert.equal(plan.phoneVerifiedAt, null);
+});
+
 test("verified OTP activates the account, session and recovery phone together", () => {
   const verifiedAt = new Date("2026-08-20T00:00:00.000Z");
   const plan = passwordRegistrationSecurityPlan({
+    verificationRequested: true,
     challengeActive: true,
     activationEligible: true,
     otpVerified: true,
@@ -74,6 +89,7 @@ test("verified OTP activates the account, session and recovery phone together", 
 
 test("expired challenge stays fail-closed even after an OTP provider success", () => {
   const plan = passwordRegistrationSecurityPlan({
+    verificationRequested: true,
     challengeActive: false,
     activationEligible: true,
     otpVerified: true,
@@ -87,18 +103,19 @@ test("duplicate registration follows OTP proof but can never activate", () => {
   assert.equal(
     registrationChallengeActivationEligible({
       emailAlreadyRegistered: true,
-      verifiedPhoneOwnerCount: 0,
+      phoneOwnerCount: 0,
     }),
     false,
   );
   assert.equal(
     registrationChallengeActivationEligible({
       emailAlreadyRegistered: false,
-      verifiedPhoneOwnerCount: 1,
+      phoneOwnerCount: 1,
     }),
     false,
   );
   const plan = passwordRegistrationSecurityPlan({
+    verificationRequested: true,
     challengeActive: true,
     activationEligible: false,
     otpVerified: true,

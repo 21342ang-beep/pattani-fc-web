@@ -13,7 +13,7 @@ import {
 } from "@/lib/customer-session";
 import { clearBookingAccessCookies } from "@/lib/booking-access-cookies";
 import { rateLimit } from "@/lib/rate-limit";
-import { getVerifiedPhoneOwnerIds } from "@/lib/customer-phone-ownership";
+import { getPhoneOwnerIds } from "@/lib/customer-phone-ownership";
 import { createOAuthState, getSafeReturnTo } from "@/lib/oauth";
 import { buildGoogleAuthUrl, isGoogleConfigured } from "@/lib/oauth-google";
 import { buildLineAuthUrl, isLineConfigured } from "@/lib/oauth-line";
@@ -79,6 +79,7 @@ const registerSchema = z.object({
   pdpaConsent: z.literal("on", {
     message: "กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนสมัคร",
   }),
+  phoneVerification: z.enum(["skip", "otp"]).default("skip"),
 }).refine((d) => d.password === d.confirmPassword, {
   message: "รหัสผ่านยืนยันไม่ตรงกัน",
   path: ["confirmPassword"],
@@ -165,6 +166,7 @@ export async function registerCustomer(
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
     pdpaConsent: formData.get("pdpaConsent"),
+    phoneVerification: formData.get("phoneVerification") || "skip",
   });
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -184,7 +186,23 @@ export async function registerCustomer(
     };
   }
 
-  const { name, email, phone, gender, birthDate, address, province, district, postalCode, password } = parsed.data;
+  const {
+    name,
+    email,
+    phone,
+    gender,
+    birthDate,
+    address,
+    province,
+    district,
+    postalCode,
+    password,
+    phoneVerification,
+  } = parsed.data;
+  const accountEmail = resolveRegistrationAccountEmail(
+    email,
+    randomBytes(32).toString("hex"),
+  );
 
   // ── โหมดผูก Google / LINE ──
   // validate ครบแล้ว → hash รหัสผ่าน, ฝากข้อมูลไว้ใน OAuth state (signed cookie),
@@ -221,9 +239,9 @@ export async function registerCustomer(
     redirect(authUrl); // absolute/external URL — server action ตอบ 303
   }
 
-  // ── โหมดสมัครด้วยรหัสผ่าน: ขั้นที่ 1 — ส่ง OTP เท่านั้น ──
-  // Keep all pending data in a short-lived server-side row. There is no
-  // Customer and no authenticated session until verifyCustomerRegistrationOtp.
+  // ── โหมดสมัครด้วยรหัสผ่าน ──
+  // OTP is optional. Skipping creates an unverified account immediately;
+  // requesting OTP keeps the data pending until provider verification.
   const normalizedPhone = normalizeRegistrationPhone(phone);
   if (!normalizedPhone) {
     return {
@@ -238,32 +256,109 @@ export async function registerCustomer(
   });
   if (!phoneLimit.ok) return { error: REGISTRATION_GENERIC_ERROR };
 
-  const credentials = registrationOtpCredentials();
-  if (!credentials) return { error: "ระบบ OTP ยังไม่พร้อมใช้งาน" };
-
-  // Hash before the ownership lookups so duplicate/non-duplicate responses do
-  // not differ by one expensive bcrypt operation.
+  // Hash before ownership lookups so duplicate/non-duplicate responses do not
+  // differ by one expensive bcrypt operation.
   const passwordHash = await bcrypt.hash(password, 12);
-  const accountEmail = resolveRegistrationAccountEmail(
-    email,
-    randomBytes(32).toString("hex"),
-  );
-  const [existingEmail, verifiedPhoneOwners] = await Promise.all([
+  const [existingEmail, phoneOwners] = await Promise.all([
     email
       ? prisma.customer.findFirst({
           where: { email: { equals: email, mode: "insensitive" } },
           select: { id: true },
         })
       : Promise.resolve(null),
-    getVerifiedPhoneOwnerIds(normalizedPhone),
+    getPhoneOwnerIds(normalizedPhone),
   ]);
+  const activationEligible = registrationChallengeActivationEligible({
+    emailAlreadyRegistered: Boolean(existingEmail),
+    phoneOwnerCount: phoneOwners.length,
+  });
+
+  if (phoneVerification === "skip") {
+    const activationPlan = passwordRegistrationSecurityPlan({
+      verificationRequested: false,
+      challengeActive: false,
+      activationEligible,
+      otpVerified: false,
+      verifiedAt: new Date(),
+    });
+    if (!activationPlan.createCustomer || !activationPlan.issueCustomerSession) {
+      return { error: REGISTRATION_GENERIC_ERROR };
+    }
+
+    try {
+      const customer = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`customer-phone:${normalizedPhone}`}))`,
+        );
+        await tx.$executeRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`customer-email:${accountEmail.toLowerCase()}`}))`,
+        );
+
+        const [emailOwner, currentPhoneOwners] = await Promise.all([
+          tx.customer.findFirst({
+            where: { email: { equals: accountEmail, mode: "insensitive" } },
+            select: { id: true },
+          }),
+          tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+            SELECT "id" FROM "Customer"
+            WHERE (
+              regexp_replace(coalesce("phone", ''), '\\D', '', 'g') = ${normalizedPhone}
+              OR regexp_replace(coalesce("phone", ''), '\\D', '', 'g') = ${`66${normalizedPhone.slice(1)}`}
+            )
+            LIMIT 1
+          `),
+        ]);
+        if (emailOwner || currentPhoneOwners.length > 0) return null;
+
+        return tx.customer.create({
+          data: {
+            email: accountEmail,
+            passwordHash,
+            name,
+            phone: normalizedPhone,
+            phoneVerifiedAt: activationPlan.phoneVerifiedAt,
+            gender,
+            birthDate: new Date(`${birthDate}T00:00:00.000Z`),
+            address,
+            province,
+            district,
+            postalCode,
+            pdpaConsentAt: new Date(),
+            lastLoginAt: new Date(),
+          },
+          select: { id: true, email: true, name: true, authVersion: true },
+        });
+      });
+      if (!customer) return { error: REGISTRATION_GENERIC_ERROR };
+
+      try {
+        await createCustomerSession(
+          customer.id,
+          customer.email,
+          customer.name,
+          customer.authVersion,
+        );
+        return { registered: true, redirectTo: returnTo ?? "/member" };
+      } catch {
+        return { registered: true, redirectTo: "/member/login?registered=1" };
+      }
+    } catch (error) {
+      console.error("Unverified customer registration failed", {
+        code:
+          typeof error === "object" && error && "code" in error
+            ? String(error.code)
+            : "unknown",
+      });
+      return { error: REGISTRATION_GENERIC_ERROR };
+    }
+  }
+
+  const credentials = registrationOtpCredentials();
+  if (!credentials) return { error: "ระบบ OTP ยังไม่พร้อมใช้งาน" };
+
   // Never reveal whether either identifier already belongs to an account.
   // A duplicate follows the same provider + persisted challenge + OTP UI, but
   // the immutable eligibility bit prevents activation after proof succeeds.
-  const activationEligible = registrationChallengeActivationEligible({
-    emailAlreadyRegistered: Boolean(existingEmail),
-    verifiedPhoneOwnerCount: verifiedPhoneOwners.length,
-  });
 
   try {
     const { response, data } = await registrationOtpProviderRequest(
@@ -298,7 +393,10 @@ export async function registerCustomer(
       await tx.$executeRaw`
         WITH expired AS (
           SELECT "id" FROM "CustomerRegistrationChallenge"
-          WHERE "expiresAt" <= NOW()
+          -- Prisma stores DateTime values in this timestamp-without-time-zone
+          -- column as UTC wall time. Compare against UTC too, regardless of
+          -- the PostgreSQL session timezone (production is Asia/Bangkok).
+          WHERE "expiresAt" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
           ORDER BY "expiresAt" ASC
           LIMIT 100
         )
@@ -387,7 +485,7 @@ export async function verifyCustomerRegistrationOtp(
       UPDATE "CustomerRegistrationChallenge"
       SET "attempts" = "attempts" + 1
       WHERE "id" = ${challengeId}
-        AND "expiresAt" > NOW()
+        AND "expiresAt" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
         AND "completedAt" IS NULL
         AND "attempts" < ${CUSTOMER_REGISTRATION_MAX_OTP_ATTEMPTS}
       RETURNING "id", "phone", "providerToken"
@@ -427,7 +525,7 @@ export async function verifyCustomerRegistrationOtp(
       const locked = await tx.$queryRaw<{ id: string }[]>`
         SELECT "id" FROM "CustomerRegistrationChallenge"
         WHERE "id" = ${attempt.id}
-          AND "expiresAt" > NOW()
+          AND "expiresAt" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
           AND "completedAt" IS NULL
         FOR UPDATE
       `;
@@ -441,6 +539,7 @@ export async function verifyCustomerRegistrationOtp(
       );
 
       const activationPlan = passwordRegistrationSecurityPlan({
+        verificationRequested: true,
         challengeActive: true,
         activationEligible: challenge.activationEligible,
         otpVerified,
@@ -465,8 +564,7 @@ export async function verifyCustomerRegistrationOtp(
         }),
         tx.$queryRaw<{ id: string }[]>(Prisma.sql`
           SELECT "id" FROM "Customer"
-          WHERE "phoneVerifiedAt" IS NOT NULL
-            AND (
+          WHERE (
               regexp_replace(coalesce("phone", ''), '\\D', '', 'g') = ${challenge.phone}
               OR regexp_replace(coalesce("phone", ''), '\\D', '', 'g') = ${`66${challenge.phone.slice(1)}`}
             )
@@ -597,9 +695,10 @@ export async function loginCustomer(
       where: { email: identifier.toLowerCase() },
     });
   } else {
-    // A phone number is a login identifier only after OTP verification and
-    // only when it has exactly one owner. Never guess between duplicate rows.
-    const ownerIds = await getVerifiedPhoneOwnerIds(identifier);
+    // Password authentication may use an unverified phone as a username. OTP
+    // remains required before trusting that phone for recovery or ticket data.
+    // Never guess between duplicate legacy rows.
+    const ownerIds = await getPhoneOwnerIds(identifier);
     if (ownerIds.length === 1) {
       customer = await prisma.customer.findUnique({
         where: { id: ownerIds[0] },

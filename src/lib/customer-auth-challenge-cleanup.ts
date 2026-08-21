@@ -25,7 +25,8 @@ export async function cleanupCustomerAuthChallenges(): Promise<void> {
     await tx.$executeRaw`
       WITH doomed AS (
         SELECT "id" FROM "CustomerRegistrationChallenge"
-        WHERE "expiresAt" <= NOW() OR "completedAt" IS NOT NULL
+        WHERE "expiresAt" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+          OR "completedAt" IS NOT NULL
         ORDER BY "expiresAt" ASC
         LIMIT ${CUSTOMER_AUTH_CHALLENGE_CLEANUP_BATCH_SIZE}
         FOR UPDATE SKIP LOCKED
