@@ -2088,14 +2088,75 @@ echo ""
 echo "════════════════════════════════════════════════"
 echo "   Verification"
 echo "════════════════════════════════════════════════"
+CURRENT_PM2_STABLE=0
+CURRENT_PM2_STATUS=""
+CURRENT_APP_PID=""
+CURRENT_PM2_UNSTABLE=""
+CURRENT_PM2_UPTIME=""
+for handoff_attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  if systemctl is-active --quiet "$PM2_SYSTEMD_UNIT"; then
+    CURRENT_PM2_HEALTH=$(run_as_app pm2 jlist 2>/dev/null | node -e '
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => { input += chunk; });
+process.stdin.on("end", () => {
+  const list = JSON.parse(input);
+  const app = list.find((entry) => entry.name === "pattani-fc");
+  if (!app) process.exit(2);
+  process.stdout.write([
+    app.pm2_env?.status ?? "",
+    app.pid ?? 0,
+    app.pm2_env?.unstable_restarts ?? 0,
+    app.pm2_env?.pm_uptime ?? 0,
+  ].join("|"));
+});' 2>/dev/null || true)
+    IFS='|' read -r CURRENT_PM2_STATUS CURRENT_APP_PID CURRENT_PM2_UNSTABLE CURRENT_PM2_UPTIME <<< "$CURRENT_PM2_HEALTH"
+    NOW_MILLISECONDS=$(date +%s%3N)
+    if [ "$CURRENT_PM2_STATUS" = "online" ] && [[ "$CURRENT_APP_PID" =~ ^[0-9]+$ ]] && \
+      [ "$CURRENT_APP_PID" != "0" ] && [ "$CURRENT_PM2_UNSTABLE" = "0" ] && \
+      [[ "$CURRENT_PM2_UPTIME" =~ ^[0-9]+$ ]] && [ "$CURRENT_PM2_UPTIME" != "0" ] && \
+      [ $((NOW_MILLISECONDS - CURRENT_PM2_UPTIME)) -ge 5000 ] && \
+      systemctl is-active --quiet "$PM2_SYSTEMD_UNIT"; then
+      CURRENT_PM2_STABLE=1
+      break
+    fi
+  fi
+  sleep 2
+done
+if [ "$CURRENT_PM2_STABLE" != "1" ]; then
+  fail_closed_after_database_change "The systemd-managed PM2 application did not remain stably online after handoff."
+fi
 run_as_app pm2 status
-CURRENT_APP_PID=$(run_as_app pm2 pid pattani-fc | tail -1)
 CURRENT_APP_OWNER=$(ps -o user= -p "$CURRENT_APP_PID" | xargs)
 CURRENT_LISTENER=$(ss -H -ltnp 'sport = :3000' || true)
 if [ -z "$CURRENT_APP_PID" ] || [ "$CURRENT_APP_PID" = "0" ] || \
-  [ "$CURRENT_APP_PID" != "$APP_PID" ] || [ "$CURRENT_APP_OWNER" != "$SERVICE_USER" ] || \
+  [ "$CURRENT_APP_OWNER" != "$SERVICE_USER" ] || \
   [ -z "$CURRENT_LISTENER" ] || ! printf '%s\n' "$CURRENT_LISTENER" | grep -q '127\.0\.0\.1:3000'; then
   fail_closed_after_database_change "The verified PM2/Next.js process changed or stopped before final handoff."
+fi
+if printf '%s\n' "$CURRENT_LISTENER" | grep -Eq '0\.0\.0\.0:3000|\[::\]:3000|\*:3000'; then
+  fail_closed_after_database_change "Next.js became exposed on a wildcard interface during final handoff."
+fi
+CURRENT_LISTENER_PID=$(printf '%s\n' "$CURRENT_LISTENER" | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | head -1)
+if [ -z "$CURRENT_LISTENER_PID" ]; then
+  fail_closed_after_database_change "The final port 3000 listener process could not be identified."
+fi
+CURRENT_LISTENER_OWNER=$(ps -o user= -p "$CURRENT_LISTENER_PID" | xargs)
+CURRENT_LISTENER_CWD=$(realpath -e "/proc/$CURRENT_LISTENER_PID/cwd" 2>/dev/null || true)
+if [ "$CURRENT_LISTENER_OWNER" != "$SERVICE_USER" ] || [ "$CURRENT_LISTENER_CWD" != "$APP_DIR" ]; then
+  fail_closed_after_database_change "The final port 3000 listener is not the reviewed release owned by $SERVICE_USER."
+fi
+CURRENT_ANCESTOR_PID="$CURRENT_LISTENER_PID"
+CURRENT_LISTENER_IS_PM2_CHILD=0
+while [ -n "$CURRENT_ANCESTOR_PID" ] && [ "$CURRENT_ANCESTOR_PID" -gt 1 ]; do
+  if [ "$CURRENT_ANCESTOR_PID" = "$CURRENT_APP_PID" ]; then
+    CURRENT_LISTENER_IS_PM2_CHILD=1
+    break
+  fi
+  CURRENT_ANCESTOR_PID=$(ps -o ppid= -p "$CURRENT_ANCESTOR_PID" 2>/dev/null | xargs || true)
+done
+if [ "$CURRENT_LISTENER_IS_PM2_CHILD" != "1" ]; then
+  fail_closed_after_database_change "The final port 3000 listener is not a child of the systemd-managed PM2 application."
 fi
 echo ""
 echo "── curl localhost:3000 (Next.js direct) ──"
