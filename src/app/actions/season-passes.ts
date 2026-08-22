@@ -577,6 +577,7 @@ export async function updateSeasonPassStatus(
 const editSeasonPassSchema = z
   .object({
     orderId: z.string().regex(/^[a-z0-9]+$/i),
+    tierId: z.enum(["vvip-elite", "vip-advanced", "premium", "gold"] as const),
     customerId: z.string().trim().optional().or(z.literal("")),
     customerName: z.string().trim().min(2, "กรุณากรอกชื่อ").max(100),
     customerPhone: z.string().trim().regex(/^[0-9+\-\s()]{9,15}$/, "เบอร์โทรไม่ถูกต้อง"),
@@ -591,6 +592,7 @@ const editSeasonPassSchema = z
       .optional()
       .or(z.literal("")),
     confirmZoneTransfer: z.enum(["yes"]).optional(),
+    confirmTierTransfer: z.enum(["yes"]).optional(),
     shirtSize: z.enum(SEASON_PASS_SHIRT_SIZES).optional().or(z.literal("")),
     deliveryMethod: z.enum(["SHIPPING", "PICKUP"] as const),
     shipAddress: z.string().trim().max(300).optional().or(z.literal("")),
@@ -665,23 +667,29 @@ export async function updateSeasonPassOrder(
       if (linkedCustomer && !/^0[689]\d{8}$/.test(linkedCustomerPhone ?? "")) {
         throw new Error("MEMBER_PHONE_REQUIRED");
       }
-      const tier = SEASON_TIERS.find((item) => item.id === order.tierId);
-      const isOfflineVvip = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
-      const canDeferStaffZone = ["vvip-elite", "vip-advanced"].includes(order.tierId) && order.salesChannel === "OFFLINE";
+      const currentTier = SEASON_TIERS.find((item) => item.id === order.tierId);
+      const tier = SEASON_TIERS.find((item) => item.id === input.tierId);
+      const tierChanged = order.tierId !== input.tierId;
+      if (!currentTier || !tier) throw new Error("INVALID_TIER");
+      if (tierChanged && input.confirmTierTransfer !== "yes") {
+        throw new Error("TIER_TRANSFER_CONFIRMATION_REQUIRED");
+      }
+      const isOfflineVvip = tier.id === "vvip-elite" && order.salesChannel === "OFFLINE";
+      const canDeferStaffZone = ["vvip-elite", "vip-advanced"].includes(tier.id) && order.salesChannel === "OFFLINE";
       if (
-        !tier ||
         (!input.seatZone &&
           (!canDeferStaffZone || Boolean(order.barcode) || Boolean(input.barcode))) ||
         (input.seatZone && !tier.allowedSeatZones.includes(input.seatZone))
       ) {
         throw new Error("INVALID_ZONE");
       }
-      if (order.tierId === "vvip-elite" && !input.seatNumber && !isOfflineVvip) {
+      if (tier.id === "vvip-elite" && !input.seatNumber && !isOfflineVvip) {
         throw new Error("SEAT_REQUIRED");
       }
       const barcodePrefix = `PFC26-${tier.priceBaht}-`;
 
       const zoneChanged = order.seatZone !== input.seatZone;
+      const destinationChanged = tierChanged || zoneChanged;
       let configuredQuotas: {
         seatZone: string;
         totalSeats: number;
@@ -690,23 +698,23 @@ export async function updateSeasonPassOrder(
       let destinationBarcodeBounds: ReturnType<typeof getSeasonPassZoneBarcodeBounds> = null;
       let barcodeChangeRequiredForZone = false;
 
-      if (input.seatZone && (zoneChanged || order.barcode)) {
+      if (input.seatZone && (destinationChanged || order.barcode)) {
         const zonesToLock = [...tier.allowedSeatZones].sort();
         for (const seatZone of zonesToLock) {
-          const quotaLockKey = `${order.seasonLabel}:${order.tierId}:${seatZone}`;
+          const quotaLockKey = `${order.seasonLabel}:${tier.id}:${seatZone}`;
           await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))::text AS lock_result`;
         }
 
         configuredQuotas = await tx.seasonPassZoneQuota.findMany({
           where: {
             seasonLabel: order.seasonLabel,
-            tierId: order.tierId,
+            tierId: tier.id,
             seatZone: { in: [...tier.allowedSeatZones] },
           },
         });
         const barcodeZoneQuotas = resolveSeasonPassBarcodeZoneQuotas(
           order.seasonLabel,
-          order.tierId,
+          tier.id,
           barcodePrefix,
           tier.allowedSeatZones,
           configuredQuotas,
@@ -727,7 +735,7 @@ export async function updateSeasonPassOrder(
             : 0
           : destinationBarcodeBounds?.publicSeatCount ?? null;
         if (
-          zoneChanged &&
+          destinationChanged &&
           limit != null &&
           ["PENDING", "CONFIRMED"].includes(order.status)
         ) {
@@ -735,7 +743,7 @@ export async function updateSeasonPassOrder(
             where: {
               id: { not: order.id },
               seasonLabel: order.seasonLabel,
-              tierId: order.tierId,
+              tierId: tier.id,
               seatZone: input.seatZone,
               ...activeSeasonPassOrderWhere(),
             },
@@ -743,20 +751,35 @@ export async function updateSeasonPassOrder(
           if (active >= limit) throw new Error("ZONE_SOLD_OUT");
         }
 
-        if (zoneChanged && order.barcode && !destinationBarcodeBounds) {
+        if (destinationChanged && order.barcode && !destinationBarcodeBounds) {
           throw new Error("ZONE_BARCODE_RANGE_UNCONFIGURED");
         }
         barcodeChangeRequiredForZone = Boolean(
           order.barcode &&
-          destinationBarcodeBounds &&
-          !seasonPassBarcodeIsWithinBounds(
-            order.barcode.barcode,
-            destinationBarcodeBounds,
-          ),
+          (tierChanged ||
+            (destinationBarcodeBounds &&
+              !seasonPassBarcodeIsWithinBounds(
+                order.barcode.barcode,
+                destinationBarcodeBounds,
+              ))),
         );
-        if (barcodeChangeRequiredForZone && input.confirmZoneTransfer !== "yes") {
+        if (
+          barcodeChangeRequiredForZone &&
+          !tierChanged &&
+          input.confirmZoneTransfer !== "yes"
+        ) {
           throw new Error("ZONE_TRANSFER_CONFIRMATION_REQUIRED");
         }
+      }
+
+      if (
+        tierChanged &&
+        !order.barcode &&
+        input.seatZone &&
+        !isOfflineVvip &&
+        !input.barcode
+      ) {
+        throw new Error("BARCODE_REQUIRED_FOR_TIER_TRANSFER");
       }
 
       let assignedBarcode = order.barcode;
@@ -765,7 +788,13 @@ export async function updateSeasonPassOrder(
         order.barcode &&
         barcodeChangeRequiredForZone
       ) {
-        if (!input.barcode) throw new Error("BARCODE_REQUIRED_FOR_ZONE_TRANSFER");
+        if (!input.barcode) {
+          throw new Error(
+            tierChanged
+              ? "BARCODE_REQUIRED_FOR_TIER_TRANSFER"
+              : "BARCODE_REQUIRED_FOR_ZONE_TRANSFER",
+          );
+        }
         if (!destinationBarcodeBounds || destinationBarcodeBounds.publicSeatCount <= 0) {
           throw new Error("BARCODE_UNAVAILABLE");
         }
@@ -776,7 +805,7 @@ export async function updateSeasonPassOrder(
         const availableBarcode = await tx.seasonPassBarcode.findFirst({
           where: {
             barcode: input.barcode,
-            tierId: order.tierId,
+            tierId: tier.id,
             seasonLabel: order.seasonLabel,
             isGenerated: true,
             orderId: null,
@@ -800,7 +829,7 @@ export async function updateSeasonPassOrder(
               where: {
                 id: availableBarcode.id,
                 barcode: input.barcode,
-                tierId: order.tierId,
+                tierId: tier.id,
                 seasonLabel: order.seasonLabel,
                 isGenerated: true,
                 orderId: null,
@@ -838,19 +867,23 @@ export async function updateSeasonPassOrder(
         });
         if (claimed.count !== 1) throw new Error("BARCODE_UNAVAILABLE");
         assignedBarcode = currentAvailableBarcode;
-      } else if (isOfflineVvip && input.barcode && input.barcode !== order.barcode?.barcode) {
+      } else if (
+        (isOfflineVvip || (tierChanged && !order.barcode)) &&
+        input.barcode &&
+        input.barcode !== order.barcode?.barcode
+      ) {
         if (!configuredQuotas) {
           configuredQuotas = await tx.seasonPassZoneQuota.findMany({
             where: {
               seasonLabel: order.seasonLabel,
-              tierId: order.tierId,
+              tierId: tier.id,
               seatZone: { in: [...tier.allowedSeatZones] },
             },
           });
         }
         const barcodeZoneQuotas = resolveSeasonPassBarcodeZoneQuotas(
           order.seasonLabel,
-          order.tierId,
+          tier.id,
           barcodePrefix,
           tier.allowedSeatZones,
           configuredQuotas,
@@ -873,7 +906,7 @@ export async function updateSeasonPassOrder(
         const availableBarcode = await tx.seasonPassBarcode.findFirst({
           where: {
             barcode: input.barcode,
-            tierId: order.tierId,
+            tierId: tier.id,
             seasonLabel: order.seasonLabel,
             isGenerated: true,
             orderId: null,
@@ -899,7 +932,7 @@ export async function updateSeasonPassOrder(
               where: {
                 id: availableBarcode.id,
                 barcode: input.barcode,
-                tierId: order.tierId,
+                tierId: tier.id,
                 seasonLabel: order.seasonLabel,
                 isGenerated: true,
                 orderId: null,
@@ -941,12 +974,12 @@ export async function updateSeasonPassOrder(
         if (claimed.count !== 1) throw new Error("BARCODE_UNAVAILABLE");
         assignedBarcode = currentAvailableBarcode;
       }
-      if (order.tierId === "vip-advanced" && order.salesChannel === "OFFLINE" && !order.barcode && input.seatZone) {
+      if (tier.id === "vip-advanced" && order.salesChannel === "OFFLINE" && !assignedBarcode && input.seatZone) {
         if (!configuredQuotas) {
           configuredQuotas = await tx.seasonPassZoneQuota.findMany({
             where: {
               seasonLabel: order.seasonLabel,
-              tierId: order.tierId,
+              tierId: tier.id,
               seatZone: { in: [...tier.allowedSeatZones] },
             },
           });
@@ -960,7 +993,7 @@ export async function updateSeasonPassOrder(
         if (!destinationBarcodeBounds) throw new Error("ZONE_BARCODE_RANGE_UNCONFIGURED");
         const availableBarcode = await tx.seasonPassBarcode.findFirst({
           where: {
-            tierId: order.tierId,
+            tierId: tier.id,
             seasonLabel: order.seasonLabel,
             isGenerated: true,
             orderId: null,
@@ -990,14 +1023,18 @@ export async function updateSeasonPassOrder(
       const detailsComplete = Boolean(input.seatZone && assignedBarcode);
       const updatedOrder = await tx.seasonPassOrder.update({
         where: { id: order.id },
+        // Package transfers are data-only. Keep the original order price,
+        // purchase totals and payment records untouched because staff collect
+        // any difference offline.
         data: {
+          tierId: tier.id,
           customerId: linkedCustomer ? linkedCustomer.id : order.customerId,
           customerName: linkedCustomer ? linkedCustomer.name : input.customerName,
           customerPhone: linkedCustomerPhone ?? input.customerPhone,
           customerEmail: linkedCustomer ? linkedCustomer.email : input.customerEmail || null,
           seatZone: input.seatZone,
           seatNumber: input.seatNumber || null,
-          shirtSize: input.shirtSize || null,
+          shirtSize: seasonTierIncludesShirt(tier.id) ? input.shirtSize || null : null,
           deliveryMethod: input.deliveryMethod,
           shipAddress: input.deliveryMethod === "SHIPPING" ? input.shipAddress || null : null,
           shipCity: input.deliveryMethod === "SHIPPING" ? input.shipCity || null : null,
@@ -1011,7 +1048,9 @@ export async function updateSeasonPassOrder(
           ...(assignedBarcode && assignedBarcode.barcode !== order.passCode
             ? { passCode: assignedBarcode.barcode }
             : {}),
-          ...(canDeferStaffZone && order.status === "PENDING" && detailsComplete ? { status: "CONFIRMED" } : {}),
+          ...(order.salesChannel === "OFFLINE" && order.status === "PENDING" && detailsComplete
+            ? { status: "CONFIRMED" }
+            : {}),
         },
         select: { passCode: true },
       });
@@ -1032,6 +1071,8 @@ export async function updateSeasonPassOrder(
   } catch (error) {
     if (error instanceof Error && error.message === "MEMBER_REQUIRED") return { ok: false, error: "กรุณาเลือกสมาชิกที่สมัครแล้วสำหรับรายการรอบทีมงาน", fieldErrors: { customerId: ["กรุณาเลือกสมาชิก"] } };
     if (error instanceof Error && error.message === "MEMBER_PHONE_REQUIRED") return { ok: false, error: "สมาชิกที่เลือกยังไม่มีเบอร์โทรศัพท์ที่ถูกต้อง กรุณาแก้ไขข้อมูลสมาชิกก่อน", fieldErrors: { customerId: ["ข้อมูลสมาชิกไม่มีเบอร์โทรศัพท์ที่ถูกต้อง"] } };
+    if (error instanceof Error && error.message === "INVALID_TIER") return { ok: false, error: "ไม่พบแพ็กเกจบัตรรายปีที่เลือก", fieldErrors: { tierId: ["กรุณาเลือกแพ็กเกจใหม่อีกครั้ง"] } };
+    if (error instanceof Error && error.message === "TIER_TRANSFER_CONFIRMATION_REQUIRED") return { ok: false, error: "กรุณายืนยันการย้ายแพ็กเกจและการชำระส่วนต่างแบบออฟไลน์ก่อนบันทึก" };
     if (error instanceof Error && error.message === "INVALID_ZONE") return { ok: false, error: "โซนไม่ตรงกับแพ็กเกจนี้" };
     if (error instanceof Error && error.message === "INVALID_DELIVERY") return { ok: false, error: "ไม่สามารถเปลี่ยนวิธีรับบัตรหลังสร้างรายการได้" };
     if (error instanceof Error && error.message === "SEAT_REQUIRED") return { ok: false, error: "แพ็กเกจ VVIP ต้องระบุหมายเลขที่นั่ง" };
@@ -1040,6 +1081,9 @@ export async function updateSeasonPassOrder(
     if (error instanceof Error && error.message === "BARCODE_HAS_SCANS") return { ok: false, error: "ไม่สามารถเปลี่ยนบาร์โค้ดที่มีประวัติการสแกนแล้วได้ เพื่อป้องกันข้อมูลการใช้งานสูญหาย" };
     if (error instanceof Error && error.message === "BARCODE_REQUIRED_FOR_ZONE_TRANSFER") {
       return { ok: false, error: "กรุณาเลือกเลขรันบาร์โค้ดของโซนใหม่", fieldErrors: { barcode: ["กรุณาเลือกเลขรันของโซนใหม่"] } };
+    }
+    if (error instanceof Error && error.message === "BARCODE_REQUIRED_FOR_TIER_TRANSFER") {
+      return { ok: false, error: "กรุณาเลือกเลขรันบาร์โค้ดของแพ็กเกจใหม่", fieldErrors: { barcode: ["กรุณาเลือกเลขรันของแพ็กเกจและโซนใหม่"] } };
     }
     if (error instanceof Error && error.message === "ZONE_TRANSFER_CONFIRMATION_REQUIRED") {
       return { ok: false, error: "กรุณายืนยันโซนและการเปลี่ยนบาร์โค้ดก่อนบันทึก" };

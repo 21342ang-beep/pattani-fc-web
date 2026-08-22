@@ -9,6 +9,7 @@ import { SEASON_PASS_SHIRT_SIZES, seasonTierIncludesShirt } from "@/lib/season-p
 type EditableOrder = {
   id: string;
   tierId: string;
+  priceBaht: number;
   passCode: string;
   barcode: string;
   barcodeSeatZone: string;
@@ -39,30 +40,36 @@ type MemberOption = {
   email: string;
 };
 
+type TierOption = {
+  id: string;
+  badge: string;
+  priceBaht: number;
+  zones: string[];
+  availableBarcodes: { barcode: string; seatZone: string }[];
+  hasCompleteZoneBarcodeRanges: boolean;
+};
+
 const inputClass = "mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20 disabled:bg-slate-100";
 
 export default function EditSeasonPassForm({
   order,
-  tierBadge,
-  zones,
-  availableBarcodes,
-  hasCompleteZoneBarcodeRanges,
+  tierOptions,
   members,
   backHref,
 }: {
   order: EditableOrder;
-  tierBadge: string;
-  zones: string[];
-  availableBarcodes: { barcode: string; seatZone: string }[];
-  hasCompleteZoneBarcodeRanges: boolean;
+  tierOptions: TierOption[];
   members: MemberOption[];
   backHref: string;
 }) {
   const [state, formAction, pending] = useActionState<EditSeasonPassState, FormData>(updateSeasonPassOrder, undefined);
   const router = useRouter();
   const [customerId, setCustomerId] = useState(order.customerId);
+  const [selectedTierId, setSelectedTierId] = useState(order.tierId);
   const [selectedZone, setSelectedZone] = useState(order.seatZone);
   const [selectedBarcode, setSelectedBarcode] = useState(order.barcode);
+  const selectedTier = tierOptions.find((item) => item.id === selectedTierId) ?? tierOptions[0]!;
+  const originalTier = tierOptions.find((item) => item.id === order.tierId) ?? tierOptions[0]!;
   const selectedMember = useMemo(
     () => members.find((member) => member.id === customerId) ?? null,
     [customerId, members],
@@ -73,9 +80,10 @@ export default function EditSeasonPassForm({
   }, [backHref, router, state]);
 
   const errorFor = (field: string) => state && !state.ok ? state.fieldErrors?.[field]?.[0] : undefined;
-  const isOfflineVvip = order.tierId === "vvip-elite" && order.salesChannel === "OFFLINE";
+  const tierChanged = selectedTierId !== order.tierId;
+  const isOfflineVvip = selectedTierId === "vvip-elite" && order.salesChannel === "OFFLINE";
   const isDeferredStaffTier =
-    ["vvip-elite", "vip-advanced"].includes(order.tierId) &&
+    ["vvip-elite", "vip-advanced"].includes(selectedTierId) &&
     order.salesChannel === "OFFLINE";
   const canDeferStaffZone = isDeferredStaffTier && !order.barcode;
   const needsZoneForExistingBarcode =
@@ -84,30 +92,48 @@ export default function EditSeasonPassForm({
   const barcodeChangeRequiredForZone = Boolean(
     order.barcode &&
     selectedZone &&
-    (barcodeZone
+    (tierChanged || (barcodeZone
       ? selectedZone !== barcodeZone
-      : hasCompleteZoneBarcodeRanges || selectedZone !== order.seatZone),
+      : selectedTier.hasCompleteZoneBarcodeRanges || selectedZone !== order.seatZone)),
   );
-  const availableBarcodesForZone = availableBarcodes
+  const barcodeAssignmentRequiredForTier = Boolean(
+    tierChanged &&
+    !order.barcode &&
+    selectedZone &&
+    !isOfflineVvip,
+  );
+  const barcodeUpdateRequired =
+    barcodeChangeRequiredForZone || barcodeAssignmentRequiredForTier;
+  const availableBarcodesForZone = selectedTier.availableBarcodes
     .filter((item) => item.seatZone === selectedZone)
     .map((item) => item.barcode);
-  const selectableBarcodes = order.barcode && selectedZone === barcodeZone
+  const selectableBarcodes = !tierChanged && order.barcode && selectedZone === barcodeZone
     ? [
         order.barcode,
         ...availableBarcodesForZone.filter((barcode) => barcode !== order.barcode),
       ]
     : availableBarcodesForZone;
   const noDestinationBarcode =
-    barcodeChangeRequiredForZone && availableBarcodesForZone.length === 0;
+    barcodeUpdateRequired && availableBarcodesForZone.length === 0;
   const barcodeChangeBlocked =
-    barcodeChangeRequiredForZone &&
-    (!hasCompleteZoneBarcodeRanges || noDestinationBarcode);
-  const showBarcodeSelector = Boolean(order.barcode || isOfflineVvip);
+    barcodeUpdateRequired &&
+    (!selectedTier.hasCompleteZoneBarcodeRanges || noDestinationBarcode);
+  const showBarcodeSelector = Boolean(order.barcode || isOfflineVvip || tierChanged);
   const barcodeSelectionDisabled =
-    !isOfflineVvip && !barcodeChangeRequiredForZone;
+    !isOfflineVvip && !barcodeUpdateRequired;
   const handleZoneChange = (nextZone: string) => {
     setSelectedZone(nextZone);
-    setSelectedBarcode(nextZone === barcodeZone ? order.barcode : "");
+    setSelectedBarcode(!tierChanged && nextZone === barcodeZone ? order.barcode : "");
+  };
+  const handleTierChange = (nextTierId: string) => {
+    setSelectedTierId(nextTierId);
+    if (nextTierId === order.tierId) {
+      setSelectedZone(order.seatZone);
+      setSelectedBarcode(order.barcode);
+      return;
+    }
+    setSelectedZone("");
+    setSelectedBarcode("");
   };
   const displayPassCode = order.passCode.startsWith("PENDING-") ? "รอระบบผูกบาร์โค้ด" : order.passCode;
   return (
@@ -116,8 +142,22 @@ export default function EditSeasonPassForm({
       {state && !state.ok && <div className="rounded-lg bg-red-50 px-4 py-3 text-base font-medium text-red-700">{state.error}</div>}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="แพ็กเกจ">
-          <input value={`${tierBadge} · ${displayPassCode}`} disabled className={`${inputClass} font-mono`} />
+        <Field label="แพ็กเกจ" error={errorFor("tierId")}>
+          <select
+            name="tierId"
+            value={selectedTierId}
+            onChange={(event) => handleTierChange(event.target.value)}
+            className={inputClass}
+          >
+            {tierOptions.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.badge} · ราคาหน้าแพ็กเกจ ฿{item.priceBaht.toLocaleString("th-TH")}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1.5 block text-sm font-normal text-slate-500">
+            เลขอ้างอิงเดิม <span className="font-mono">{displayPassCode}</span>
+          </span>
         </Field>
         <Field label={canDeferStaffZone ? "โซน (ไม่บังคับ)" : "โซน"} error={errorFor("seatZone")}>
           <select
@@ -127,19 +167,19 @@ export default function EditSeasonPassForm({
             required={!canDeferStaffZone}
             className={inputClass}
           >
-            {(canDeferStaffZone || needsZoneForExistingBarcode) && (
-              <option value="" disabled={needsZoneForExistingBarcode}>
-                {needsZoneForExistingBarcode
+            {(tierChanged || canDeferStaffZone || needsZoneForExistingBarcode) && (
+              <option value="" disabled={!canDeferStaffZone || needsZoneForExistingBarcode}>
+                {!canDeferStaffZone || needsZoneForExistingBarcode
                   ? "เลือกโซนให้ตรงกับเลขรันบาร์โค้ด"
                   : "ยังไม่ระบุ — แก้ไขภายหลังได้"}
               </option>
             )}
-            {zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+            {selectedTier.zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
           </select>
           {barcodeChangeRequiredForZone && (
             <span className="mt-2 block rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-normal text-amber-900">
               {barcodeChangeBlocked
-                ? !hasCompleteZoneBarcodeRanges
+                ? !selectedTier.hasCompleteZoneBarcodeRanges
                   ? "ยังย้ายโซนไม่ได้ เพราะแพ็กเกจนี้ยังกำหนดช่วงเลขรันบาร์โค้ดแยกโซนไม่ครบ"
                   : `ยังย้ายไปโซน ${selectedZone} ไม่ได้ เพราะไม่มีเลขรันบาร์โค้ดว่างในโซนนี้`
                 : selectedZone === order.seatZone
@@ -151,7 +191,7 @@ export default function EditSeasonPassForm({
         {showBarcodeSelector && (
           <Field
             label={
-              barcodeChangeRequiredForZone
+              barcodeUpdateRequired
                 ? `เลขรันบาร์โค้ดโซน ${selectedZone}`
                 : isOfflineVvip
                   ? "เลขรันบาร์โค้ด (ไม่บังคับ)"
@@ -164,12 +204,12 @@ export default function EditSeasonPassForm({
               value={selectedBarcode}
               onChange={(event) => setSelectedBarcode(event.target.value)}
               disabled={barcodeSelectionDisabled || barcodeChangeBlocked}
-              required={barcodeChangeRequiredForZone}
+              required={barcodeUpdateRequired}
               className={`${inputClass} font-mono uppercase`}
             >
-              {(!order.barcode || barcodeChangeRequiredForZone) && (
+              {(!order.barcode || barcodeUpdateRequired) && (
                 <option value="">
-                  {barcodeChangeRequiredForZone
+                  {barcodeUpdateRequired
                     ? "เลือกเลขรันของโซนใหม่"
                     : "ยังไม่ระบุ — แก้ไขภายหลังได้"}
                 </option>
@@ -185,7 +225,7 @@ export default function EditSeasonPassForm({
             )}
           </Field>
         )}
-        {barcodeChangeRequiredForZone && !barcodeChangeBlocked && (
+        {barcodeChangeRequiredForZone && !tierChanged && !barcodeChangeBlocked && (
           <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base font-semibold text-amber-950">
             <input
               type="checkbox"
@@ -196,6 +236,21 @@ export default function EditSeasonPassForm({
             />
             <span>
               ยืนยันใช้โซน {selectedZone} และเปลี่ยนเป็นเลขรันที่เลือก โดยบัตรหรือภาพบาร์โค้ดเดิมจะใช้กับลูกค้ารายนี้ไม่ได้อีก
+            </span>
+          </label>
+        )}
+        {tierChanged && (
+          <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base font-semibold text-amber-950">
+            <input
+              type="checkbox"
+              name="confirmTierTransfer"
+              value="yes"
+              required
+              className="mt-1 size-4 accent-green-800"
+            />
+            <span>
+              ยืนยันย้ายจาก {originalTier.badge} ไป {selectedTier.badge} โดยคงยอดที่ระบบบันทึกไว้เดิม ฿{order.priceBaht.toLocaleString("th-TH")} และไม่บันทึกส่วนต่างหรือการชำระเพิ่มในระบบ ส่วนต่างชำระแบบออฟไลน์
+              {order.barcode ? " บาร์โค้ดเดิมจะถูกยกเลิกและเปลี่ยนเป็นเลขรันของแพ็กเกจใหม่" : ""}
             </span>
           </label>
         )}
@@ -243,7 +298,7 @@ export default function EditSeasonPassForm({
             </Field>
           </>
         )}
-        {seasonTierIncludesShirt(order.tierId) ? (
+        {seasonTierIncludesShirt(selectedTierId) ? (
           <Field label="ไซส์เสื้อ (ไม่บังคับ)" error={errorFor("shirtSize")}>
             <select name="shirtSize" defaultValue={order.shirtSize} className={inputClass}>
               <option value="">ยังไม่ระบุ</option>
@@ -253,8 +308,8 @@ export default function EditSeasonPassForm({
         ) : (
           <input type="hidden" name="shirtSize" value="" />
         )}
-        <Field label={order.tierId === "vvip-elite" && !isOfflineVvip ? "หมายเลขที่นั่ง VVIP" : "หมายเลขที่นั่ง (ไม่บังคับ)"} error={errorFor("seatNumber")}>
-          <input name="seatNumber" defaultValue={order.seatNumber} required={order.tierId === "vvip-elite" && !isOfflineVvip} maxLength={30} className={`${inputClass} uppercase`} />
+        <Field label={selectedTierId === "vvip-elite" && !isOfflineVvip ? "หมายเลขที่นั่ง VVIP" : "หมายเลขที่นั่ง (ไม่บังคับ)"} error={errorFor("seatNumber")}>
+          <input name="seatNumber" defaultValue={order.seatNumber} required={selectedTierId === "vvip-elite" && !isOfflineVvip} maxLength={30} className={`${inputClass} uppercase`} />
         </Field>
         <Field label="วิธีรับบัตร" error={errorFor("deliveryMethod")}>
           <input type="hidden" name="deliveryMethod" value={order.deliveryMethod} />

@@ -36,10 +36,9 @@ export default async function EditSeasonPassPage({
     prisma.seasonPassZoneQuota.findMany({
       where: {
         seasonLabel: order.seasonLabel,
-        tierId: order.tierId,
-        seatZone: { in: [...tier.allowedSeatZones] },
+        tierId: { in: SEASON_TIERS.map((item) => item.id) },
       },
-      select: { seatZone: true, totalSeats: true, sponsorReserved: true },
+      select: { tierId: true, seatZone: true, totalSeats: true, sponsorReserved: true },
     }),
     order.salesChannel === "OFFLINE"
       ? prisma.customer.findMany({
@@ -48,34 +47,45 @@ export default async function EditSeasonPassPage({
         })
       : Promise.resolve([]),
   ]);
-  const barcodePrefix = `PFC26-${tier.priceBaht}-`;
-  const barcodeZoneQuotas = resolveSeasonPassBarcodeZoneQuotas(
-    order.seasonLabel,
-    order.tierId,
-    barcodePrefix,
-    tier.allowedSeatZones,
-    zoneQuotas,
-  );
-  const tierZoneBounds = tier.allowedSeatZones.flatMap((seatZone) => {
-    const bounds = getSeasonPassZoneBarcodeBounds(
+  const tierBarcodeDetails = SEASON_TIERS.map((item) => {
+    const barcodePrefix = `PFC26-${item.priceBaht}-`;
+    const itemQuotas = zoneQuotas.filter((quota) => quota.tierId === item.id);
+    const barcodeZoneQuotas = resolveSeasonPassBarcodeZoneQuotas(
+      order.seasonLabel,
+      item.id,
       barcodePrefix,
-      tier.allowedSeatZones,
-      barcodeZoneQuotas,
-      seatZone,
+      item.allowedSeatZones,
+      itemQuotas,
     );
-    return bounds ? [bounds] : [];
+    const zoneBounds = item.allowedSeatZones.flatMap((seatZone) => {
+      const bounds = getSeasonPassZoneBarcodeBounds(
+        barcodePrefix,
+        item.allowedSeatZones,
+        barcodeZoneQuotas,
+        seatZone,
+      );
+      return bounds ? [bounds] : [];
+    });
+    return {
+      tier: item,
+      zoneBounds,
+      hasCompleteZoneBarcodeRanges:
+        zoneBounds.length === item.allowedSeatZones.length,
+    };
   });
-  const hasCompleteZoneBarcodeRanges =
-    tierZoneBounds.length === tier.allowedSeatZones.length;
-  const barcodeRangeFilters = tierZoneBounds
-    .filter((bounds) => bounds.publicSeatCount > 0)
-    .map((bounds) => ({
-      barcode: { gte: bounds.lowerBound, lte: bounds.upperBound },
-    }));
-  const availableBarcodeRows = hasCompleteZoneBarcodeRanges && barcodeRangeFilters.length > 0
+  const barcodeRangeFilters = tierBarcodeDetails.flatMap((detail) =>
+    detail.hasCompleteZoneBarcodeRanges
+      ? detail.zoneBounds
+          .filter((bounds) => bounds.publicSeatCount > 0)
+          .map((bounds) => ({
+            tierId: detail.tier.id,
+            barcode: { gte: bounds.lowerBound, lte: bounds.upperBound },
+          }))
+      : [],
+  );
+  const availableBarcodeRows = barcodeRangeFilters.length > 0
     ? await prisma.seasonPassBarcode.findMany({
         where: {
-          tierId: order.tierId,
           seasonLabel: order.seasonLabel,
           isGenerated: true,
           orderId: null,
@@ -83,17 +93,28 @@ export default async function EditSeasonPassPage({
           OR: barcodeRangeFilters,
         },
         orderBy: { barcode: "asc" },
-        select: { barcode: true },
+        select: { tierId: true, barcode: true },
       })
     : [];
-  const availableBarcodes = availableBarcodeRows.flatMap((item) => {
-    const bounds = tierZoneBounds.find((candidate) =>
-      seasonPassBarcodeIsWithinBounds(item.barcode, candidate),
-    );
-    return bounds ? [{ barcode: item.barcode, seatZone: bounds.seatZone }] : [];
-  });
+  const tierOptions = tierBarcodeDetails.map((detail) => ({
+    id: detail.tier.id,
+    badge: detail.tier.badge,
+    priceBaht: detail.tier.priceBaht,
+    zones: [...detail.tier.allowedSeatZones],
+    hasCompleteZoneBarcodeRanges: detail.hasCompleteZoneBarcodeRanges,
+    availableBarcodes: availableBarcodeRows.flatMap((item) => {
+      if (item.tierId !== detail.tier.id) return [];
+      const bounds = detail.zoneBounds.find((candidate) =>
+        seasonPassBarcodeIsWithinBounds(item.barcode, candidate),
+      );
+      return bounds ? [{ barcode: item.barcode, seatZone: bounds.seatZone }] : [];
+    }),
+  }));
+  const currentTierDetails = tierBarcodeDetails.find(
+    (detail) => detail.tier.id === order.tierId,
+  )!;
   const barcodeSeatZone = order.barcode
-    ? tierZoneBounds.find((bounds) =>
+    ? currentTierDetails.zoneBounds.find((bounds) =>
         seasonPassBarcodeIsWithinBounds(order.barcode!.barcode, bounds),
       )?.seatZone ?? ""
     : "";
@@ -113,6 +134,7 @@ export default async function EditSeasonPassPage({
         order={{
           id: order.id,
           tierId: order.tierId,
+          priceBaht: order.priceBaht,
           passCode: order.passCode,
           barcode: order.barcode?.barcode ?? "",
           barcodeSeatZone,
@@ -135,10 +157,7 @@ export default async function EditSeasonPassPage({
           notes: order.notes ?? "",
           salesChannel: order.salesChannel,
         }}
-        tierBadge={tier.badge}
-        zones={[...tier.allowedSeatZones]}
-        availableBarcodes={availableBarcodes}
-        hasCompleteZoneBarcodeRanges={hasCompleteZoneBarcodeRanges}
+        tierOptions={tierOptions}
         members={members}
         backHref={backHref}
       />
