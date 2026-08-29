@@ -1104,24 +1104,21 @@ export async function updateSeasonPassOrder(
 export async function deleteSeasonPassOrder(
   orderId: string,
 ): Promise<{ ok: true } | { error: string }> {
-  await verifySuperAdmin();
-  if (process.env.NODE_ENV === "production") {
-    return {
-      error:
-        "ปิดการลบถาวรบนระบบจริงเพื่อรักษาหลักฐานการชำระเงินและประวัติการใช้งาน",
-    };
-  }
+  await verifyPermission("SEASON_PASSES");
   if (typeof orderId !== "string" || !/^[a-z0-9]+$/i.test(orderId)) {
     return { error: "รหัสไม่ถูกต้อง" };
   }
   try {
-    await prisma.$transaction(async (tx) => {
+    const deletedPassCode = await prisma.$transaction(async (tx) => {
       const order = await tx.seasonPassOrder.findUnique({
         where: { id: orderId },
-        select: { purchaseId: true, barcode: { select: { id: true } } },
+        select: { passCode: true, purchaseId: true, barcode: { select: { id: true } } },
       });
       if (!order) throw new Error("NOT_FOUND");
       if (order.barcode) {
+        await tx.seasonPassScan.deleteMany({
+          where: { barcodeId: order.barcode.id },
+        });
         await tx.seasonPassBarcode.update({
           where: { id: order.barcode.id },
           data: {
@@ -1133,7 +1130,7 @@ export async function deleteSeasonPassOrder(
         });
       }
       await tx.seasonPassOrder.delete({ where: { id: orderId } });
-      if (!order.purchaseId) return;
+      if (!order.purchaseId) return order.passCode;
 
       const remaining = await tx.seasonPassOrder.aggregate({
         where: { purchaseId: order.purchaseId },
@@ -1142,7 +1139,7 @@ export async function deleteSeasonPassOrder(
       });
       if (remaining._count._all === 0) {
         await tx.seasonPassPurchase.delete({ where: { id: order.purchaseId } });
-        return;
+        return order.passCode;
       }
       await tx.beamPayment.deleteMany({ where: { seasonPassPurchaseId: order.purchaseId } });
       await tx.xenditPayment.deleteMany({ where: { seasonPassPurchaseId: order.purchaseId } });
@@ -1157,8 +1154,14 @@ export async function deleteSeasonPassOrder(
           totalBaht: subtotalBaht + remainingShippingFee,
         },
       });
+      return order.passCode;
     });
     revalidatePath("/admin/season-passes");
+    revalidatePath("/admin/season-passes/check");
+    revalidatePath("/admin/season-passes/staff");
+    revalidatePath("/admin/members");
+    revalidatePath("/member");
+    revalidatePath(`/tickets/season/${deletedPassCode}`);
     revalidateSeatAvailability();
     return { ok: true };
   } catch {
