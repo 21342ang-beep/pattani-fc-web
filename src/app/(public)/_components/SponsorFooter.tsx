@@ -1,8 +1,8 @@
 import Image from "next/image";
 
-const SPONSOR_IMAGE = "/sponsors-pattani-fc-2026-v4.png";
-const IMAGE_WIDTH = 3000;
-const IMAGE_HEIGHT = 1175;
+const SPONSOR_IMAGE = "/sponsors-pattani-fc-2026-v5.png";
+const IMAGE_WIDTH = 4167;
+const IMAGE_HEIGHT = 1632;
 
 export default function SponsorFooter() {
   return (
