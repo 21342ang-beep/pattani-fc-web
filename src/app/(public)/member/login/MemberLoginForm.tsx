@@ -31,7 +31,7 @@ export default function MemberLoginForm({
         {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
         <div>
           <label className="block text-base font-semibold text-green-900 md:text-lg">
-            อีเมลหรือเบอร์โทรศัพท์
+            เบอร์โทรศัพท์ (หรืออีเมล)
           </label>
           <input
             name="identifier"
