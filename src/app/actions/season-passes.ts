@@ -359,7 +359,7 @@ export async function createSeasonPassOrder(
           data: {
             orderId: created.id,
             assignedAt: new Date(),
-            ...secureSeasonPassGateAssignment(),
+            ...secureSeasonPassGateAssignment(barcode.barcode),
           },
         });
         if (claimed.count !== 1) throw new Error("SOLD_OUT");
@@ -862,7 +862,7 @@ export async function updateSeasonPassOrder(
             orderId: order.id,
             assignedAt: new Date(),
             usesRemaining: SEASON_MATCHES,
-            ...secureSeasonPassGateAssignment(),
+            ...secureSeasonPassGateAssignment(currentAvailableBarcode.barcode),
           },
         });
         if (claimed.count !== 1) throw new Error("BARCODE_UNAVAILABLE");
@@ -968,7 +968,7 @@ export async function updateSeasonPassOrder(
             orderId: order.id,
             assignedAt: new Date(),
             usesRemaining: SEASON_MATCHES,
-            ...secureSeasonPassGateAssignment(),
+            ...secureSeasonPassGateAssignment(currentAvailableBarcode.barcode),
           },
         });
         if (claimed.count !== 1) throw new Error("BARCODE_UNAVAILABLE");
@@ -1013,7 +1013,7 @@ export async function updateSeasonPassOrder(
             orderId: order.id,
             assignedAt: new Date(),
             usesRemaining: SEASON_MATCHES,
-            ...secureSeasonPassGateAssignment(),
+            ...secureSeasonPassGateAssignment(availableBarcode.barcode),
           },
         });
         if (claimed.count !== 1) throw new Error("BARCODE_UNAVAILABLE");

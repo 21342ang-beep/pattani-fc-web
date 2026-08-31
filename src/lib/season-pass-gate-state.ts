@@ -2,6 +2,9 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+const PRINTED_PFC26_BARCODE_PATTERN =
+  /^PFC26-(4000|2500|2000|1500)-\d{4}$/;
+
 /**
  * Every flow that can hold more than one barcode row must acquire them in the
  * same order. This avoids mover-vs-mover deadlocks while the gate scanner holds
@@ -25,7 +28,16 @@ export function rotateSeasonPassGateCredential() {
   } as const;
 }
 
-/** New assignments must never turn the legacy transition back on. */
-export function secureSeasonPassGateAssignment() {
-  return { legacyGateAllowed: false } as const;
+/**
+ * Physical 2026/27 cards were printed with the human PFC26 code, not SPG2.
+ * Enable that input only for the known printed inventory format. Other barcode
+ * formats remain SPG2-only, and rotateSeasonPassGateCredential disables the
+ * physical credential again whenever a card leaves an assignment.
+ */
+export function secureSeasonPassGateAssignment(barcode: string) {
+  return {
+    legacyGateAllowed: PRINTED_PFC26_BARCODE_PATTERN.test(
+      barcode.trim().toUpperCase(),
+    ),
+  } as const;
 }

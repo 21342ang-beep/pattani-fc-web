@@ -277,7 +277,7 @@ export async function registerStaffSeasonPass(
             orderId: order.id,
             assignedAt: new Date(),
             usesRemaining: SEASON_MATCHES,
-            ...secureSeasonPassGateAssignment(),
+            ...secureSeasonPassGateAssignment(barcode.barcode),
           },
         });
         if (claimed.count !== 1) throw new Error("SOLD_OUT");
