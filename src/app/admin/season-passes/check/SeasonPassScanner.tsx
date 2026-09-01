@@ -9,6 +9,13 @@ import {
   type LookupSeasonPassResult,
   type ScanSeasonPassResult,
 } from "@/app/actions/gate-check";
+import {
+  ALL_SCAN_ZONES,
+  UNASSIGNED_SCAN_ZONE,
+  buildScanZoneSummaries,
+  scanZoneKey,
+  scanZoneMatches,
+} from "@/lib/scan-zone-summary";
 import DeleteAllSeasonPassScansButton from "./DeleteAllSeasonPassScansButton";
 import DeleteSeasonPassScanButton from "./DeleteSeasonPassScanButton";
 
@@ -19,11 +26,12 @@ type MatchOption = {
   competitionName: string | null;
   competitionRound: string | null;
 };
-type TierSummary = { id: string; badge: string; orders: number; scans: number; unregistered?: number };
+type TierSummary = { id: string; badge: string; zones: string[]; orders: number; scans: number; unregistered?: number };
 type ScanHistoryItem = {
   id: string;
   scannedAt: string;
   tierId: string;
+  seatZone: string | null;
   passCode: string;
   customerName: string;
   matchLabel: string;
@@ -46,19 +54,26 @@ function scanErrorMessage(error: ScanError) {
   }[error];
 }
 
+function zoneLabel(zone: string) {
+  return zone === UNASSIGNED_SCAN_ZONE ? "ไม่ระบุโซน" : `โซน ${zone}`;
+}
+
 export default function SeasonPassScanner({
   matches,
+  initialMatchId,
   summaries,
   scanHistory,
 }: {
   matches: MatchOption[];
+  initialMatchId: string;
   summaries: TierSummary[];
   scanHistory: ScanHistoryItem[];
 }) {
-  const [matchId, setMatchId] = useState(matches[0]?.id ?? "");
+  const [matchId, setMatchId] = useState(initialMatchId);
   const [matchFilter, setMatchFilter] = useState<"ALL" | "LEAGUE" | "CUP">("ALL");
   const [matchMenuOpen, setMatchMenuOpen] = useState(false);
-  const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
+  const [selectedTierId, setSelectedTierId] = useState<string | null>(summaries[0]?.id ?? null);
+  const [selectedZone, setSelectedZone] = useState(ALL_SCAN_ZONES);
   const [history, setHistory] = useState(scanHistory);
   const [barcode, setBarcode] = useState("");
   const [preview, setPreview] = useState<PreviewRecord | null>(null);
@@ -72,11 +87,27 @@ export default function SeasonPassScanner({
     ? matches
     : matches.filter((match) => match.competitionType === matchFilter);
   const selectedTier = summaries.find((tier) => tier.id === selectedTierId);
-  const selectedHistory = selectedTierId ? history.filter((scan) => scan.tierId === selectedTierId) : [];
+  const selectedTierHistory = selectedTierId ? history.filter((scan) => scan.tierId === selectedTierId) : [];
+  const zoneSummaries = selectedTier
+    ? buildScanZoneSummaries(
+      selectedTierHistory.map((scan) => ({ zone: scan.seatZone, scans: 1 })),
+      selectedTier.zones,
+    )
+    : [];
+  const selectedHistory = selectedTierHistory.filter((scan) => scanZoneMatches(scan.seatZone, selectedZone));
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    setMatchId(initialMatchId);
+    setSelectedZone(ALL_SCAN_ZONES);
+  }, [initialMatchId]);
+
+  useEffect(() => {
+    setHistory(scanHistory);
+  }, [scanHistory]);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -137,38 +168,6 @@ export default function SeasonPassScanner({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="tablist" aria-label="แพ็กเกจบัตรรายปี">
-        {summaries.map((summary) => {
-          const isSelected = summary.id === selectedTierId;
-          const scanCount = history.filter((scan) => scan.tierId === summary.id).length;
-
-          return (
-            <button
-              key={summary.id}
-              type="button"
-              role="tab"
-              aria-selected={isSelected}
-              onClick={() => setSelectedTierId(summary.id)}
-              className={`rounded-xl border p-4 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-green-700/30 ${
-                isSelected
-                  ? "border-green-700 bg-green-50 ring-2 ring-green-700/20"
-                  : "border-green-100 bg-white hover:border-green-400 hover:bg-green-50/50"
-              }`}
-            >
-              <p className="text-sm font-bold tracking-wider text-yellow-700 md:text-base">{summary.badge}</p>
-              <p className="mt-2 text-2xl font-black text-green-900 md:text-3xl">{summary.orders.toLocaleString("th-TH")} บัตร</p>
-              <p className="text-base text-slate-600 md:text-lg">ใช้งานแล้ว {scanCount.toLocaleString("th-TH")} ครั้ง</p>
-              {typeof summary.unregistered === "number" && summary.unregistered > 0 && (
-                <p className="mt-1 text-sm font-semibold text-amber-700 md:text-base">
-                  ยังไม่ลงทะเบียน {summary.unregistered.toLocaleString("th-TH")} ใบ
-                </p>
-              )}
-              <p className="mt-2 text-sm font-semibold text-green-800 md:text-base">ดูประวัติแพ็กเกจนี้</p>
-            </button>
-          );
-        })}
-      </div>
-
       <form onSubmit={submit} className="rounded-xl border bg-white p-5 shadow-sm">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <label className="block text-base font-semibold text-slate-800 md:text-lg">
@@ -204,9 +203,13 @@ export default function SeasonPassScanner({
                       type="button"
                       onClick={() => {
                         setMatchId(match.id);
+                        setSelectedZone(ALL_SCAN_ZONES);
                         setMatchMenuOpen(false);
                         setPreview(null);
                         setError(null);
+                        startTransition(() => {
+                          router.replace(`/admin/season-passes/check?match=${encodeURIComponent(match.id)}`, { scroll: false });
+                        });
                       }}
                       className={`block w-full px-3 py-3 text-left text-base hover:bg-green-50 md:text-lg ${match.id === matchId ? "bg-green-100 font-semibold text-green-900" : "text-slate-700"}`}
                     >
@@ -317,26 +320,105 @@ export default function SeasonPassScanner({
         </section>
       )}
 
+      <section>
+        <div className="mb-3">
+          <h2 className="text-2xl font-bold text-green-900 md:text-3xl">บัตรที่สแกนแล้วแยกตามแพ็กเกจ</h2>
+          <p className="text-base text-slate-600 md:text-lg">{selectedMatch?.label ?? "กรุณาเลือกแมตช์"}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="tablist" aria-label="แพ็กเกจบัตรรายปี">
+          {summaries.map((summary) => {
+            const isSelected = summary.id === selectedTierId;
+            const scanCount = history.filter((scan) => scan.tierId === summary.id).length;
+
+            return (
+              <button
+                key={summary.id}
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                onClick={() => {
+                  setSelectedTierId(summary.id);
+                  setSelectedZone(ALL_SCAN_ZONES);
+                }}
+                className={`rounded-xl border p-4 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-green-700/30 ${
+                  isSelected
+                    ? "border-green-700 bg-green-50 ring-2 ring-green-700/20"
+                    : "border-green-100 bg-white hover:border-green-400 hover:bg-green-50/50"
+                }`}
+              >
+                <p className="text-sm font-bold tracking-wider text-yellow-700 md:text-base">{summary.badge}</p>
+                <p className="mt-2 text-2xl font-black text-green-900 md:text-3xl">{summary.orders.toLocaleString("th-TH")} บัตร</p>
+                <p className="text-base text-slate-600 md:text-lg">สแกนแล้ว {scanCount.toLocaleString("th-TH")} ครั้ง</p>
+                {typeof summary.unregistered === "number" && summary.unregistered > 0 && (
+                  <p className="mt-1 text-sm font-semibold text-amber-700 md:text-base">
+                    ยังไม่ลงทะเบียน {summary.unregistered.toLocaleString("th-TH")} ใบ
+                  </p>
+                )}
+                <p className="mt-2 text-sm font-semibold text-green-800 md:text-base">ดูโซนของแพ็กเกจนี้</p>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {selectedTier && (
         <section className="rounded-xl border bg-white p-5 shadow-sm" role="tabpanel">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-2xl font-bold text-green-900 md:text-3xl">ประวัติการใช้งานบัตรรายปี · {selectedTier.badge}</h2>
-              <p className="mt-1 text-base text-slate-600 md:text-lg">ลบรายการเพื่อทดสอบได้ · ระบบคืนสิทธิ์เฉพาะรายการบอลลีก ส่วนบอลถ้วยไม่เปลี่ยนโควตา</p>
+              <p className="mt-1 text-base font-medium text-green-800 md:text-lg">{selectedMatch?.label ?? "ยังไม่ได้เลือกแมตช์"}</p>
+              <p className="text-base text-slate-600 md:text-lg">เลือกโซนเพื่อกรองรายการ · การลบทดสอบคืนสิทธิ์เฉพาะบอลลีก ส่วนบอลถ้วยไม่เปลี่ยนโควตา</p>
             </div>
-            <DeleteAllSeasonPassScansButton
-              tierId={selectedTier.id}
-              tierBadge={selectedTier.badge}
-              onDeleted={() => {
-                setHistory((current) => current.filter((scan) => scan.tierId !== selectedTier.id));
-                if (latest?.tierId === selectedTier.id) setLatest(null);
-              }}
-            />
+            <div className="flex flex-col items-end gap-2">
+              <span className="rounded-full bg-green-100 px-3 py-1.5 text-base font-semibold text-green-800 md:text-lg">
+                สแกนแล้ว {selectedHistory.length.toLocaleString("th-TH")} ครั้ง
+              </span>
+              <DeleteAllSeasonPassScansButton
+                tierId={selectedTier.id}
+                tierBadge={selectedTier.badge}
+                onDeleted={() => {
+                  setHistory((current) => current.filter((scan) => scan.tierId !== selectedTier.id));
+                  if (latest?.tierId === selectedTier.id) setLatest(null);
+                }}
+              />
+            </div>
           </div>
+
+          <h3 className="mt-4 text-lg font-bold text-green-900 md:text-xl">บัตรที่สแกนแล้วแยกตามโซน</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" role="tablist" aria-label="โซนบัตรรายปี">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedZone === ALL_SCAN_ZONES}
+              onClick={() => setSelectedZone(ALL_SCAN_ZONES)}
+              className={`rounded-xl border p-4 text-left shadow-sm transition hover:border-green-400 hover:bg-green-50/50 focus:outline-none focus:ring-2 focus:ring-green-700/30 ${
+                selectedZone === ALL_SCAN_ZONES ? "border-green-700 bg-green-50 ring-2 ring-green-700/20" : "border-green-100 bg-white"
+              }`}
+            >
+              <p className="font-bold text-green-900">ทุกโซน</p>
+              <p className="mt-2 text-2xl font-black text-green-900">{selectedTierHistory.length.toLocaleString("th-TH")} <span className="text-sm font-medium">ครั้ง</span></p>
+            </button>
+            {zoneSummaries.map((summary) => (
+              <button
+                key={summary.zone}
+                type="button"
+                role="tab"
+                aria-selected={selectedZone === summary.zone}
+                onClick={() => setSelectedZone(summary.zone)}
+                className={`rounded-xl border p-4 text-left shadow-sm transition hover:border-green-400 hover:bg-green-50/50 focus:outline-none focus:ring-2 focus:ring-green-700/30 ${
+                  selectedZone === summary.zone ? "border-green-700 bg-green-50 ring-2 ring-green-700/20" : "border-green-100 bg-white"
+                }`}
+              >
+                <p className="font-bold text-green-900">{zoneLabel(summary.zone)}</p>
+                <p className="mt-2 text-2xl font-black text-green-900">{summary.scans.toLocaleString("th-TH")} <span className="text-sm font-medium">ครั้ง</span></p>
+              </button>
+            ))}
+          </div>
+
           <div className="mt-4 overflow-x-auto rounded-lg border">
-            <table className="w-full min-w-[800px] text-base md:text-lg">
+            <table className="w-full min-w-[950px] text-base md:text-lg">
               <thead className="border-b bg-slate-50 text-left text-sm uppercase md:text-base">
-                <tr><th className="px-3 py-2">เวลาสแกน</th><th className="px-3 py-2">รหัสบัตร</th><th className="px-3 py-2">ผู้ซื้อ</th><th className="px-3 py-2">แมตช์</th><th className="px-3 py-2 text-right">ทดสอบ</th></tr>
+                <tr><th className="px-3 py-2">เวลาสแกน</th><th className="px-3 py-2">รหัสบัตร</th><th className="px-3 py-2">ผู้ซื้อ</th><th className="px-3 py-2">โซน</th><th className="px-3 py-2">แมตช์</th><th className="px-3 py-2 text-right">ทดสอบ</th></tr>
               </thead>
               <tbody>
                 {selectedHistory.map((scan) => (
@@ -344,13 +426,14 @@ export default function SeasonPassScanner({
                     <td className="px-3 py-2 text-slate-600">{new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(scan.scannedAt))}</td>
                     <td className="px-3 py-2 font-mono text-sm md:text-base">{scan.passCode}</td>
                     <td className="px-3 py-2">{scan.customerName}</td>
+                    <td className="px-3 py-2 font-semibold">{zoneLabel(scanZoneKey(scan.seatZone))}</td>
                     <td className="px-3 py-2">
                       <span className="flex items-start gap-2"><CompetitionBadge type={scan.competitionType} /><span>{scan.matchLabel}{scan.competitionDetail ? <span className="block text-sm text-slate-500">{scan.competitionDetail}</span> : null}</span></span>
                     </td>
                     <td className="px-3 py-2 text-right"><DeleteSeasonPassScanButton scanId={scan.id} onDeleted={() => setHistory((current) => current.filter((item) => item.id !== scan.id))} /></td>
                   </tr>
                 ))}
-                {selectedHistory.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-slate-500">ยังไม่มีประวัติการสแกนของแพ็กเกจนี้</td></tr>}
+                {selectedHistory.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-slate-500">ยังไม่มีประวัติการสแกนของแพ็กเกจและโซนที่เลือกในแมตช์นี้</td></tr>}
               </tbody>
             </table>
           </div>

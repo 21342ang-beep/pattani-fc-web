@@ -9,10 +9,13 @@ import SeasonPassScanner from "./SeasonPassScanner";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "สแกนบัตรรายปี — Admin" };
 
-export default async function SeasonPassCheckPage() {
+export default async function SeasonPassCheckPage(props: {
+  searchParams: Promise<{ match?: string }>;
+}) {
   await verifyPermission("SEASON_PASSES");
+  const { match: rawMatchId } = await props.searchParams;
 
-  const [matches, orders, activeBarcodes, scans] = await Promise.all([
+  const [matches, orders, activeBarcodes] = await Promise.all([
     prisma.match.findMany({
       where: { seasonPassEligible: true },
       orderBy: { kickoffAt: "asc" },
@@ -35,30 +38,33 @@ export default async function SeasonPassCheckPage() {
       where: { isGenerated: true },
       select: { tierId: true, orderId: true },
     }),
-    prisma.seasonPassScan.findMany({
+  ]);
+
+  const eligibleMatches = matches.filter(isSeasonPassEligibleMatch);
+  const selectedMatch = eligibleMatches.find((match) => match.id === rawMatchId) ?? eligibleMatches[0];
+  const scans = selectedMatch
+    ? await prisma.seasonPassScan.findMany({
+      where: { matchId: selectedMatch.id },
       orderBy: { scannedAt: "desc" },
-      take: 100,
       select: {
         id: true,
         scannedAt: true,
-        match: {
+        barcode: {
           select: {
-            homeTeam: true,
-            awayTeam: true,
-            competitionType: true,
-            competitionName: true,
-            competitionRound: true,
+            barcode: true,
+            tierId: true,
+            order: { select: { passCode: true, customerName: true, seatZone: true } },
           },
         },
-        barcode: { select: { barcode: true, tierId: true, order: { select: { passCode: true, customerName: true } } } },
       },
-    }),
-  ]);
+    })
+    : [];
 
   const tiers = SEASON_TIERS;
   const summaries = tiers.map((tier) => ({
     id: tier.id,
     badge: tier.badge,
+    zones: [...tier.allowedSeatZones],
     orders: tier.id === "vvip-elite"
       ? orders.filter((order) => order.tierId === tier.id && order.status === "CONFIRMED").length
       : orders.filter((order) => order.tierId === tier.id).length,
@@ -87,25 +93,27 @@ export default async function SeasonPassCheckPage() {
       </header>
 
       <SeasonPassScanner
-        matches={matches
-          .filter(isSeasonPassEligibleMatch)
-          .map((match) => ({
+        matches={eligibleMatches.map((match) => ({
             id: match.id,
             label: `${match.homeTeam} vs ${match.awayTeam}${match.kickoffAt ? ` · ${formatDateTime(match.kickoffAt)}` : ""}`,
             competitionType: match.competitionType,
             competitionName: match.competitionName,
             competitionRound: match.competitionRound,
           }))}
+        initialMatchId={selectedMatch?.id ?? ""}
         summaries={summaries}
         scanHistory={scans.map((scan) => ({
           id: scan.id,
           scannedAt: scan.scannedAt.toISOString(),
           tierId: scan.barcode.tierId,
+          seatZone: scan.barcode.order?.seatZone ?? null,
           passCode: scan.barcode.order?.passCode ?? scan.barcode.barcode,
           customerName: scan.barcode.order?.customerName ?? "VVIP 4,000 · ใช้งานภายใน",
-          matchLabel: `${scan.match.homeTeam} vs ${scan.match.awayTeam}`,
-          competitionType: scan.match.competitionType,
-          competitionDetail: [scan.match.competitionName, scan.match.competitionRound].filter(Boolean).join(" · ") || null,
+          matchLabel: selectedMatch ? `${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam}` : "",
+          competitionType: selectedMatch?.competitionType ?? "LEAGUE",
+          competitionDetail: selectedMatch
+            ? [selectedMatch.competitionName, selectedMatch.competitionRound].filter(Boolean).join(" · ") || null
+            : null,
         }))}
       />
     </div>

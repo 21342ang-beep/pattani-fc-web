@@ -2,24 +2,97 @@ import Link from "next/link";
 import { verifyPermission } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDateTime } from "@/lib/format";
+import {
+  ALL_SCAN_ZONES,
+  UNASSIGNED_SCAN_ZONE,
+  buildScanZoneSummaries,
+  resolveSelectedScanZone,
+  scanZoneKey,
+  scanZoneMatches,
+} from "@/lib/scan-zone-summary";
 import CheckForm from "./CheckForm";
 import DeleteBookingGateScanButton from "./DeleteBookingGateScanButton";
 
 export const metadata = { title: "ตรวจสอบการจอง — Pattani FC Admin" };
 
+function bookingUnitPrice(booking: { quantity: number; totalAmount: number }) {
+  return booking.quantity > 0 ? booking.totalAmount / booking.quantity : null;
+}
+
+function zoneLabel(zone: string) {
+  return zone === UNASSIGNED_SCAN_ZONE ? "ไม่ระบุโซน" : `โซน ${zone}`;
+}
+
+function bookingCheckHref(matchId: string, price?: number, zone?: string) {
+  const params = new URLSearchParams({ match: matchId });
+  if (price !== undefined) params.set("price", String(price));
+  if (zone && zone !== ALL_SCAN_ZONES) params.set("zone", zone);
+  return `/admin/bookings/check?${params.toString()}`;
+}
+
 export default async function CheckBookingPage(props: {
-  searchParams: Promise<{ match?: string; price?: string }>;
+  searchParams: Promise<{ match?: string; price?: string; zone?: string }>;
 }) {
   await verifyPermission("BOOKINGS");
-  const { match: rawMatchId, price: rawPrice } = await props.searchParams;
-  const [matches, scans, bookingPrices] = await Promise.all([
+  const { match: rawMatchId, price: rawPrice, zone: rawZone } = await props.searchParams;
+  const [matches, bookingStats] = await Promise.all([
     prisma.match.findMany({
       where: { bookings: { some: {} } },
       orderBy: [{ kickoffAt: "asc" }, { createdAt: "desc" }],
       take: 100,
       select: { id: true, homeTeam: true, awayTeam: true, kickoffAt: true },
     }),
-    prisma.bookingGateScan.findMany({
+    prisma.booking.findMany({
+      where: {
+        OR: [
+          { status: "CONFIRMED" },
+          { gateScans: { some: {} } },
+        ],
+      },
+      select: {
+        id: true,
+        matchId: true,
+        status: true,
+        quantity: true,
+        totalAmount: true,
+        zone: true,
+        _count: { select: { gateScans: true } },
+      },
+    }),
+  ]);
+
+  const selectedMatchId = matches.some((match) => match.id === rawMatchId) ? rawMatchId! : matches[0]?.id;
+  const selectedMatch = matches.find((match) => match.id === selectedMatchId);
+  const selectedMatchBookings = selectedMatchId
+    ? bookingStats.filter((booking) => booking.matchId === selectedMatchId)
+    : [];
+  const priceOptions = selectedMatchId
+    ? [...new Set(selectedMatchBookings
+      .filter((booking) => booking.status === "CONFIRMED")
+      .map(bookingUnitPrice)
+      .filter((price): price is number => price !== null))].sort((a, b) => a - b)
+    : [];
+  const parsedPrice = Number(rawPrice);
+  const selectedPrice = priceOptions.includes(parsedPrice) ? parsedPrice : priceOptions[0];
+  const selectedPriceBookings = selectedPrice === undefined
+    ? selectedMatchBookings.filter((booking) => booking._count.gateScans > 0)
+    : selectedMatchBookings.filter((booking) => bookingUnitPrice(booking) === selectedPrice);
+  const zoneSummaries = buildScanZoneSummaries(
+    selectedPriceBookings
+      .filter((booking) => booking.status === "CONFIRMED" || booking._count.gateScans > 0)
+      .map((booking) => ({
+        zone: booking.zone,
+        scans: booking._count.gateScans,
+        total: booking.status === "CONFIRMED" ? booking.quantity : 0,
+      })),
+  );
+  const selectedZone = resolveSelectedScanZone(rawZone, zoneSummaries.map((summary) => summary.zone));
+  const displayedBookings = selectedPriceBookings.filter((booking) => scanZoneMatches(booking.zone, selectedZone));
+  const displayedScanCount = displayedBookings.reduce((sum, booking) => sum + booking._count.gateScans, 0);
+  const displayedBookingIds = displayedBookings.map((booking) => booking.id);
+  const displayedScans = displayedBookingIds.length > 0
+    ? await prisma.bookingGateScan.findMany({
+      where: { bookingId: { in: displayedBookingIds } },
       orderBy: { scannedAt: "desc" },
       take: 100,
       select: {
@@ -30,32 +103,14 @@ export default async function CheckBookingPage(props: {
           select: {
             bookingCode: true,
             customerName: true,
-            quantity: true,
-            totalAmount: true,
-            match: { select: { id: true, homeTeam: true, awayTeam: true } },
+            zone: true,
           },
         },
       },
-    }),
-    prisma.booking.findMany({
-      where: { status: "CONFIRMED" },
-      select: { matchId: true, quantity: true, totalAmount: true },
-    }),
-  ]);
-
-  const selectedMatchId = matches.some((match) => match.id === rawMatchId) ? rawMatchId! : matches[0]?.id;
-  const selectedMatch = matches.find((match) => match.id === selectedMatchId);
-  const priceOptions = selectedMatchId
-    ? [...new Set(bookingPrices
-      .filter((booking) => booking.matchId === selectedMatchId && booking.quantity > 0)
-      .map((booking) => booking.totalAmount / booking.quantity))].sort((a, b) => a - b)
+    })
     : [];
-  const parsedPrice = Number(rawPrice);
-  const selectedPrice = priceOptions.includes(parsedPrice) ? parsedPrice : priceOptions[0];
-  const matchScans = selectedMatchId ? scans.filter((scan) => scan.booking.match.id === selectedMatchId) : [];
-  const displayedScans = selectedPrice === undefined
-    ? matchScans
-    : matchScans.filter((scan) => scan.booking.quantity > 0 && scan.booking.totalAmount / scan.booking.quantity === selectedPrice);
+  const allZoneScans = zoneSummaries.reduce((sum, summary) => sum + summary.scans, 0);
+  const allZoneTickets = zoneSummaries.reduce((sum, summary) => sum + summary.total, 0);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
@@ -76,12 +131,14 @@ export default async function CheckBookingPage(props: {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="tablist" aria-label="แมตช์การแข่งขัน">
             {matches.map((match) => {
-              const scanCount = scans.filter((scan) => scan.booking.match.id === match.id).length;
+              const scanCount = bookingStats
+                .filter((booking) => booking.matchId === match.id)
+                .reduce((sum, booking) => sum + booking._count.gateScans, 0);
               const isSelected = match.id === selectedMatchId;
               return (
                 <Link
                   key={match.id}
-                  href={`/admin/bookings/check?match=${match.id}`}
+                  href={bookingCheckHref(match.id)}
                   role="tab"
                   aria-selected={isSelected}
                   className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-700/30 ${
@@ -104,22 +161,22 @@ export default async function CheckBookingPage(props: {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-2xl font-bold text-green-900 md:text-3xl">ประวัติการสแกน · {selectedMatch.homeTeam} vs {selectedMatch.awayTeam}</h2>
-              <p className="text-base text-slate-600 md:text-lg">เลือกประเภทราคาบัตรเพื่อดูและตรวจสอบรายการได้สะดวกขึ้น</p>
+              <p className="text-base text-slate-600 md:text-lg">เลือกประเภทราคาบัตรและโซนเพื่อดูรายการสแกนจริงแยกตามจุดเข้า</p>
             </div>
-            <span className="rounded-full bg-green-100 px-3 py-1.5 text-base font-semibold text-green-800 md:text-lg">สแกนแล้ว {displayedScans.length.toLocaleString("th-TH")} ครั้ง</span>
+            <span className="rounded-full bg-green-100 px-3 py-1.5 text-base font-semibold text-green-800 md:text-lg">สแกนแล้ว {displayedScanCount.toLocaleString("th-TH")} ครั้ง</span>
           </div>
 
           {priceOptions.length > 0 && (
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="tablist" aria-label="ราคาบัตร">
               {priceOptions.map((price) => {
                 const isSelected = price === selectedPrice;
-                const ticketCount = bookingPrices
-                  .filter((booking) => booking.matchId === selectedMatchId && booking.quantity > 0 && booking.totalAmount / booking.quantity === price)
+                const ticketCount = selectedMatchBookings
+                  .filter((booking) => booking.status === "CONFIRMED" && bookingUnitPrice(booking) === price)
                   .reduce((sum, booking) => sum + booking.quantity, 0);
                 return (
                   <Link
                     key={price}
-                    href={`/admin/bookings/check?match=${selectedMatchId}&price=${price}`}
+                    href={bookingCheckHref(selectedMatch.id, price)}
                     role="tab"
                     aria-selected={isSelected}
                     className={`rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-700/30 ${
@@ -136,10 +193,45 @@ export default async function CheckBookingPage(props: {
             </div>
           )}
 
+          {selectedPrice !== undefined && zoneSummaries.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-lg font-bold text-green-900 md:text-xl">บัตรที่สแกนแล้วแยกตามโซน</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" role="tablist" aria-label="โซนที่นั่ง">
+                <Link
+                  href={bookingCheckHref(selectedMatch.id, selectedPrice)}
+                  role="tab"
+                  aria-selected={selectedZone === ALL_SCAN_ZONES}
+                  className={`rounded-xl border p-4 shadow-sm transition hover:border-green-400 hover:bg-green-50/50 focus:outline-none focus:ring-2 focus:ring-green-700/30 ${
+                    selectedZone === ALL_SCAN_ZONES ? "border-green-700 bg-green-50 ring-2 ring-green-700/20" : "border-green-100 bg-white"
+                  }`}
+                >
+                  <p className="font-bold text-green-900">ทุกโซน</p>
+                  <p className="mt-2 text-2xl font-black text-green-900">{allZoneScans.toLocaleString("th-TH")} <span className="text-sm font-medium">ครั้ง</span></p>
+                  <p className="text-sm text-slate-600">บัตรยืนยัน {allZoneTickets.toLocaleString("th-TH")} ใบ</p>
+                </Link>
+                {zoneSummaries.map((summary) => (
+                  <Link
+                    key={summary.zone}
+                    href={bookingCheckHref(selectedMatch.id, selectedPrice, summary.zone)}
+                    role="tab"
+                    aria-selected={selectedZone === summary.zone}
+                    className={`rounded-xl border p-4 shadow-sm transition hover:border-green-400 hover:bg-green-50/50 focus:outline-none focus:ring-2 focus:ring-green-700/30 ${
+                      selectedZone === summary.zone ? "border-green-700 bg-green-50 ring-2 ring-green-700/20" : "border-green-100 bg-white"
+                    }`}
+                  >
+                    <p className="font-bold text-green-900">{zoneLabel(summary.zone)}</p>
+                    <p className="mt-2 text-2xl font-black text-green-900">{summary.scans.toLocaleString("th-TH")} <span className="text-sm font-medium">ครั้ง</span></p>
+                    <p className="text-sm text-slate-600">บัตรยืนยัน {summary.total.toLocaleString("th-TH")} ใบ</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 overflow-x-auto rounded-lg border">
-            <table className="w-full min-w-[900px] text-base md:text-lg">
+            <table className="w-full min-w-[1000px] text-base md:text-lg">
               <thead className="border-b bg-slate-50 text-left text-sm uppercase text-slate-600 md:text-base">
-                <tr><th className="px-3 py-2">เวลาสแกน</th><th className="px-3 py-2">รหัสการจอง</th><th className="px-3 py-2">ผู้จอง</th><th className="px-3 py-2">ผู้สแกน</th><th className="px-3 py-2 text-right">ทดสอบ</th></tr>
+                <tr><th className="px-3 py-2">เวลาสแกน</th><th className="px-3 py-2">รหัสการจอง</th><th className="px-3 py-2">ผู้จอง</th><th className="px-3 py-2">โซน</th><th className="px-3 py-2">ผู้สแกน</th><th className="px-3 py-2 text-right">ทดสอบ</th></tr>
               </thead>
               <tbody>
                 {displayedScans.map((scan) => (
@@ -147,14 +239,20 @@ export default async function CheckBookingPage(props: {
                     <td className="whitespace-nowrap px-3 py-2 text-slate-600">{formatDateTime(scan.scannedAt)}</td>
                     <td className="px-3 py-2 font-mono text-sm md:text-base">{scan.booking.bookingCode}</td>
                     <td className="px-3 py-2 font-medium">{scan.booking.customerName}</td>
+                    <td className="px-3 py-2 font-semibold">{zoneLabel(scanZoneKey(scan.booking.zone))}</td>
                     <td className="px-3 py-2 font-mono text-sm text-slate-500 md:text-base">{scan.scannedBy}</td>
                     <td className="px-3 py-2 text-right"><DeleteBookingGateScanButton scanId={scan.id} /></td>
                   </tr>
                 ))}
-                {displayedScans.length === 0 && <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-500">ยังไม่มีข้อมูลการสแกนของราคาบัตรนี้</td></tr>}
+                {displayedScans.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-500">ยังไม่มีข้อมูลการสแกนของราคาและโซนที่เลือก</td></tr>}
               </tbody>
             </table>
           </div>
+          {displayedScanCount > displayedScans.length && (
+            <p className="mt-2 text-sm text-slate-500 md:text-base">
+              แสดง 100 รายการล่าสุดจากทั้งหมด {displayedScanCount.toLocaleString("th-TH")} ครั้งในตัวกรองนี้
+            </p>
+          )}
         </section>
       )}
     </div>
