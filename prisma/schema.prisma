@@ -192,6 +192,7 @@ model Match {
   ticketZones        MatchTicketZone[]
   zoneLabels         MatchZoneLabel[]
   seasonPassScans    SeasonPassScan[]
+  seasonPassFinalization SeasonPassMatchFinalization?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -580,6 +581,8 @@ model SeasonPassOrder {
   offlineReceiptNo String?
   soldAt           DateTime?
   soldById         String?
+  // เวลาที่บัตรเริ่มมีสิทธิ์ใช้งานจริง ใช้คำนวณจำนวนเกมลีกที่เหลือสำหรับผู้ซื้อระหว่างฤดูกาล
+  entitlementStartedAt DateTime?
   notes            String?
   purchaseId       String?
   purchase         SeasonPassPurchase?      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
@@ -596,6 +599,7 @@ model SeasonPassOrder {
   @@index([customerId])
   @@index([purchaseId])
   @@index([salesChannel])
+  @@index([seasonLabel, status, entitlementStartedAt])
 }
 
 // ค่าจำนวนสูงสุดต่อหนึ่งคำสั่งซื้อ กำหนดผ่านหลังบ้าน
@@ -647,6 +651,7 @@ model SeasonPassBarcode {
   gateNonce         String           @unique @default(dbgenerated("gen_random_uuid()"))
   legacyGateAllowed Boolean          @default(false)
   scans             SeasonPassScan[]
+  absences          SeasonPassAbsence[]
   createdAt         DateTime         @default(now())
 
   @@index([tierId, orderId])
@@ -664,6 +669,45 @@ model SeasonPassScan {
 
   @@unique([barcodeId, matchId])
   @@index([matchId])
+}
+
+// One row marks that an eligible home league match was closed and its
+// season-pass attendance was settled. Keeping this separate from scans makes
+// a no-show auditable without falsely recording that the customer attended.
+model SeasonPassMatchFinalization {
+  matchId      String   @id
+  match        Match    @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  seasonLabel  String
+  finalizedAt  DateTime
+  finalizedBy  String
+  reversedAt   DateTime?
+  reversedBy   String?
+  missedCount  Int      @default(0)
+  postMatchCount Int    @default(0)
+  absences     SeasonPassAbsence[]
+
+  @@index([reversedAt, finalizedAt])
+}
+
+model SeasonPassAbsence {
+  barcodeId    String
+  barcode      SeasonPassBarcode          @relation(fields: [barcodeId], references: [id], onDelete: Cascade)
+  matchId      String
+  finalization SeasonPassMatchFinalization @relation(fields: [matchId], references: [matchId], onDelete: Cascade)
+  passCode     String
+  customerName String
+  tierId       String
+  seatZone     String
+  usesBefore   Int
+  usesAfter    Int
+  deductedAt   DateTime
+  deductedBy   String
+  restoredAt   DateTime?
+  restoredBy   String?
+
+  @@id([barcodeId, matchId])
+  @@index([matchId, restoredAt])
+  @@index([tierId, restoredAt, deductedAt])
 }
 
 enum SeasonPassOrderStatus {

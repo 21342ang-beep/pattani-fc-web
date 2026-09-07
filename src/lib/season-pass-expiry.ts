@@ -57,6 +57,22 @@ export function activeSeasonPassOrderWhere(now = new Date()): Prisma.SeasonPassO
   };
 }
 
+/**
+ * Public inventory is already reduced by SeasonPassZoneQuota.sponsorReserved.
+ * INTERNAL orders represent those reserved sponsor/club seats, so counting
+ * them again would incorrectly reduce the number of seats available for sale.
+ */
+export function activePublicSeasonPassOrderWhere(
+  now = new Date(),
+): Prisma.SeasonPassOrderWhereInput {
+  return {
+    AND: [
+      activeSeasonPassOrderWhere(now),
+      { salesChannel: { not: "INTERNAL" } },
+    ],
+  };
+}
+
 export async function expirePendingSeasonPassPurchases(input: {
   purchaseCode?: string;
   passCode?: string;

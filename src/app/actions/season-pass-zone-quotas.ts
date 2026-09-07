@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { SEASON_LABEL, getSeasonTier } from "@/lib/season-pass-tiers";
-import { activeSeasonPassOrderWhere, expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
+import {
+  activeSeasonPassOrderWhere,
+  expirePendingSeasonPassPurchases,
+} from "@/lib/season-pass-expiry";
 
 export type SeasonPassZoneQuotaState =
   | { success: string; error?: never }
@@ -64,8 +67,8 @@ export async function updateSeasonPassZoneQuotas(
         const lockKey = `${SEASON_LABEL}:${tierId}:${row.seatZone}`;
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))::text AS lock_result`;
       }
-      const soldGroups = await tx.seasonPassOrder.groupBy({
-        by: ["seatZone"],
+      const occupiedGroups = await tx.seasonPassOrder.groupBy({
+        by: ["seatZone", "salesChannel"],
         where: {
           seasonLabel: SEASON_LABEL,
           tierId,
@@ -73,12 +76,35 @@ export async function updateSeasonPassZoneQuotas(
         },
         _count: { _all: true },
       });
-      const soldByZone = new Map(soldGroups.map((row) => [row.seatZone, row._count._all]));
+      const soldByZone = new Map(
+        tier.allowedSeatZones.map((seatZone) => [
+          seatZone,
+          occupiedGroups
+            .filter((row) => row.seatZone === seatZone && row.salesChannel !== "INTERNAL")
+            .reduce((sum, row) => sum + row._count._all, 0),
+        ]),
+      );
+      const sponsorByZone = new Map(
+        tier.allowedSeatZones.map((seatZone) => [
+          seatZone,
+          occupiedGroups
+            .filter((row) => row.seatZone === seatZone && row.salesChannel === "INTERNAL")
+            .reduce((sum, row) => sum + row._count._all, 0),
+        ]),
+      );
       const belowSold = rows.find(
         (row) => row.totalSeats! - row.sponsorReserved! < (soldByZone.get(row.seatZone) ?? 0),
       );
       if (belowSold) {
         throw new Error(`BELOW_SOLD:${belowSold.seatZone}:${soldByZone.get(belowSold.seatZone) ?? 0}`);
+      }
+      const belowSponsor = rows.find(
+        (row) => row.sponsorReserved! < (sponsorByZone.get(row.seatZone) ?? 0),
+      );
+      if (belowSponsor) {
+        throw new Error(
+          `BELOW_SPONSOR:${belowSponsor.seatZone}:${sponsorByZone.get(belowSponsor.seatZone) ?? 0}`,
+        );
       }
 
       for (const row of rows) {
@@ -108,6 +134,12 @@ export async function updateSeasonPassZoneQuotas(
     if (error instanceof Error && error.message.startsWith("BELOW_SOLD:")) {
       const [, seatZone, sold = "0"] = error.message.split(":");
       return { error: `โซน ${seatZone} มีผู้จองแล้ว ${Number(sold).toLocaleString("th-TH")} ที่ จึงลดโควตาขายต่ำกว่านี้ไม่ได้` };
+    }
+    if (error instanceof Error && error.message.startsWith("BELOW_SPONSOR:")) {
+      const [, seatZone, reserved = "0"] = error.message.split(":");
+      return {
+        error: `โซน ${seatZone} มีบัตรสปอนเซอร์ลงทะเบียนแล้ว ${Number(reserved).toLocaleString("th-TH")} ใบ จึงลดที่นั่งสปอนเซอร์ต่ำกว่านี้ไม่ได้`,
+      };
     }
     console.error("Failed to update season-pass zone quotas", error);
     return { error: "บันทึกโควตาไม่สำเร็จ กรุณาลองใหม่" };

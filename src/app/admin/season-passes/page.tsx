@@ -149,7 +149,9 @@ export default async function AdminSeasonPassesPage(props: {
       </div>
 
       <SeasonPassSalesCalendar
-        orders={orders.filter((order) => order.status === "CONFIRMED")}
+        orders={orders.filter(
+          (order) => order.status === "CONFIRMED" && order.salesChannel !== "INTERNAL",
+        )}
         rawMonth={rawMonth}
         rawDate={rawDate}
         selectedTier={selectedTier}
@@ -184,7 +186,9 @@ export default async function AdminSeasonPassesPage(props: {
             const remainingByZone = tier.allowedSeatZones.map((seatZone, index) => {
               const configuredCapacity = ranges.find((range) => range.seatZone === seatZone)?.publicSeatCount;
               const capacity = configuredCapacity ?? baseFallbackCapacity + (index < fallbackRemainder ? 1 : 0);
-              const occupied = activeOrders.filter((order) => order.seatZone === seatZone).length;
+              const occupied = activeOrders.filter(
+                (order) => order.seatZone === seatZone && order.salesChannel !== "INTERNAL",
+              ).length;
               return { seatZone, remaining: Math.max(0, capacity - occupied) };
             });
             return (
@@ -288,6 +292,7 @@ export default async function AdminSeasonPassesPage(props: {
               displayedOrders.map((o) => {
                 const tier = tierById.get(o.tierId as SeasonTierId);
                 const isMember = !!o.customerId;
+                const isSponsor = o.salesChannel === "INTERNAL";
                 const total = o.priceBaht + o.shippingFeeBaht;
                 return (
                   <tr key={o.id} className="border-b last:border-0 align-top">
@@ -331,12 +336,14 @@ export default async function AdminSeasonPassesPage(props: {
                       <div className="mt-1">
                         <span
                           className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-sm font-medium ${
-                            isMember
+                            isSponsor
+                              ? "bg-violet-100 text-violet-800"
+                              : isMember
                               ? "bg-emerald-100 text-emerald-800"
                               : "bg-slate-100 text-slate-700"
                           }`}
                         >
-                          {isMember ? "สมาชิก" : "ลูกค้าทั่วไป"}
+                          {isSponsor ? "สปอนเซอร์" : isMember ? "สมาชิก" : "ลูกค้าทั่วไป"}
                         </span>
                       </div>
                     </td>

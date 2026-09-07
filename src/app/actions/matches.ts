@@ -7,6 +7,11 @@ import { matchCreateSchema, matchUpdateSchema, matchZoneLabelsSchema } from "@/l
 import { getAdminUser, hasPermission, verifyPermission } from "@/lib/dal";
 import { saveTeamLogo, deleteTeamLogo, UploadError } from "@/lib/upload";
 import { STADIUM_ZONE_CODES } from "@/lib/stadium-zones";
+import {
+  hasActiveSeasonPassFinalization,
+  lockSeasonPassMatch,
+  removeSeasonPassMatchFinalization,
+} from "@/lib/season-pass-match-finalization";
 
 export type MatchFormState = {
   error?: string;
@@ -279,21 +284,40 @@ export async function updateMatch(
   }
 
   try {
-    await prisma.match.update({
-      where: { id: matchId },
-      data: {
-        ...parsed.data,
-        zoneLabels: {
-          upsert: parsedLabels.data.map(({ code, label }) => ({
-            where: { matchId_code: { matchId, code } },
-            create: { code, label },
-            update: { label },
-          })),
+    await prisma.$transaction(async (tx) => {
+      const previous = await lockSeasonPassMatch(tx, matchId);
+      if (!previous) throw new Error("MATCH_NOT_FOUND");
+      if (await hasActiveSeasonPassFinalization(tx, matchId)) {
+        const nextKickoffAt = parsed.data.kickoffAt;
+        const kickoffChanged = (nextKickoffAt?.getTime() ?? null) !== (previous.kickoffAt?.getTime() ?? null);
+        const settlementIdentityChanged =
+          parsed.data.homeTeam !== previous.homeTeam ||
+          parsed.data.awayTeam !== previous.awayTeam ||
+          parsed.data.status !== previous.status ||
+          parsed.data.competitionType !== previous.competitionType ||
+          parsed.data.seasonPassEligible !== previous.seasonPassEligible ||
+          kickoffChanged;
+        if (settlementIdentityChanged) throw new Error("MATCH_SETTLEMENT_ACTIVE");
+      }
+      await tx.match.update({
+        where: { id: matchId },
+        data: {
+          ...parsed.data,
+          zoneLabels: {
+            upsert: parsedLabels.data.map(({ code, label }) => ({
+              where: { matchId_code: { matchId, code } },
+              create: { code, label },
+              update: { label },
+            })),
+          },
         },
-      },
+      });
     });
   } catch (e) {
     await rollbackUploads(parsedForm.rollback);
+    if (e instanceof Error && e.message === "MATCH_SETTLEMENT_ACTIVE") {
+      return { error: "แมตช์นี้ตัดสิทธิ์บัตรรายปีแล้ว กรุณายกเลิกการตัดสิทธิ์ก่อนแก้ข้อมูลสำคัญของแมตช์" };
+    }
     throw e;
   }
 
@@ -310,28 +334,36 @@ export async function updateMatch(
 }
 
 export async function deleteMatch(matchId: string): Promise<{ ok: true } | { error: string }> {
-  await verifyPermission("MATCHES");
+  const user = await verifyPermission("MATCHES");
   try {
-    const bookings = await prisma.booking.count({
-      where: { matchId, status: { in: ["PENDING", "CONFIRMED"] } },
+    const match = await prisma.$transaction(async (tx) => {
+      const current = await lockSeasonPassMatch(tx, matchId);
+      if (!current) throw new Error("MATCH_NOT_FOUND");
+      const bookings = await tx.booking.count({
+        where: { matchId, status: { in: ["PENDING", "CONFIRMED"] } },
+      });
+      if (bookings > 0) throw new Error("MATCH_HAS_ACTIVE_BOOKINGS");
+      const currentWithLogos = await tx.match.findUnique({
+        where: { id: matchId },
+        select: { homeTeamLogo: true, awayTeamLogo: true },
+      });
+      await removeSeasonPassMatchFinalization(tx, matchId, user.id);
+      await tx.match.delete({ where: { id: matchId } });
+      return currentWithLogos;
     });
-    if (bookings > 0) {
-      return { error: "ลบไม่ได้: มีการจองที่ยังใช้งานอยู่ ยกเลิกการจองก่อน" };
-    }
-    const m = await prisma.match.findUnique({
-      where: { id: matchId },
-      select: { homeTeamLogo: true, awayTeamLogo: true },
-    });
-    await prisma.match.delete({ where: { id: matchId } });
-    if (m?.homeTeamLogo) await deleteTeamLogo(m.homeTeamLogo);
-    if (m?.awayTeamLogo) await deleteTeamLogo(m.awayTeamLogo);
+    if (!match) return { error: "ไม่พบแมตช์" };
+    if (match.homeTeamLogo) await deleteTeamLogo(match.homeTeamLogo);
+    if (match.awayTeamLogo) await deleteTeamLogo(match.awayTeamLogo);
     revalidatePath("/admin/matches");
     revalidatePath("/admin/bookings/staff");
     revalidatePath("/");
     revalidatePath("/tickets");
     revalidateTag("matches", { expire: 0 });
     return { ok: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "MATCH_HAS_ACTIVE_BOOKINGS") {
+      return { error: "ลบไม่ได้: มีการจองที่ยังใช้งานอยู่ ยกเลิกการจองก่อน" };
+    }
     return { error: "ลบไม่สำเร็จ" };
   }
 }

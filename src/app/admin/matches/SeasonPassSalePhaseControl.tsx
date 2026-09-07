@@ -10,7 +10,13 @@ export default function SeasonPassSalePhaseControl({
   stats,
 }: {
   initialPhase: SeasonPassSalePhase;
-  stats: { total: number; staffBooked: number; onlineBooked: number; remaining: number };
+  stats: {
+    total: number;
+    staffBooked: number;
+    onlineBooked: number;
+    sponsorBooked: number;
+    remaining: number;
+  };
 }) {
   const [isOpen, setIsOpen] = useState(initialPhase === "PUBLIC_OPEN");
   const [error, setError] = useState("");
@@ -19,7 +25,7 @@ export default function SeasonPassSalePhaseControl({
   function toggle() {
     const nextOpen = !isOpen;
     const message = nextOpen
-      ? `ยืนยันเปิดจองบัตรรายปีให้ผู้ใช้ทั่วไป?\n\nทีมงานจองแล้ว ${stats.staffBooked.toLocaleString("th-TH")} ใบ\nคงเหลือประมาณ ${stats.remaining.toLocaleString("th-TH")} ใบ`
+      ? `ยืนยันเปิดจองบัตรรายปีให้ผู้ใช้ทั่วไป?\n\nทีมงานจองแล้ว ${stats.staffBooked.toLocaleString("th-TH")} ใบ\nลงทะเบียนสปอนเซอร์แล้ว ${stats.sponsorBooked.toLocaleString("th-TH")} ใบ\nคงเหลือสำหรับขายประมาณ ${stats.remaining.toLocaleString("th-TH")} ใบ`
       : "ยืนยันปิดจองบัตรรายปีสำหรับผู้ใช้ทั่วไป?\n\nทีมงานยังจองแพ็กเกจ 4,000 บาทผ่านหลังบ้านได้";
     if (!window.confirm(message)) return;
 

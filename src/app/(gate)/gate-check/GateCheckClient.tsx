@@ -316,6 +316,7 @@ export default function GateCheckClient({
             UNREGISTERED: "บัตร VVIP 4,000 นี้ยังไม่ได้ลงทะเบียนการขายออฟไลน์",
             INVALID: "รูปแบบบาร์โค้ดไม่ถูกต้อง",
             MATCH_NOT_ELIGIBLE: "แมตช์นี้ไม่ได้เปิดสิทธิ์บัตรรายปี หรือไม่ใช่เกมเหย้าของ Pattani FC",
+            MATCH_CLOSED: "แมตช์นี้ปิดการแข่งขันแล้ว ไม่สามารถบันทึกการสแกนเพิ่มได้",
           };
           const state: ScanState = { kind: "invalid", reason: reasons[result.error] };
           setScanState(state);

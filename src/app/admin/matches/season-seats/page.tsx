@@ -3,7 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { verifyPermission } from "@/lib/dal";
 import { SEASON_LABEL, SEASON_TIERS } from "@/lib/season-pass-tiers";
 import SeasonPassZoneQuotaForm from "./SeasonPassZoneQuotaForm";
-import { activeSeasonPassOrderWhere, expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
+import {
+  activePublicSeasonPassOrderWhere,
+  expirePendingSeasonPassPurchases,
+} from "@/lib/season-pass-expiry";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +20,7 @@ export default async function SeasonPassZoneQuotasPage() {
       by: ["tierId", "seatZone"],
       where: {
         seasonLabel: SEASON_LABEL,
-        ...activeSeasonPassOrderWhere(),
+        ...activePublicSeasonPassOrderWhere(),
       },
       _count: { _all: true },
     }),

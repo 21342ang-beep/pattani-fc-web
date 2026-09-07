@@ -29,6 +29,7 @@ import {
   seasonPassBarcodeIsWithinBounds,
 } from "@/lib/season-pass-zone-ranges";
 import {
+  activePublicSeasonPassOrderWhere,
   activeSeasonPassOrderWhere,
   expirePendingSeasonPassPurchases,
   newSeasonPassPaymentDeadline,
@@ -38,6 +39,7 @@ import {
   rotateSeasonPassGateCredential,
   secureSeasonPassGateAssignment,
 } from "@/lib/season-pass-gate-state";
+import { activateSeasonPassEntitlements } from "@/lib/season-pass-entitlement";
 
 function revalidateSeatAvailability() {
   revalidatePath("/season-pass");
@@ -281,7 +283,7 @@ export async function createSeasonPassOrder(
             seasonLabel: SEASON_LABEL,
             tierId: parsed.data.tierId,
             seatZone: parsed.data.seatZone,
-            ...activeSeasonPassOrderWhere(),
+            ...activePublicSeasonPassOrderWhere(),
           },
         });
         if (zoneSold + parsed.data.quantity > publicZoneLimit) {
@@ -403,6 +405,7 @@ export async function updateSeasonPassStatus(
   }
   try {
     await prisma.$transaction(async (tx) => {
+      const entitlementStartedAt = new Date();
       const preliminary = await tx.seasonPassOrder.findUnique({
         where: { id: orderId },
         select: { purchaseId: true },
@@ -456,7 +459,7 @@ export async function updateSeasonPassStatus(
       if (
         status === "CONFIRMED" &&
         order.purchase?.paymentExpiresAt &&
-        order.purchase.paymentExpiresAt <= new Date()
+        order.purchase.paymentExpiresAt <= entitlementStartedAt
       ) {
         throw new Error("PAYMENT_EXPIRED");
       }
@@ -504,7 +507,7 @@ export async function updateSeasonPassStatus(
                 seasonLabel: order.seasonLabel,
                 tierId: order.tierId,
                 seatZone: order.seatZone,
-                ...activeSeasonPassOrderWhere(),
+                ...activePublicSeasonPassOrderWhere(),
               },
             });
             if (active + newlyActiveCount > limit) throw new Error("ZONE_SOLD_OUT");
@@ -549,6 +552,13 @@ export async function updateSeasonPassStatus(
           data: { status },
         });
         if (changed.count !== 1) throw new Error("STATE_CHANGED");
+      }
+      if (status === "CONFIRMED") {
+        await activateSeasonPassEntitlements(
+          tx,
+          groupedOrders.map((item) => item.id),
+          entitlementStartedAt,
+        );
       }
     });
     revalidatePath("/admin/season-passes");
@@ -745,7 +755,7 @@ export async function updateSeasonPassOrder(
               seasonLabel: order.seasonLabel,
               tierId: tier.id,
               seatZone: input.seatZone,
-              ...activeSeasonPassOrderWhere(),
+              ...activePublicSeasonPassOrderWhere(),
             },
           });
           if (active >= limit) throw new Error("ZONE_SOLD_OUT");
@@ -810,6 +820,7 @@ export async function updateSeasonPassOrder(
             isGenerated: true,
             orderId: null,
             scans: { none: {} },
+            absences: { none: {} },
           },
           select: { id: true, barcode: true },
         });
@@ -823,7 +834,7 @@ export async function updateSeasonPassOrder(
           await Promise.all([
             tx.seasonPassBarcode.findUnique({
               where: { id: order.barcode.id },
-              select: { orderId: true },
+              select: { orderId: true, usesRemaining: true },
             }),
             tx.seasonPassBarcode.findFirst({
               where: {
@@ -834,6 +845,7 @@ export async function updateSeasonPassOrder(
                 isGenerated: true,
                 orderId: null,
                 scans: { none: {} },
+                absences: { none: {} },
               },
               select: { id: true, barcode: true },
             }),
@@ -841,11 +853,17 @@ export async function updateSeasonPassOrder(
               where: { barcodeId: order.barcode.id },
             }),
           ]);
-        if (currentSourceBarcode?.orderId !== order.id) {
+        if (!currentSourceBarcode || currentSourceBarcode.orderId !== order.id) {
           throw new Error("STATE_CHANGED");
         }
         if (scanCount > 0) throw new Error("BARCODE_HAS_SCANS");
         if (!currentAvailableBarcode) throw new Error("BARCODE_UNAVAILABLE");
+
+        await tx.$executeRaw(Prisma.sql`
+          UPDATE "SeasonPassAbsence"
+          SET "barcodeId" = ${currentAvailableBarcode.id}
+          WHERE "barcodeId" = ${order.barcode.id}
+        `);
 
         await tx.seasonPassBarcode.update({
           where: { id: order.barcode.id },
@@ -861,7 +879,7 @@ export async function updateSeasonPassOrder(
           data: {
             orderId: order.id,
             assignedAt: new Date(),
-            usesRemaining: SEASON_MATCHES,
+            usesRemaining: currentSourceBarcode.usesRemaining,
             ...secureSeasonPassGateAssignment(currentAvailableBarcode.barcode),
           },
         });
@@ -911,6 +929,7 @@ export async function updateSeasonPassOrder(
             isGenerated: true,
             orderId: null,
             scans: { none: {} },
+            absences: { none: {} },
           },
           select: { id: true, barcode: true },
         });
@@ -925,7 +944,7 @@ export async function updateSeasonPassOrder(
             order.barcode
               ? tx.seasonPassBarcode.findUnique({
                   where: { id: order.barcode.id },
-                  select: { orderId: true },
+                  select: { orderId: true, usesRemaining: true },
                 })
               : Promise.resolve(null),
             tx.seasonPassBarcode.findFirst({
@@ -937,6 +956,7 @@ export async function updateSeasonPassOrder(
                 isGenerated: true,
                 orderId: null,
                 scans: { none: {} },
+                absences: { none: {} },
               },
               select: { id: true, barcode: true },
             }),
@@ -946,12 +966,17 @@ export async function updateSeasonPassOrder(
                 })
               : Promise.resolve(0),
           ]);
-        if (order.barcode && currentSourceBarcode?.orderId !== order.id) {
+        if (order.barcode && (!currentSourceBarcode || currentSourceBarcode.orderId !== order.id)) {
           throw new Error("STATE_CHANGED");
         }
         if (scanCount > 0) throw new Error("BARCODE_HAS_SCANS");
         if (!currentAvailableBarcode) throw new Error("BARCODE_UNAVAILABLE");
         if (order.barcode) {
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE "SeasonPassAbsence"
+            SET "barcodeId" = ${currentAvailableBarcode.id}
+            WHERE "barcodeId" = ${order.barcode.id}
+          `);
           await tx.seasonPassBarcode.update({
             where: { id: order.barcode.id },
             data: {
@@ -967,7 +992,7 @@ export async function updateSeasonPassOrder(
           data: {
             orderId: order.id,
             assignedAt: new Date(),
-            usesRemaining: SEASON_MATCHES,
+            usesRemaining: currentSourceBarcode?.usesRemaining ?? SEASON_MATCHES,
             ...secureSeasonPassGateAssignment(currentAvailableBarcode.barcode),
           },
         });
@@ -1002,6 +1027,7 @@ export async function updateSeasonPassOrder(
               lte: destinationBarcodeBounds.upperBound,
             },
             scans: { none: {} },
+            absences: { none: {} },
           },
           orderBy: { barcode: "asc" },
           select: { id: true, barcode: true },
@@ -1021,6 +1047,9 @@ export async function updateSeasonPassOrder(
       }
 
       const detailsComplete = Boolean(input.seatZone && assignedBarcode);
+      const becomesConfirmed =
+        order.salesChannel === "OFFLINE" && order.status === "PENDING" && detailsComplete;
+      const entitlementStartedAt = new Date();
       const updatedOrder = await tx.seasonPassOrder.update({
         where: { id: order.id },
         // Package transfers are data-only. Keep the original order price,
@@ -1048,12 +1077,15 @@ export async function updateSeasonPassOrder(
           ...(assignedBarcode && assignedBarcode.barcode !== order.passCode
             ? { passCode: assignedBarcode.barcode }
             : {}),
-          ...(order.salesChannel === "OFFLINE" && order.status === "PENDING" && detailsComplete
+          ...(becomesConfirmed
             ? { status: "CONFIRMED" }
             : {}),
         },
-        select: { passCode: true },
+        select: { id: true, passCode: true },
       });
+      if (becomesConfirmed) {
+        await activateSeasonPassEntitlements(tx, [updatedOrder.id], entitlementStartedAt);
+      }
       return { oldPassCode: order.passCode, newPassCode: updatedOrder.passCode };
     });
     revalidatePath("/admin/season-passes");

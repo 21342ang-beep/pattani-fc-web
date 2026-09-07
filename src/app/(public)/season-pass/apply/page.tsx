@@ -5,9 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { getOptionalCustomer } from "@/lib/customer-dal";
 import { SEASON_LABEL, getSeasonTier } from "@/lib/season-pass-tiers";
 import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
+import { getCurrentSeasonPassInitialUses } from "@/lib/season-pass-entitlement";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import {
-  activeSeasonPassOrderWhere,
+  activePublicSeasonPassOrderWhere,
   expirePendingSeasonPassPurchases,
 } from "@/lib/season-pass-expiry";
 import SeasonPassWizard, {
@@ -36,7 +37,7 @@ export default async function SeasonPassApplyPage(props: {
     redirect(`/member/login?returnTo=${encodeURIComponent(`/tickets/season/apply?tier=${tier.id}`)}`);
   }
   await expirePendingSeasonPassPurchases();
-  const [customer, quotas, soldGroups] = await Promise.all([
+  const [customer, quotas, soldGroups, initialUses] = await Promise.all([
     prisma.customer.findUnique({
       where: { id: identity.id },
       select: {
@@ -57,10 +58,11 @@ export default async function SeasonPassApplyPage(props: {
       where: {
         seasonLabel: SEASON_LABEL,
         tierId: tier.id,
-        ...activeSeasonPassOrderWhere(),
+        ...activePublicSeasonPassOrderWhere(),
       },
       _count: { _all: true },
     }),
+    prisma.$transaction((tx) => getCurrentSeasonPassInitialUses(tx)),
   ]);
   const ranges = calculateSeasonPassZoneRanges(tier.allowedSeatZones, quotas);
   const zoneOptions: SeasonPassZoneOption[] = tier.allowedSeatZones.map((seatZone) => {
@@ -114,6 +116,7 @@ export default async function SeasonPassApplyPage(props: {
         shippingProvinces={shippingProvinces}
         zoneOptions={zoneOptions}
         maxQuantity={purchaseSettings.seasonPassMaxQuantity}
+        initialUses={initialUses}
       />
     </div>
   );

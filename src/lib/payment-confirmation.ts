@@ -10,6 +10,7 @@ import {
 import { isStandaloneSeasonOrder } from "@/lib/season-payment-invariants";
 import { activeBookingStatusWhere } from "@/lib/booking-expiry";
 import { bookingCanAutomaticallyConfirm } from "@/lib/payment-state";
+import { activateSeasonPassEntitlements } from "@/lib/season-pass-entitlement";
 
 export type StoredPaymentTarget = {
   bookingId: string | null;
@@ -287,6 +288,11 @@ async function confirmSeasonPassPurchasePayment(
   if (updatedOrders.count !== purchase.orders.length) {
     throw new Error("SEASON_PURCHASE_ORDERS_CHANGED");
   }
+  await activateSeasonPassEntitlements(
+    tx,
+    purchase.orders.map((order) => order.id),
+    input.paidAt,
+  );
   return { outcome: "CONFIRMED", ...base };
 }
 
@@ -335,5 +341,6 @@ async function confirmStandaloneSeasonPassPayment(
   if (updated.count !== 1) {
     return { outcome: "REVIEW_REQUIRED", reason: "season_order_changed_during_confirmation", ...base };
   }
+  await activateSeasonPassEntitlements(tx, [order.id], input.paidAt);
   return { outcome: "CONFIRMED", ...base };
 }

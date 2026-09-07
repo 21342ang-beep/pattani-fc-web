@@ -6,6 +6,11 @@ import { z } from "zod";
 import { verifyPermission } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { saveTeamLogo, deleteTeamLogo, isValidLogoPath, UploadError } from "@/lib/upload";
+import {
+  hasActiveSeasonPassFinalization,
+  lockSeasonPassMatch,
+  removeSeasonPassMatchFinalization,
+} from "@/lib/season-pass-match-finalization";
 
 const scoreSchema = z.object({
   homeScore: z.coerce.number().int().min(0).max(99),
@@ -81,6 +86,7 @@ function revalidateMatchPages() {
   revalidatePath("/results");
   revalidatePath("/admin/matches");
   revalidatePath("/admin/results");
+  revalidatePath("/admin/season-passes/check");
   revalidateTag("matches", { expire: 0 });
 }
 
@@ -134,17 +140,11 @@ export async function updateResultMatch(
   if (homeScoreEmpty !== awayScoreEmpty) {
     return { error: "กรอกสกอร์ให้ครบทั้งสองฝั่ง หรือเว้นว่างทั้งคู่" };
   }
-  let scoreData: { homeScore: number | null; awayScore: number | null; status?: "FINISHED" | "SCHEDULED" };
+  let scoreData: { homeScore: number | null; awayScore: number | null; status?: "FINISHED" };
   if (homeScoreEmpty) {
-    const current = await prisma.match.findUnique({
-      where: { id: matchId },
-      select: { status: true },
-    });
     scoreData = {
       homeScore: null,
       awayScore: null,
-      // ถอยสถานะเฉพาะแมตช์ที่จบไปแล้ว — ไม่แตะสถานะอื่น (เช่น เปิดจองอยู่)
-      ...(current?.status === "FINISHED" ? { status: "SCHEDULED" as const } : {}),
     };
   } else {
     const parsedScore = scoreSchema.safeParse({ homeScore: homeScoreRaw, awayScore: awayScoreRaw });
@@ -160,19 +160,43 @@ export async function updateResultMatch(
   }
 
   try {
-    await prisma.match.update({
-      where: { id: matchId },
-      data: {
-        homeTeam: parsed.data.homeTeam,
-        awayTeam: parsed.data.awayTeam,
-        kickoffAt: parsed.data.kickoffAt,
-        homeTeamLogo: logos.home.path,
-        awayTeamLogo: logos.away.path,
-        ...scoreData,
-      },
+    await prisma.$transaction(async (tx) => {
+      const previous = await lockSeasonPassMatch(tx, matchId);
+      if (!previous) throw new Error("MATCH_NOT_FOUND");
+      if (await hasActiveSeasonPassFinalization(tx, matchId)) {
+        const nextStatus = homeScoreEmpty && previous.status === "FINISHED"
+          ? "SCHEDULED"
+          : (scoreData.status ?? previous.status);
+        const kickoffChanged =
+          (parsed.data.kickoffAt?.getTime() ?? null) !== (previous.kickoffAt?.getTime() ?? null);
+        const settlementIdentityChanged =
+          parsed.data.homeTeam !== previous.homeTeam ||
+          parsed.data.awayTeam !== previous.awayTeam ||
+          nextStatus !== previous.status ||
+          kickoffChanged;
+        if (settlementIdentityChanged) throw new Error("MATCH_SETTLEMENT_ACTIVE");
+      }
+      await tx.match.update({
+        where: { id: matchId },
+        data: {
+          homeTeam: parsed.data.homeTeam,
+          awayTeam: parsed.data.awayTeam,
+          kickoffAt: parsed.data.kickoffAt,
+          homeTeamLogo: logos.home.path,
+          awayTeamLogo: logos.away.path,
+          ...scoreData,
+          // ถอยสถานะเฉพาะแมตช์ที่จบไปแล้ว — ไม่แตะสถานะอื่น (เช่น เปิดจองอยู่)
+          ...(homeScoreEmpty && previous.status === "FINISHED"
+            ? { status: "SCHEDULED" as const }
+            : {}),
+        },
+      });
     });
   } catch (e) {
     await Promise.all(logos.uploaded.map((p) => deleteTeamLogo(p)));
+    if (e instanceof Error && e.message === "MATCH_SETTLEMENT_ACTIVE") {
+      return { error: "แมตช์นี้ตัดสิทธิ์บัตรรายปีแล้ว กรุณายกเลิกการตัดสิทธิ์ก่อนแก้ทีม วันแข่งขัน หรือยกเลิกผล" };
+    }
     throw e;
   }
 
@@ -189,24 +213,32 @@ export async function updateResultMatch(
 export async function deleteResultMatch(
   matchId: string
 ): Promise<{ ok: true } | { error: string }> {
-  await verifyPermission("MATCH_RESULTS");
+  const user = await verifyPermission("MATCH_RESULTS");
   try {
-    const bookings = await prisma.booking.count({
-      where: { matchId, status: { in: ["PENDING", "CONFIRMED"] } },
+    const match = await prisma.$transaction(async (tx) => {
+      const current = await lockSeasonPassMatch(tx, matchId);
+      if (!current) throw new Error("MATCH_NOT_FOUND");
+      const bookings = await tx.booking.count({
+        where: { matchId, status: { in: ["PENDING", "CONFIRMED"] } },
+      });
+      if (bookings > 0) throw new Error("MATCH_HAS_ACTIVE_BOOKINGS");
+      const currentWithLogos = await tx.match.findUnique({
+        where: { id: matchId },
+        select: { homeTeamLogo: true, awayTeamLogo: true },
+      });
+      await removeSeasonPassMatchFinalization(tx, matchId, user.id);
+      await tx.match.delete({ where: { id: matchId } });
+      return currentWithLogos;
     });
-    if (bookings > 0) {
-      return { error: "ลบไม่ได้: มีการจองที่ยังใช้งานอยู่ ยกเลิกการจองก่อน" };
-    }
-    const m = await prisma.match.findUnique({
-      where: { id: matchId },
-      select: { homeTeamLogo: true, awayTeamLogo: true },
-    });
-    await prisma.match.delete({ where: { id: matchId } });
-    if (m?.homeTeamLogo) await deleteTeamLogo(m.homeTeamLogo);
-    if (m?.awayTeamLogo) await deleteTeamLogo(m.awayTeamLogo);
+    if (!match) return { error: "ไม่พบแมตช์" };
+    if (match.homeTeamLogo) await deleteTeamLogo(match.homeTeamLogo);
+    if (match.awayTeamLogo) await deleteTeamLogo(match.awayTeamLogo);
     revalidateMatchPages();
     return { ok: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "MATCH_HAS_ACTIVE_BOOKINGS") {
+      return { error: "ลบไม่ได้: มีการจองที่ยังใช้งานอยู่ ยกเลิกการจองก่อน" };
+    }
     return { error: "ลบไม่สำเร็จ" };
   }
 }
@@ -219,10 +251,15 @@ export async function reportMatchResult(matchId: string, formData: FormData) {
   });
   if (!parsed.success) throw new Error("กรุณากรอกสกอร์เป็นตัวเลขตั้งแต่ 0 ถึง 99");
 
-  const match = await prisma.match.update({
-    where: { id: matchId },
-    data: { ...parsed.data, status: "FINISHED" },
-    select: { competitionType: true },
+  const match = await prisma.$transaction(async (tx) => {
+    const previous = await lockSeasonPassMatch(tx, matchId);
+    if (!previous) throw new Error("MATCH_NOT_FOUND");
+    const updated = await tx.match.update({
+      where: { id: matchId },
+      data: { ...parsed.data, status: "FINISHED" },
+      select: { competitionType: true },
+    });
+    return updated;
   });
 
   revalidateMatchPages();

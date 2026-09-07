@@ -8,9 +8,11 @@ import { getSeatAvailabilityForMatches, type ZoneAvailability } from "@/lib/seat
 import { STADIUM_ZONE_CODES, type StadiumZoneCode } from "@/lib/stadium-zones";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
 import { SEASON_LABEL, SEASON_TIERS, getSeasonPublicSaleLimit } from "@/lib/season-pass-tiers";
+import { isPattaniHomeTeam } from "@/lib/season-pass-home-match";
 import DeleteMatchButton from "./DeleteMatchButton";
 import BookingSaleToggle from "./BookingSaleToggle";
 import SeasonPassSalePhaseControl from "./SeasonPassSalePhaseControl";
+import SeasonPassSettlementControl from "./SeasonPassSettlementControl";
 import { activeSeasonPassOrderWhere, expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
 
 export const dynamic = "force-dynamic";
@@ -77,8 +79,9 @@ export default async function AdminMatchesPage(props: {
       }, 0);
     const seasonPassStats = {
       total: configuredPublicCapacity + activeVvip + availableVvipBarcodes,
-      staffBooked: countOrders(["OFFLINE", "INTERNAL"]),
+      staffBooked: countOrders(["OFFLINE"]),
       onlineBooked: countOrders(["ONLINE"]),
+      sponsorBooked: countOrders(["INTERNAL"]),
       remaining: 0,
     };
     seasonPassStats.remaining = Math.max(
@@ -137,6 +140,16 @@ export default async function AdminMatchesPage(props: {
         }
       : undefined,
     orderBy: { kickoffAt: "asc" },
+    include: {
+      seasonPassFinalization: {
+        select: {
+          finalizedAt: true,
+          reversedAt: true,
+          missedCount: true,
+          postMatchCount: true,
+        },
+      },
+    },
   });
   const availabilityByMatch = await getSeatAvailabilityForMatches(matches);
 
@@ -217,6 +230,19 @@ export default async function AdminMatchesPage(props: {
               </div>
               <ZoneAvailabilityGrid availability={availabilityByMatch.get(m.id)} />
             </div>
+            {m.competitionType === "LEAGUE" && m.seasonPassEligible && isPattaniHomeTeam(m.homeTeam) && (
+              <SeasonPassSettlementControl
+                matchId={m.id}
+                matchStatus={m.status}
+                initialFinalization={m.seasonPassFinalization && !m.seasonPassFinalization.reversedAt
+                  ? {
+                      finalizedAtLabel: formatDateTime(m.seasonPassFinalization.finalizedAt),
+                      missedCount: m.seasonPassFinalization.missedCount,
+                      postMatchCount: m.seasonPassFinalization.postMatchCount,
+                    }
+                  : null}
+              />
+            )}
           </article>
         ))}
         {matches.length === 0 && (
@@ -247,7 +273,13 @@ function MatchManagementCard({
   };
   seasonPassControl?: {
     phase: "STAFF_ONLY" | "PUBLIC_OPEN" | "CLOSED";
-    stats: { total: number; staffBooked: number; onlineBooked: number; remaining: number };
+    stats: {
+      total: number;
+      staffBooked: number;
+      onlineBooked: number;
+      sponsorBooked: number;
+      remaining: number;
+    };
   };
 }) {
   return (

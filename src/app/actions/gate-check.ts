@@ -17,6 +17,10 @@ import {
   isSeasonPassEligibleMatch,
   seasonPassScanConsumesLeagueUse,
 } from "@/lib/season-pass-home-match";
+import {
+  hasActiveSeasonPassFinalization,
+  lockSeasonPassMatch,
+} from "@/lib/season-pass-match-finalization";
 
 // Server actions สำหรับหน้า /gate-check (ระบบสแกนเข้างานที่ประตูสนาม)
 // ทุก action ต้องผ่าน verifyAdmin → ป้องกันคนนอกใช้
@@ -352,7 +356,7 @@ const seasonPassScanSchema = z.object({
   barcode: z.string().trim().min(1).max(256),
 });
 
-type SeasonPassScanError = "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "UNREGISTERED" | "INVALID" | "MATCH_NOT_ELIGIBLE";
+type SeasonPassScanError = "NOT_FOUND" | "DUPLICATE" | "EXHAUSTED" | "INACTIVE" | "UNREGISTERED" | "INVALID" | "MATCH_NOT_ELIGIBLE" | "MATCH_CLOSED";
 
 export type LookupSeasonPassResult =
   | {
@@ -400,10 +404,13 @@ export async function lookupSeasonPass(input: unknown): Promise<LookupSeasonPass
   if (!credential) return { ok: false, error: "INVALID" };
   const match = await prisma.match.findUnique({
     where: { id: parsed.data.matchId },
-    select: { competitionType: true, homeTeam: true, seasonPassEligible: true },
+    select: { competitionType: true, homeTeam: true, seasonPassEligible: true, status: true },
   });
   if (!match || !isSeasonPassEligibleMatch(match)) {
     return { ok: false, error: "MATCH_NOT_ELIGIBLE" };
+  }
+  if (match.status === "FINISHED" || match.status === "CANCELLED") {
+    return { ok: false, error: "MATCH_CLOSED" };
   }
 
   const pass = await prisma.seasonPassBarcode.findUnique({
@@ -473,10 +480,13 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
   if (!credential) return { ok: false, error: "INVALID" };
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { competitionType: true, homeTeam: true, seasonPassEligible: true },
+    select: { competitionType: true, homeTeam: true, seasonPassEligible: true, status: true },
   });
   if (!match || !isSeasonPassEligibleMatch(match)) {
     return { ok: false, error: "MATCH_NOT_ELIGIBLE" };
+  }
+  if (match.status === "FINISHED" || match.status === "CANCELLED") {
+    return { ok: false, error: "MATCH_CLOSED" };
   }
   const pass = await prisma.seasonPassBarcode.findUnique({
     where:
@@ -507,11 +517,20 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
   if (!order || order.status !== "CONFIRMED") {
     return { ok: false, error: "INACTIVE" };
   }
-  const consumesLeagueUse = seasonPassScanConsumesLeagueUse(match.competitionType);
-  if (consumesLeagueUse && pass.usesRemaining <= 0) return { ok: false, error: "EXHAUSTED" };
+  if (seasonPassScanConsumesLeagueUse(match.competitionType) && pass.usesRemaining <= 0) {
+    return { ok: false, error: "EXHAUSTED" };
+  }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const currentMatch = await lockSeasonPassMatch(tx, matchId);
+      if (!currentMatch || !isSeasonPassEligibleMatch(currentMatch)) {
+        throw new Error("MATCH_NOT_ELIGIBLE");
+      }
+      if (currentMatch.status === "FINISHED" || currentMatch.status === "CANCELLED") {
+        throw new Error("MATCH_CLOSED");
+      }
+      const consumesLeagueUse = seasonPassScanConsumesLeagueUse(currentMatch.competitionType);
       await tx.$queryRaw`
         SELECT "id" FROM "SeasonPassBarcode"
         WHERE "id" = ${pass.id}
@@ -571,6 +590,7 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
         customerEmail: currentPass.order.customerEmail,
         seatZone: currentPass.order.seatZone,
         tierId: currentPass.tierId,
+        competitionType: currentMatch.competitionType,
       };
     });
     return {
@@ -583,7 +603,7 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
       tierId: result.tierId,
       usesRemaining: result.usesRemaining,
       scanId: result.scanId,
-      competitionType: match.competitionType,
+      competitionType: result.competitionType,
     };
   } catch (error) {
     if (error instanceof Error && error.message === "EXHAUSTED") return { ok: false, error: "EXHAUSTED" };
@@ -591,6 +611,8 @@ export async function scanSeasonPass(input: unknown): Promise<ScanSeasonPassResu
     if (error instanceof Error && error.message === "UNREGISTERED") return { ok: false, error: "UNREGISTERED" };
     if (error instanceof Error && error.message === "INACTIVE") return { ok: false, error: "INACTIVE" };
     if (error instanceof Error && error.message === "INVALID_CREDENTIAL") return { ok: false, error: "INVALID" };
+    if (error instanceof Error && error.message === "MATCH_NOT_ELIGIBLE") return { ok: false, error: "MATCH_NOT_ELIGIBLE" };
+    if (error instanceof Error && error.message === "MATCH_CLOSED") return { ok: false, error: "MATCH_CLOSED" };
     // PostgreSQL unique index [barcodeId, matchId] is the final duplicate guard.
     return { ok: false, error: "DUPLICATE" };
   }
@@ -606,6 +628,15 @@ export async function deleteSeasonPassScan(scanId: string): Promise<{ ok: true }
 
   try {
     await prisma.$transaction(async (tx) => {
+      const target = await tx.seasonPassScan.findUnique({
+        where: { id: scanId },
+        select: { matchId: true },
+      });
+      if (!target) throw new Error("NOT_FOUND");
+      await lockSeasonPassMatch(tx, target.matchId);
+      if (await hasActiveSeasonPassFinalization(tx, target.matchId)) {
+        throw new Error("MATCH_FINALIZED");
+      }
       const scan = await tx.seasonPassScan.findUnique({
         where: { id: scanId },
         select: { id: true, barcodeId: true, match: { select: { competitionType: true } } },
@@ -621,7 +652,10 @@ export async function deleteSeasonPassScan(scanId: string): Promise<{ ok: true }
     });
     revalidatePath("/admin/season-passes/check");
     return { ok: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "MATCH_FINALIZED") {
+      return { error: "ลบไม่ได้: แมตช์นี้ปิดผลและตัดสิทธิ์เรียบร้อยแล้ว" };
+    }
     return { error: "ลบข้อมูลการสแกนไม่สำเร็จ" };
   }
 }

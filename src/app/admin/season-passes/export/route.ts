@@ -117,6 +117,7 @@ function paymentMethodLabel(method: string) {
     banking: "โมบายแบงก์กิ้ง",
     OFFLINE_CASH: "เงินสด (ทีมงาน)",
     OFFLINE_TRANSFER: "โอนเงิน (ทีมงาน)",
+    SPONSOR: "สปอนเซอร์",
   };
   return labels[method] ?? method;
 }

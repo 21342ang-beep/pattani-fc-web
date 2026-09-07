@@ -101,6 +101,7 @@ export default function SeasonPassWizard({
   shippingProvinces,
   zoneOptions,
   maxQuantity,
+  initialUses,
 }: {
   tier: SeasonTier;
   memberEmail: string | null;
@@ -113,6 +114,7 @@ export default function SeasonPassWizard({
   shippingProvinces: ShippingProvince[];
   zoneOptions: SeasonPassZoneOption[];
   maxQuantity: number;
+  initialUses: number;
 }) {
   const [step, setStep] = useState<Step>("form");
   const [customer, setCustomer] = useState<CustomerData>({
@@ -241,7 +243,12 @@ export default function SeasonPassWizard({
             />
           )}
           {step === "success" && (
-            <SuccessStep tier={tier} customer={customer} passCode={passCode} />
+            <SuccessStep
+              tier={tier}
+              customer={customer}
+              passCode={passCode}
+              initialUses={initialUses}
+            />
           )}
         </div>
       </div>
@@ -253,6 +260,7 @@ export default function SeasonPassWizard({
           shippingFee={shippingFee}
           totalBaht={totalBaht}
           quantity={customer.quantity}
+          initialUses={initialUses}
         />
       </div>
     </div>
@@ -1259,10 +1267,12 @@ function SuccessStep({
   tier,
   customer,
   passCode,
+  initialUses,
 }: {
   tier: SeasonTier;
   customer: CustomerData;
   passCode: string;
+  initialUses: number;
 }) {
   return (
     <div className="space-y-6">
@@ -1272,11 +1282,11 @@ function SuccessStep({
         </div>
         <h2 className="mt-3 text-2xl font-black text-emerald-900">สมัครสำเร็จ!</h2>
         <p className="mt-1 text-sm text-emerald-800">
-          บัตร {tier.name} ของคุณพร้อมใช้งานแล้ว — เก็บรหัสไว้เพื่อเข้าชม 15 แมตช์
+          บัตร {tier.name} ของคุณพร้อมใช้งานแล้ว — สิทธิ์บอลลีกคงเหลือ {initialUses} แมตช์
         </p>
       </div>
 
-      <DigitalPass tier={tier} customer={customer} passCode={passCode} />
+      <DigitalPass tier={tier} customer={customer} passCode={passCode} initialUses={initialUses} />
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
         <p className="font-semibold">หมายเหตุ</p>
@@ -1307,10 +1317,12 @@ function DigitalPass({
   tier,
   customer,
   passCode,
+  initialUses,
 }: {
   tier: SeasonTier;
   customer: CustomerData;
   passCode: string;
+  initialUses: number;
 }) {
   return (
     <div className="overflow-hidden rounded-3xl border-2 border-yellow-400 bg-gradient-to-br from-green-950 via-green-900 to-emerald-800 p-6 text-white shadow-2xl shadow-green-900/20 md:p-8">
@@ -1341,7 +1353,7 @@ function DigitalPass({
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-widest text-yellow-100/60">แมตช์คงเหลือ</p>
             <p className="mt-1 text-2xl font-black text-yellow-300">
-              {SEASON_MATCHES}
+              {initialUses}
               <span className="text-sm text-yellow-100/60"> / {SEASON_MATCHES}</span>
             </p>
           </div>
@@ -1377,12 +1389,14 @@ function TierSummary({
   shippingFee,
   totalBaht,
   quantity,
+  initialUses,
 }: {
   tier: SeasonTier;
   isMember: boolean;
   shippingFee: number;
   totalBaht: number;
   quantity: number;
+  initialUses: number;
 }) {
   return (
     <aside className="h-fit space-y-5 rounded-2xl border border-green-100 bg-white p-4 shadow-sm sm:p-6">
@@ -1425,6 +1439,9 @@ function TierSummary({
         </div>
         <p className="mt-1 text-right text-xs text-slate-500">
           / ฤดูกาล {SEASON_LABEL} · {SEASON_MATCHES} แมตช์
+        </p>
+        <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-right text-xs font-semibold text-emerald-800">
+          สิทธิ์บอลลีกเริ่มต้นเมื่อยืนยันชำระ ณ ตอนนี้ {initialUses} / {SEASON_MATCHES} แมตช์
         </p>
       </div>
 

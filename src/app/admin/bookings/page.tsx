@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { expirePendingBookings } from "@/lib/booking-expiry";
+import { getBookingScanProgress } from "@/lib/booking-scan-progress";
 import { verifyPermission } from "@/lib/dal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import Link from "next/link";
@@ -30,24 +32,43 @@ const statusLabel: Record<string, string> = {
   REFUNDED: "ทำเครื่องหมายคืนเงินแล้ว",
 };
 
-export default async function AdminBookingsPage(props: { searchParams: Promise<{ name?: string; matchId?: string; zone?: string; view?: string }> }) {
+export default async function AdminBookingsPage(props: { searchParams: Promise<{ name?: string; matchId?: string; zone?: string; view?: string; usage?: string }> }) {
   await verifyPermission("BOOKINGS");
-  const { name: rawName, matchId: rawMatchId, zone: rawZone, view: rawView } = await props.searchParams;
+  const { name: rawName, matchId: rawMatchId, zone: rawZone, view: rawView, usage: rawUsage } = await props.searchParams;
   const customerName = rawName?.trim().slice(0, 100) ?? "";
   const requestedMatchId = rawMatchId && /^[a-z0-9_-]{1,50}$/i.test(rawMatchId) ? rawMatchId : null;
   const selectedZone = rawZone?.trim().slice(0, 50) || null;
   const showAllMatches = rawView === "all";
+  const usageView = rawUsage === "completed" ? "completed" : rawUsage === "all" ? "all" : "active";
   await expirePendingBookings();
+  const customerNameFilter = customerName
+    ? { customerName: { contains: customerName, mode: "insensitive" as const } }
+    : {};
   const customerFilter = {
     status: { not: "CANCELLED" as const },
-    ...(customerName ? { customerName: { contains: customerName, mode: "insensitive" as const } } : {}),
+    ...customerNameFilter,
   };
-  const bookingSummaryGroups = await prisma.booking.groupBy({
-    by: ["matchId", "zone", "status"],
-    where: { zone: { not: null }, ...customerFilter },
-    _count: { _all: true },
-    _sum: { quantity: true, totalAmount: true },
-  });
+  const [bookingSummaryGroups, confirmedUsageRows] = await Promise.all([
+    prisma.booking.groupBy({
+      by: ["matchId", "zone", "status"],
+      where: { zone: { not: null }, ...customerFilter },
+      _count: { _all: true },
+      _sum: { quantity: true, totalAmount: true },
+    }),
+    prisma.booking.findMany({
+      where: {
+        status: "CONFIRMED",
+        zone: { not: null },
+        ...customerNameFilter,
+      },
+      select: {
+        matchId: true,
+        zone: true,
+        quantity: true,
+        _count: { select: { gateScans: true } },
+      },
+    }),
+  ]);
   const summaryMatchIds = [...new Set(bookingSummaryGroups.map((group) => group.matchId))];
   const summaryMatches = summaryMatchIds.length > 0
     ? await prisma.match.findMany({
@@ -74,6 +95,8 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     tickets: number;
     confirmedBookings: number;
     confirmedTickets: number;
+    scannedTickets: number;
+    remainingTickets: number;
     pendingBookings: number;
     pendingTickets: number;
     refundedBookings: number;
@@ -105,6 +128,8 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
       tickets: 0,
       confirmedBookings: 0,
       confirmedTickets: 0,
+      scannedTickets: 0,
+      remainingTickets: 0,
       pendingBookings: 0,
       pendingTickets: 0,
       refundedBookings: 0,
@@ -128,6 +153,14 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     }
     zoneSummaries.set(key, current);
   }
+  for (const booking of confirmedUsageRows) {
+    if (!booking.zone) continue;
+    const summary = zoneSummaries.get(`${booking.matchId}:${booking.zone}`);
+    if (!summary) continue;
+    const progress = getBookingScanProgress(booking.quantity, booking._count.gateScans);
+    summary.scannedTickets += progress.scannedTickets;
+    summary.remainingTickets += progress.remainingTickets;
+  }
   const orderedZoneSummaries = [...zoneSummaries.values()].sort((left, right) => {
     const leftKickoff = left.kickoffAt?.getTime() ?? 0;
     const rightKickoff = right.kickoffAt?.getTime() ?? 0;
@@ -150,6 +183,8 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
         tickets: zones.reduce((sum, zone) => sum + zone.tickets, 0),
         confirmedBookings: zones.reduce((sum, zone) => sum + zone.confirmedBookings, 0),
         confirmedTickets: zones.reduce((sum, zone) => sum + zone.confirmedTickets, 0),
+        scannedTickets: zones.reduce((sum, zone) => sum + zone.scannedTickets, 0),
+        remainingTickets: zones.reduce((sum, zone) => sum + zone.remainingTickets, 0),
         pendingBookings: zones.reduce((sum, zone) => sum + zone.pendingBookings, 0),
         pendingTickets: zones.reduce((sum, zone) => sum + zone.pendingTickets, 0),
         refundedBookings: zones.reduce((sum, zone) => sum + zone.refundedBookings, 0),
@@ -168,13 +203,39 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
   const selectedZoneSummary = selectedZone
     ? selectedMatchSummary?.zones.find((zone) => zone.zoneCode === selectedZone) ?? null
     : null;
-  const tableFilter = {
-    ...customerFilter,
-    ...(selectedMatchId ? { matchId: selectedMatchId } : {}),
-    ...(selectedZone ? { zone: selectedZone } : {}),
-  };
+  const tableConditions: Prisma.Sql[] = [Prisma.sql`booking."status" <> 'CANCELLED'`];
+  if (customerName) {
+    tableConditions.push(Prisma.sql`booking."customerName" ILIKE ${`%${customerName}%`}`);
+  }
+  if (selectedMatchId) {
+    tableConditions.push(Prisma.sql`booking."matchId" = ${selectedMatchId}`);
+  }
+  if (selectedZone) {
+    tableConditions.push(Prisma.sql`booking."zone" = ${selectedZone}`);
+  }
+  const fullyScannedCondition = Prisma.sql`
+    booking."status" = 'CONFIRMED'
+    AND booking."quantity" > 0
+    AND COUNT(gate_scan."id") >= booking."quantity"
+  `;
+  const usageCondition = usageView === "completed"
+    ? fullyScannedCondition
+    : usageView === "all"
+      ? Prisma.sql`TRUE`
+      : Prisma.sql`NOT (${fullyScannedCondition})`;
+  const tableBookingIds = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+    SELECT booking."id"
+    FROM "Booking" AS booking
+    LEFT JOIN "BookingGateScan" AS gate_scan
+      ON gate_scan."bookingId" = booking."id"
+    WHERE ${Prisma.join(tableConditions, " AND ")}
+    GROUP BY booking."id"
+    HAVING ${usageCondition}
+    ORDER BY booking."createdAt" DESC
+    LIMIT 100
+  `);
   const allBookings = await prisma.booking.findMany({
-    where: tableFilter,
+    where: { id: { in: tableBookingIds.map(({ id }) => id) } },
     orderBy: { createdAt: "desc" },
     include: {
       match: {
@@ -195,8 +256,8 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
         select: { id: true },
         take: 1,
       },
+      _count: { select: { gateScans: true } },
     },
-    take: 100,
   });
   const sellerIds = [...new Set(allBookings.map((booking) => booking.soldById).filter((id): id is string => Boolean(id)))];
   const sellers = sellerIds.length > 0
@@ -204,13 +265,16 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     : [];
   const sellerById = new Map(sellers.map((seller) => [seller.id, seller.name || seller.email]));
   const bookings = allBookings;
-  const filtersActive = customerName !== "" || requestedMatchId != null || selectedZone != null;
+  const filtersActive = customerName !== "" || requestedMatchId != null || selectedZone != null || usageView !== "active";
   const displayedSummary = bookings.reduce(
     (summary, booking) => {
       summary.tickets += booking.quantity;
       if (booking.status === "CONFIRMED") {
+        const progress = getBookingScanProgress(booking.quantity, booking._count.gateScans);
         summary.confirmedBookings += 1;
         summary.confirmedTickets += booking.quantity;
+        summary.scannedTickets += progress.scannedTickets;
+        summary.remainingTickets += progress.remainingTickets;
         summary.confirmedAmount += booking.totalAmount;
       } else if (booking.status === "PENDING") {
         summary.pendingBookings += 1;
@@ -224,11 +288,23 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
       tickets: 0,
       confirmedBookings: 0,
       confirmedTickets: 0,
+      scannedTickets: 0,
+      remainingTickets: 0,
       confirmedAmount: 0,
       pendingBookings: 0,
       reviewRequired: 0,
     },
   );
+  const usageHref = (nextUsage: "active" | "completed" | "all") => {
+    const query = new URLSearchParams();
+    if (customerName) query.set("name", customerName);
+    if (selectedMatchId) query.set("matchId", selectedMatchId);
+    if (selectedZone) query.set("zone", selectedZone);
+    if (showAllMatches) query.set("view", "all");
+    if (nextUsage !== "active") query.set("usage", nextUsage);
+    const suffix = query.toString();
+    return `/admin/bookings${suffix ? `?${suffix}` : ""}#bookings`;
+  };
 
   return (
     <div className="space-y-6">
@@ -281,7 +357,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
         </div>
       </div>
 
-      <section aria-label="สรุปรายการที่กำลังแสดง" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="สรุปรายการที่กำลังแสดง" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm font-semibold text-slate-500">รายการที่กำลังแสดง</p>
           <p className="mt-2 text-3xl font-black text-slate-950">{bookings.length.toLocaleString("th-TH")}</p>
@@ -291,6 +367,16 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
           <p className="text-sm font-semibold text-emerald-700">ยืนยันแล้ว</p>
           <p className="mt-2 text-3xl font-black text-emerald-900">{displayedSummary.confirmedBookings.toLocaleString("th-TH")}</p>
           <p className="mt-1 text-sm text-emerald-700">{displayedSummary.confirmedTickets.toLocaleString("th-TH")} ใบ</p>
+        </div>
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+          <p className="text-sm font-semibold text-sky-700">สแกนแล้ว</p>
+          <p className="mt-2 text-3xl font-black text-sky-950">{displayedSummary.scannedTickets.toLocaleString("th-TH")}</p>
+          <p className="mt-1 text-sm text-sky-700">ใบที่ผ่านประตูแล้ว</p>
+        </div>
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 shadow-sm">
+          <p className="text-sm font-semibold text-violet-700">คงเหลือยังไม่สแกน</p>
+          <p className="mt-2 text-3xl font-black text-violet-950">{displayedSummary.remainingTickets.toLocaleString("th-TH")}</p>
+          <p className="mt-1 text-sm text-violet-700">ยืนยันแล้ว − สแกนแล้ว</p>
         </div>
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
           <p className="text-sm font-semibold text-amber-700">รอชำระ</p>
@@ -313,6 +399,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
           {selectedMatchId && <input type="hidden" name="matchId" value={selectedMatchId} />}
           {selectedZone && <input type="hidden" name="zone" value={selectedZone} />}
           {showAllMatches && <input type="hidden" name="view" value="all" />}
+          {usageView !== "active" && <input type="hidden" name="usage" value={usageView} />}
           <label className="min-w-0 flex-1">
             <span className="block text-sm font-bold text-slate-700">ชื่อลูกค้า</span>
             <input
@@ -332,12 +419,38 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
             </Link>
           )}
         </form>
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4" aria-label="มุมมองตามการสแกน">
+          <span className="mr-1 text-sm font-bold text-slate-600">แสดงรายการ:</span>
+          {([
+            ["active", "ยังไม่สแกนครบ"],
+            ["completed", "สแกนครบแล้ว / ประวัติ"],
+            ["all", "ทั้งหมด"],
+          ] as const).map(([value, label]) => (
+            <Link
+              key={value}
+              href={usageHref(value)}
+              aria-current={usageView === value ? "page" : undefined}
+              className={`rounded-full border px-3 py-1.5 text-sm font-bold transition ${
+                usageView === value
+                  ? "border-green-800 bg-green-800 text-white"
+                  : "border-slate-300 bg-white text-slate-700 hover:border-green-600 hover:bg-green-50"
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
         {filtersActive && (
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-sm">
             <span className="font-semibold text-slate-500">กำลังกรอง:</span>
             {customerName && <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">ชื่อ “{customerName}”</span>}
             {selectedMatchSummary && <span className="rounded-full bg-green-100 px-3 py-1 font-semibold text-green-800">{selectedMatchSummary.matchLabel}</span>}
             {selectedZone && <span className="rounded-full bg-violet-100 px-3 py-1 font-semibold text-violet-800">{selectedZoneSummary?.zoneName ?? `โซน ${selectedZone}`}</span>}
+            {usageView !== "active" && (
+              <span className="rounded-full bg-sky-100 px-3 py-1 font-semibold text-sky-800">
+                {usageView === "completed" ? "สแกนครบแล้ว / ประวัติ" : "รายการทั้งหมด"}
+              </span>
+            )}
           </div>
         )}
       </section>
@@ -351,7 +464,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
               <p className="mt-1 text-sm text-slate-600">เลือกแมตช์เพื่อดูทุกโซน หรือเลือกโซนจากปุ่มด้านล่างการ์ด</p>
             </div>
             {!showAllMatches && (
-              <Link href={`/admin/bookings?view=all${customerName ? `&name=${encodeURIComponent(customerName)}` : ""}#bookings`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-green-800 shadow-sm hover:bg-green-50">
+              <Link href={`/admin/bookings?view=all${customerName ? `&name=${encodeURIComponent(customerName)}` : ""}${usageView !== "active" ? `&usage=${usageView}` : ""}#bookings`} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-green-800 shadow-sm hover:bg-green-50">
                 ดูรายการทุกแมตช์
               </Link>
             )}
@@ -361,6 +474,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
               const selected = selectedMatchId === summary.matchId;
               const matchQuery = new URLSearchParams({ matchId: summary.matchId });
               if (customerName) matchQuery.set("name", customerName);
+              if (usageView !== "active") matchQuery.set("usage", usageView);
               return (
                 <div
                   key={summary.matchId}
@@ -380,7 +494,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                       </div>
                       {selected && <span className="shrink-0 rounded-full bg-green-800 px-3 py-1 text-xs font-bold text-white">กำลังดู</span>}
                     </div>
-                    <div className="mt-4 grid grid-cols-3 gap-2">
+                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
                       <div className="rounded-lg bg-slate-100 p-2.5">
                         <p className="text-xs font-semibold text-slate-500">ทั้งหมด</p>
                         <p className="mt-1 text-xl font-black text-slate-900">{summary.bookings.toLocaleString("th-TH")}</p>
@@ -390,6 +504,16 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                         <p className="text-xs font-semibold text-emerald-700">ยืนยัน</p>
                         <p className="mt-1 text-xl font-black text-emerald-900">{summary.confirmedTickets.toLocaleString("th-TH")}</p>
                         <p className="text-xs text-emerald-700">ใบ</p>
+                      </div>
+                      <div className="rounded-lg bg-sky-100 p-2.5">
+                        <p className="text-xs font-semibold text-sky-700">สแกนแล้ว</p>
+                        <p className="mt-1 text-xl font-black text-sky-900">{summary.scannedTickets.toLocaleString("th-TH")}</p>
+                        <p className="text-xs text-sky-700">ใบ</p>
+                      </div>
+                      <div className="rounded-lg bg-violet-100 p-2.5">
+                        <p className="text-xs font-semibold text-violet-700">คงเหลือ</p>
+                        <p className="mt-1 text-xl font-black text-violet-900">{summary.remainingTickets.toLocaleString("th-TH")}</p>
+                        <p className="text-xs text-violet-700">ยังไม่สแกน</p>
                       </div>
                       <div className="rounded-lg bg-amber-100 p-2.5">
                         <p className="text-xs font-semibold text-amber-700">รอชำระ</p>
@@ -406,16 +530,17 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                     {summary.zones.map((zone) => {
                       const zoneQuery = new URLSearchParams({ matchId: summary.matchId, zone: zone.zoneCode });
                       if (customerName) zoneQuery.set("name", customerName);
+                      if (usageView !== "active") zoneQuery.set("usage", usageView);
                       const zoneSelected = selected && selectedZone === zone.zoneCode;
                       return (
                         <Link
                           key={zone.zoneCode}
                           href={`/admin/bookings?${zoneQuery.toString()}#bookings`}
                           aria-current={zoneSelected ? "page" : undefined}
-                          title={`${zone.zoneName} · ยืนยัน ${zone.confirmedTickets} ใบ`}
+                          title={`${zone.zoneName} · ยืนยัน ${zone.confirmedTickets} · สแกนแล้ว ${zone.scannedTickets} · คงเหลือ ${zone.remainingTickets} ใบ`}
                           className={`rounded-full border px-2.5 py-1 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-green-700/30 ${zoneSelected ? "border-green-800 bg-green-800 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-green-600 hover:bg-green-50 hover:text-green-900"}`}
                         >
-                          {zone.zoneCode} · {zone.confirmedTickets.toLocaleString("th-TH")}
+                          {zone.zoneCode} · เหลือ {zone.remainingTickets.toLocaleString("th-TH")}
                         </Link>
                       );
                     })}
@@ -438,7 +563,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
           </div>
           {selectedZone && selectedMatchId && (
             <Link
-              href={`/admin/bookings?matchId=${encodeURIComponent(selectedMatchId)}${customerName ? `&name=${encodeURIComponent(customerName)}` : ""}#bookings`}
+              href={`/admin/bookings?matchId=${encodeURIComponent(selectedMatchId)}${customerName ? `&name=${encodeURIComponent(customerName)}` : ""}${usageView !== "active" ? `&usage=${usageView}` : ""}#bookings`}
               className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-bold text-green-900 hover:bg-green-100"
             >
               ดูทุกโซนของแมตช์นี้
@@ -459,8 +584,10 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {bookings.map((b, index) => (
-              <tr key={b.id} className={`align-top transition hover:bg-green-50/60 ${index % 2 === 1 ? "bg-slate-50/60" : "bg-white"}`}>
+            {bookings.map((b, index) => {
+              const scanProgress = getBookingScanProgress(b.quantity, b._count.gateScans);
+              return (
+                <tr key={b.id} className={`align-top transition hover:bg-green-50/60 ${index % 2 === 1 ? "bg-slate-50/60" : "bg-white"}`}>
                 <td className="whitespace-nowrap px-4 py-3.5">
                   <Link href={`/admin/bookings/${b.id}`} className="inline-flex rounded-md bg-green-100 px-2 py-1 font-mono text-xs font-bold text-green-900 hover:bg-green-200">
                     {b.bookingCode}
@@ -491,6 +618,11 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                 <td className="whitespace-nowrap px-4 py-3.5 text-right">
                   <div className="text-lg font-black text-slate-950">{b.quantity.toLocaleString("th-TH")} ใบ</div>
                   <div className="mt-1 font-bold text-green-800">{formatBaht(b.totalAmount)}</div>
+                  {b.status === "CONFIRMED" && (
+                    <div className="mt-2 text-xs font-semibold text-slate-600">
+                      สแกนแล้ว {scanProgress.scannedTickets.toLocaleString("th-TH")} · เหลือ {scanProgress.remainingTickets.toLocaleString("th-TH")}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3.5">
                   {b.salesChannel === "STAFF" ? (
@@ -543,14 +675,19 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                     />
                   </div>
                 </td>
-              </tr>
-            ))}
+                </tr>
+              );
+            })}
             {bookings.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-6 py-14 text-center">
                   <div className="mx-auto max-w-sm rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6">
-                    <p className="text-lg font-bold text-slate-700">ไม่พบข้อมูลการจอง</p>
-                    <p className="mt-1 text-sm text-slate-500">ลองล้างตัวกรองหรือค้นหาด้วยชื่ออื่น</p>
+                    <p className="text-lg font-bold text-slate-700">
+                      {usageView === "completed" ? "ยังไม่มีรายการที่สแกนครบ" : "ไม่พบข้อมูลการจอง"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {usageView === "completed" ? "เมื่อใช้สิทธิ์ครบ รายการจะมาอยู่ในประวัตินี้" : "ลองล้างตัวกรองหรือค้นหาด้วยชื่ออื่น"}
+                    </p>
                   </div>
                 </td>
               </tr>

@@ -24,6 +24,7 @@ import {
   seasonPassBarcodeIsWithinBounds,
 } from "@/lib/season-pass-zone-ranges";
 import { secureSeasonPassGateAssignment } from "@/lib/season-pass-gate-state";
+import { activateSeasonPassEntitlements } from "@/lib/season-pass-entitlement";
 
 const staffSeasonPassSchema = z
   .object({
@@ -117,6 +118,7 @@ export async function registerStaffSeasonPass(
   const barcodePrefix = `PFC26-${tier.priceBaht}-`;
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const entitlementStartedAt = new Date();
       const customer = input.customerMode === "EXISTING"
         ? await tx.customer.findUnique({
           where: { id: input.customerId },
@@ -222,6 +224,7 @@ export async function registerStaffSeasonPass(
               orderId: null,
               isGenerated: true,
               scans: { none: {} },
+              absences: { none: {} },
               ...(input.tierId === "vvip-elite"
                 ? { barcode: input.barcode }
                 : barcodeUpperBound
@@ -263,7 +266,7 @@ export async function registerStaffSeasonPass(
           status: detailsComplete ? "CONFIRMED" : "PENDING",
           salesChannel: "OFFLINE",
           offlineReceiptNo: input.offlineReceiptNo || null,
-          soldAt: new Date(),
+          soldAt: entitlementStartedAt,
           soldById: user.id,
           notes: input.notes || null,
         },
@@ -275,12 +278,15 @@ export async function registerStaffSeasonPass(
           where: { id: barcode.id, orderId: null, isGenerated: true },
           data: {
             orderId: order.id,
-            assignedAt: new Date(),
+            assignedAt: entitlementStartedAt,
             usesRemaining: SEASON_MATCHES,
             ...secureSeasonPassGateAssignment(barcode.barcode),
           },
         });
         if (claimed.count !== 1) throw new Error("SOLD_OUT");
+      }
+      if (detailsComplete) {
+        await activateSeasonPassEntitlements(tx, [order.id], entitlementStartedAt);
       }
       return { passCode, detailsComplete };
     });
