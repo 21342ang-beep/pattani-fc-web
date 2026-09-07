@@ -20,10 +20,6 @@ export default function SiteFooter({ dict }: { dict: Dict }) {
     <footer className="bg-green-950 text-yellow-100">
       <SponsorFooter />
       <div className="relative overflow-hidden">
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.03] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:48px_48px]"
-        />
         <div className="relative mx-auto max-w-7xl px-4 pb-6 pt-14 sm:pt-16">
         <div className="flex justify-center text-center">
           <div className="w-full max-w-5xl">
