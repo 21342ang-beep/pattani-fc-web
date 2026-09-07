@@ -247,13 +247,16 @@ type PlayerDoc = {
   jerseyNumber?: number;
   position: "GK" | "DF" | "MF" | "FW";
   nationality?: string;
-  photo?: { url?: string | null } | string | number | null;
+  photo?: { filename?: string | null; url?: string | null } | string | number | null;
 };
 
 function mediaUrl(media: PlayerDoc["photo"]) {
-  return typeof media === "object" && media !== null && "url" in media
-    ? media.url ?? undefined
-    : undefined;
+  if (typeof media !== "object" || media === null) return undefined;
+
+  const filename = media.filename?.trim();
+  if (filename) return `/uploads/media/${encodeURIComponent(filename)}`;
+
+  return media.url ?? undefined;
 }
 
 type StaffDoc = {
