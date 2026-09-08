@@ -12,7 +12,7 @@ export type HomePlayer = {
   name: string;
   jerseyNumber?: number | null;
   position: "GK" | "DF" | "MF" | "FW";
-  photo?: { url?: string | null } | string | number | null;
+  photo?: { filename?: string | null; url?: string | null } | string | number | null;
 };
 
 const positionTone: Record<HomePlayer["position"], string> = {
@@ -155,7 +155,10 @@ function PlayerSpotlight({ player, labels }: { player: HomePlayer; labels: Dict[
 }
 
 function mediaUrl(media: HomePlayer["photo"]) {
-  return typeof media === "object" && media !== null && "url" in media
-    ? media.url ?? undefined
-    : undefined;
+  if (typeof media !== "object" || media === null) return undefined;
+
+  const filename = media.filename?.trim();
+  if (filename) return `/uploads/media/${encodeURIComponent(filename)}`;
+
+  return media.url ?? undefined;
 }
