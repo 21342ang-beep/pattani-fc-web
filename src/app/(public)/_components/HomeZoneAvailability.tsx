@@ -6,11 +6,13 @@ import { intlLocale } from "@/lib/i18n/text";
 export default function HomeZoneAvailability({
   availability,
   dynamicZones,
+  zoneLabels,
   locale,
   labels,
 }: {
   availability: Record<StadiumZoneCode, AggregatedZoneAvailability>;
   dynamicZones: DynamicZoneAvailability[];
+  zoneLabels: Record<StadiumZoneCode, string | null>;
   locale: Locale;
   labels: Dict["home"];
 }) {
@@ -25,7 +27,12 @@ export default function HomeZoneAvailability({
             key={code}
             className="rounded-xl border border-green-100 bg-white p-4 text-center shadow-sm lg:px-2"
           >
-            <p className="text-sm font-bold text-slate-600 sm:text-base lg:text-sm xl:text-base">{labels.zone} {code}</p>
+            <p
+              className="truncate text-sm font-bold text-slate-600 sm:text-base lg:text-sm xl:text-base"
+              title={zoneLabels[code] ?? `${labels.zone} ${code}`}
+            >
+              {zoneLabels[code] ?? `${labels.zone} ${code}`}
+            </p>
             <p className="mt-1 text-3xl font-black text-green-900 sm:text-2xl lg:text-2xl xl:text-3xl">
               {zone.capacity == null ? "—" : zone.remaining.toLocaleString(numberLocale)}
             </p>

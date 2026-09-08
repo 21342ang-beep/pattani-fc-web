@@ -222,7 +222,18 @@ export default function MatchForm({
             const savedLabel = initial?.zoneLabels.find((item) => item.code === code)?.label;
             return (
               <div key={code} className="rounded-md border bg-white p-3">
-                <p className="mb-3 text-base font-bold text-slate-900 md:text-lg">โซน {code}</p>
+                <div className="mb-3">
+                  <Field
+                    label="ชื่อโซน"
+                    name={`zoneLabel_${code}`}
+                    defaultValue={savedLabel ?? STADIUM_ZONES[code].label}
+                    required
+                    maxLength={80}
+                  />
+                  <p className="mt-1 text-sm text-slate-500">
+                    รหัสโซน {code} · ใช้เชื่อมกับบัตรและการจองเดิม
+                  </p>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Field
                     label="จำนวนที่นั่ง"
@@ -239,15 +250,6 @@ export default function MatchForm({
                     min={0.01}
                     step="0.01"
                     defaultValue={initial?.[priceField] != null ? (initial[priceField] / 100).toString() : ""}
-                  />
-                </div>
-                <div className="mt-3">
-                  <Field
-                    label="ชื่อที่แสดงในรายการจอง"
-                    name={`zoneLabel_${code}`}
-                    defaultValue={savedLabel ?? STADIUM_ZONES[code].label}
-                    required
-                    maxLength={80}
                   />
                 </div>
               </div>

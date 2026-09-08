@@ -21,6 +21,11 @@ import {
   getTicketPurchaseSettings,
   isMatchTicketBookingOpen,
 } from "@/lib/ticket-purchase-settings";
+import {
+  getMatchZoneLabel,
+  STADIUM_ZONE_CODES,
+  type StadiumZoneCode,
+} from "@/lib/stadium-zones";
 
 export const revalidate = 60;
 
@@ -48,6 +53,7 @@ export default async function HomePage() {
           where: { isActive: true },
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         },
+        zoneLabels: { select: { code: true, label: true } },
       },
     }),
     cms.findGlobal({ slug: "home-page", overrideAccess: true }),
@@ -87,6 +93,19 @@ export default async function HomePage() {
     { matchBooked: 0, remaining: 0 },
   );
   const totalRemaining = seatSummary.remaining + dynamicSummary.remaining;
+  const homeZoneLabels = Object.fromEntries(
+    STADIUM_ZONE_CODES.map((code) => {
+      const labelMatch = onSaleMatches.find((match) => {
+        const capacity = availabilityByMatch.get(match.id)?.[code].capacity;
+        return capacity != null && capacity > 0;
+      }) ?? onSaleMatches[0];
+
+      return [
+        code,
+        labelMatch ? getMatchZoneLabel(labelMatch.zoneLabels, code) : null,
+      ];
+    }),
+  ) as Record<StadiumZoneCode, string | null>;
   const homePlayers = playersResult.docs as unknown as HomePlayer[];
   const mainboardSlides = [
     ...(Array.isArray(homePage.mainboardSlides) ? homePage.mainboardSlides : []),
@@ -136,6 +155,7 @@ export default async function HomePage() {
           <HomeZoneAvailability
             availability={availabilityByZone}
             dynamicZones={dynamicZoneAvailability}
+            zoneLabels={homeZoneLabels}
             locale={locale}
             labels={dict.home}
           />
