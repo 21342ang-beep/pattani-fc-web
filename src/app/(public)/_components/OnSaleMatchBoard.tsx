@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/format";
 import type { MatchZonePrices } from "@/lib/stadium-zones";
 import { getDict, type Dict, type Locale } from "@/lib/i18n/dict";
 import { intlLocale } from "@/lib/i18n/text";
+import { matchLogoImage } from "@/lib/match-logo-image";
 
 export type OnSaleMatch = MatchZonePrices & {
   id: string;
@@ -31,7 +32,7 @@ export default function OnSaleMatchBoard({
   const numberLocale = intlLocale(locale);
 
   return (
-    <article className="overflow-hidden rounded-2xl bg-green-950 bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/booking-background.png')] bg-[length:200%_auto] bg-[position:22%_-10%] bg-no-repeat text-white shadow-xl md:bg-[length:100%_100%] md:bg-center">
+    <article className="overflow-hidden rounded-2xl bg-green-950 bg-[linear-gradient(rgba(0,56,24,0.18),rgba(0,56,24,0.36)),url('/_next/image?url=%2Fbooking-background.png&w=1920&q=75')] bg-[length:200%_auto] bg-[position:22%_-10%] bg-no-repeat text-white shadow-xl md:bg-[length:100%_100%] md:bg-center">
       <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:p-10">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-1.5 text-base font-black uppercase tracking-wider text-green-950 sm:text-lg">
@@ -79,11 +80,10 @@ function Team({ logo, name }: { logo: string | null; name: string }) {
       <div className="flex size-20 items-center justify-center overflow-hidden rounded-full bg-white p-2 shadow-lg sm:size-28">
         {logo ? (
           <Image
-            src={logo}
+            {...matchLogoImage(logo)}
             alt={name}
             width={112}
             height={112}
-            unoptimized
             className="size-full object-contain"
           />
         ) : (

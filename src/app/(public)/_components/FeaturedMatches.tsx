@@ -14,6 +14,7 @@ import {
 import { formatBaht, formatDateTime } from "@/lib/format";
 import type { Dict, Locale } from "@/lib/i18n/dict";
 import { intlLocale } from "@/lib/i18n/text";
+import { matchLogoImage } from "@/lib/match-logo-image";
 
 export type FeaturedMatch = {
   id: string;
@@ -33,11 +34,10 @@ function TeamCrest({ logo, name }: { logo: string | null; name: string }) {
       <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
         {logo ? (
           <Image
-            src={logo}
+            {...matchLogoImage(logo)}
             alt={name}
             width={64}
             height={64}
-            unoptimized
             className="size-full object-contain p-1"
           />
         ) : (

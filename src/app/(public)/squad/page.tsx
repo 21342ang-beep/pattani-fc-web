@@ -172,7 +172,7 @@ function PlayerCard({ player: p, locale }: { player: PlayerDoc; locale: Locale }
               src={photoUrl}
               alt={p.name}
               fill
-              unoptimized
+              unoptimized={!photoUrl.startsWith("/payload-api/media/file/")}
               sizes="(min-width: 1152px) 265px, (min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
               className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
             />
@@ -227,7 +227,8 @@ function mediaUrl(media: PlayerDoc["photo"]) {
   if (typeof media !== "object" || media === null) return undefined;
 
   const filename = media.filename?.trim();
-  if (filename) return `/uploads/media/${encodeURIComponent(filename)}`;
+  // This route can read new uploads without rebuilding Next's public file list.
+  if (filename) return `/payload-api/media/file/${encodeURIComponent(filename)}`;
 
   return media.url ?? undefined;
 }

@@ -25,6 +25,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  images: {
+    remotePatterns: [new URL("https://pattanifc.co/uploads/matches/**")],
+    maximumRedirects: 0,
+  },
   // Server Action body limit — รับโล้โก้ 2 ทีม × 2MB + form fields
   // (default 1MB ไม่พอ → block ก่อน server validate รัน)
   experimental: {

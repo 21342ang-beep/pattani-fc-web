@@ -134,8 +134,8 @@ function PlayerSpotlight({ player, labels }: { player: HomePlayer; labels: Dict[
             src={photoUrl}
             alt={player.name}
             fill
-            unoptimized
-            sizes="(min-width: 640px) 25vw, 50vw"
+            unoptimized={!photoUrl.startsWith("/payload-api/media/file/")}
+            sizes="(min-width: 1280px) 280px, (min-width: 640px) 25vw, 50vw"
             className="object-cover object-top transition duration-500 group-hover:scale-105"
           />
         ) : (
@@ -158,7 +158,9 @@ function mediaUrl(media: HomePlayer["photo"]) {
   if (typeof media !== "object" || media === null) return undefined;
 
   const filename = media.filename?.trim();
-  if (filename) return `/uploads/media/${encodeURIComponent(filename)}`;
+  // The CMS file route reads runtime uploads too; Next's public file list is
+  // captured at build time. Let next/image resize and cache this public image.
+  if (filename) return `/payload-api/media/file/${encodeURIComponent(filename)}`;
 
   return media.url ?? undefined;
 }
