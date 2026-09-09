@@ -7,7 +7,6 @@ import { activeBookingStatusWhere, expirePendingBookings } from "@/lib/booking-e
 import { verifyPermission } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { STADIUM_ZONE_CODES } from "@/lib/stadium-zones";
-import { MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH } from "@/lib/match-ticket-zone-label";
 
 const zoneSchema = z.object({
   code: z.string().trim().toUpperCase().regex(
@@ -16,11 +15,7 @@ const zoneSchema = z.object({
   ),
   buttonLabel: z.string().trim().toUpperCase()
     .min(1, "กรุณากรอกตัวอักษรบนปุ่มอย่างน้อย 1 ตัว")
-    .max(
-      MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH,
-      `ตัวอักษรบนปุ่มต้องไม่เกิน ${MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH} ตัว`,
-    )
-    .regex(/^[A-Z]+$/, "ตัวอักษรบนปุ่มใช้ได้เฉพาะ A-Z"),
+    .regex(/^[^\u0000-\u001F\u007F-\u009F]+$/, "ข้อความบนปุ่มมีอักขระควบคุมที่ไม่รองรับ"),
   name: z.string().trim().min(1, "กรุณากรอกชื่อโซน").max(80),
   capacity: z.number().int().nonnegative().max(200000),
   priceBaht: z.number().positive().max(100000),

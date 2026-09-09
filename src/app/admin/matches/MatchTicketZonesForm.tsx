@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import type { MatchTicketZoneFormState } from "@/app/actions/match-ticket-zones";
 import {
   getMatchTicketZoneButtonLabel,
-  MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH,
+  sanitizeMatchTicketZoneButtonLabelInput,
 } from "@/lib/match-ticket-zone-label";
 
 type ZoneRow = {
@@ -83,7 +83,7 @@ export default function MatchTicketZonesForm({
         <div>
           <h2 className="text-xl font-bold text-violet-950 md:text-2xl">โซนขายเพิ่มเติมรายแมตช์</h2>
           <p className="mt-1 max-w-3xl text-sm text-slate-600 md:text-base">
-            ใช้สำหรับ VVIP, VIP หรือโซนพิเศษของสนามอื่น โดยกำหนดตัวอักษรบนปุ่มได้ 1–{MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH} ตัว ส่วนรหัสระบบจะจัดการแยกเพื่อไม่ให้ชนกับโซนหลัก
+            ใช้สำหรับ VVIP, VIP หรือโซนพิเศษของสนามอื่น โดยข้อความบนปุ่มรองรับภาษาไทย ภาษาอังกฤษ ตัวเลข และเครื่องหมายพิเศษ ส่วนรหัสระบบจะจัดการแยกเพื่อไม่ให้ชนกับโซนหลัก
           </p>
         </div>
         <button type="button" onClick={addZone} className="rounded-lg bg-violet-700 px-4 py-2.5 font-bold text-white hover:bg-violet-600">
@@ -102,16 +102,11 @@ export default function MatchTicketZonesForm({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[0.8fr_1.5fr_1fr_1fr_auto] lg:items-end">
               <ZoneField
                 label="ตัวอักษรบนปุ่ม"
-                hint={`A-Z จำนวน 1–${MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH} ตัว เช่น A, VIP หรือ VVIP`}
+                hint="ไม่จำกัดจำนวนตัวอักษร เช่น F1/F2, VIP-A, A + B หรือ วีไอพี-ฝั่งประธาน"
                 value={zone.buttonLabel}
-                maxLength={MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH}
-                pattern="[A-Za-z]+"
                 required
                 onChange={(value) => updateZone(zone.key, {
-                  buttonLabel: value
-                    .toUpperCase()
-                    .replace(/[^A-Z]/g, "")
-                    .slice(0, MAX_MATCH_TICKET_ZONE_BUTTON_LABEL_LENGTH),
+                  buttonLabel: sanitizeMatchTicketZoneButtonLabelInput(value),
                 })}
               />
               <ZoneField label="ชื่อที่แสดง" hint="เช่น VVIP ฝั่งประธาน" value={zone.name} onChange={(value) => updateZone(zone.key, { name: value })} />
@@ -157,7 +152,6 @@ function ZoneField({
   type = "text",
   min,
   step,
-  maxLength,
   pattern,
   required = false,
   value,
@@ -168,7 +162,6 @@ function ZoneField({
   type?: string;
   min?: string;
   step?: string;
-  maxLength?: number;
   pattern?: string;
   required?: boolean;
   value: string;
@@ -177,7 +170,7 @@ function ZoneField({
   return (
     <label className="block text-sm font-semibold text-slate-700 md:text-base">
       {label}
-      <input type={type} min={min} step={step} maxLength={maxLength} pattern={pattern} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2.5 font-normal" />
+      <input type={type} min={min} step={step} pattern={pattern} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2.5 font-normal" />
       {hint && <span className="mt-1 block text-xs font-normal text-slate-500">{hint}</span>}
     </label>
   );
