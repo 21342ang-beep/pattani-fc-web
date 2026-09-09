@@ -33,7 +33,7 @@ test("direct booking grants are bound to the exact row and owner", () => {
   }, guestBooking), false);
 });
 
-test("OTP recovery accepts phone variants but cannot cross member ownership", () => {
+test("fresh OTP recovery opens both guest and member bookings with the proven phone", () => {
   const guestClaim = {
     kind: "booking-recovery" as const,
     phone: "+66 81 234 5678",
@@ -43,7 +43,7 @@ test("OTP recovery accepts phone variants but cannot cross member ownership", ()
   assert.equal(bookingAccessClaimAllows(guestClaim, {
     ...guestBooking,
     customerId: "customer-1",
-  }), false);
+  }), true);
 
   const memberClaim = { ...guestClaim, customerId: "customer-1" };
   assert.equal(bookingAccessClaimAllows(memberClaim, guestBooking), true);
@@ -54,6 +54,22 @@ test("OTP recovery accepts phone variants but cannot cross member ownership", ()
   assert.equal(bookingAccessClaimAllows(memberClaim, {
     ...guestBooking,
     customerId: "customer-2",
+  }), true);
+  for (const phone of ["0812345678", "+66 81 234 5678", "0066 81 234 5678"]) {
+    assert.equal(bookingAccessClaimAllows(guestClaim, {
+      ...guestBooking,
+      customerId: "customer-2",
+      customerPhone: phone,
+    }), true);
+  }
+  assert.equal(bookingAccessClaimAllows(guestClaim, {
+    ...guestBooking,
+    customerPhone: "0899999999",
+  }), false);
+  assert.equal(bookingAccessClaimAllows(memberClaim, {
+    ...guestBooking,
+    customerId: "customer-1",
+    customerPhone: "0899999999",
   }), false);
 });
 

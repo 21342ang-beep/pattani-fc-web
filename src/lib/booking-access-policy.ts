@@ -33,10 +33,10 @@ export function normalizeBookingAccessPhone(phone: string): string {
 }
 
 /**
- * Pure ownership policy shared by pages and payment routes. A recovery grant
- * proves control of a phone number, but a guest grant can never cross into a
- * member-owned row. A signed-in recovery grant may access guest rows with the
- * verified phone plus rows already bound to that same member.
+ * Direct grants remain bound to the booking and account. Recovery grants are
+ * issued only after a fresh booking-search OTP and cover bookings made with
+ * that phone, whether booked as a guest, member or through staff. This does
+ * not transfer account ownership or trust an unverified profile phone.
  */
 export function bookingAccessClaimAllows(
   claim: BookingAccessClaim,
@@ -56,6 +56,5 @@ export function bookingAccessClaimAllows(
   ) {
     return false;
   }
-  if (booking.customerId === null) return true;
-  return claim.customerId !== null && claim.customerId === booking.customerId;
+  return true;
 }

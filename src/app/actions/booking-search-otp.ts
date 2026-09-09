@@ -94,7 +94,6 @@ function logOtpProviderFailure(status: number, data: unknown) {
 
 async function findBookings(
   phone: string,
-  currentCustomerId: string | null,
 ): Promise<BookingSearchResult[]> {
   const [domesticPhone, internationalPhone] = bookingSearchPhoneVariants(phone);
   const bookingRows = await prisma.$queryRaw<{ id: string }[]>`
@@ -102,11 +101,8 @@ async function findBookings(
     WHERE (
       regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
       OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}
+      OR regexp_replace("customerPhone", '\\D', '', 'g') = ${`00${internationalPhone}`}
     )
-      AND (
-        "customerId" IS NULL
-        OR "customerId" = ${currentCustomerId}
-      )
   `;
   if (bookingRows.length === 0) return [];
 
@@ -141,7 +137,6 @@ async function findBookings(
 
 async function findSeasonPasses(
   phone: string,
-  currentCustomerId: string | null,
 ): Promise<SeasonPassSearchResult[]> {
   const [domesticPhone, internationalPhone] = bookingSearchPhoneVariants(phone);
   const orderRows = await prisma.$queryRaw<{ id: string }[]>`
@@ -149,11 +144,8 @@ async function findSeasonPasses(
     WHERE (
       regexp_replace("customerPhone", '\\D', '', 'g') = ${domesticPhone}
       OR regexp_replace("customerPhone", '\\D', '', 'g') = ${internationalPhone}
+      OR regexp_replace("customerPhone", '\\D', '', 'g') = ${`00${internationalPhone}`}
     )
-      AND (
-        "customerId" IS NULL
-        OR "customerId" = ${currentCustomerId}
-      )
   `;
   if (orderRows.length === 0) return [];
 
@@ -361,9 +353,11 @@ export async function verifyBookingSearchOtp(
       });
     }
     const currentCustomer = await getOptionalCustomer();
+    // A successful OTP proves control of the booking phone for this search.
+    // Account membership and earlier profile verification do not limit results.
     const [bookings, seasonPasses] = await Promise.all([
-      findBookings(request.phone, currentCustomer?.id ?? null),
-      findSeasonPasses(request.phone, currentCustomer?.id ?? null),
+      findBookings(request.phone),
+      findSeasonPasses(request.phone),
     ]);
     await grantBookingRecoveryAccess({
       phone: request.phone,

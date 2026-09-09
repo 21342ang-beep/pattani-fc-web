@@ -109,7 +109,7 @@ function BookingSearchFlow({ onStartOver, locale }: { onStartOver: () => void; l
         {t("เบอร์โทรศัพท์ที่ใช้จอง", "Booking Phone Number")}
         <input name="customerPhone" inputMode="tel" autoComplete="tel" maxLength={20} required className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3.5 text-lg font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 md:text-xl" placeholder={t("เช่น 0929810552", "e.g. 0929810552")} />
       </label>
-      <p className="mt-4 text-base text-slate-500 md:text-lg">{t("ระบบจะส่ง OTP หนึ่งครั้ง แล้วแสดงทั้งตั๋วรายแมตช์และบัตรรายปีทั้งหมดที่จองด้วยเบอร์นี้", "We will send one OTP, then show every match ticket and season pass booked with this number.")}</p>
+      <p className="mt-4 text-base text-slate-500 md:text-lg">{t("ใช้ได้ทั้งการจองผ่านสมาชิก แขก และเจ้าหน้าที่ แม้ยังไม่เคยยืนยันเบอร์ในบัญชี เพียงยืนยัน OTP ที่ส่งให้ในครั้งนี้", "Search member, guest and staff bookings, even if the account phone was never verified. Verify the OTP sent for this search.")}</p>
       {requestState && "error" in requestState && (
         <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-lg text-red-700">{requestState.error}</p>
       )}
@@ -171,12 +171,15 @@ function BookingResults({
                         <p className="mt-1 text-base text-slate-600 md:text-lg">{booking.match.kickoffAt ? formatDateTime(booking.match.kickoffAt, intlLocale(locale)) : t("ยังไม่ระบุวันแข่งขัน", "Match date not specified")}</p>
                         <p className="mt-1 text-base font-semibold text-green-800">{t("จำนวน", "Quantity")} {booking.quantity}</p>
                         <p className="mt-2 font-mono text-sm text-slate-500">{booking.bookingCode}</p>
+                        <p className="mt-2 text-base font-semibold text-green-800">{bookingStatusLabel(booking.status, locale)}</p>
                       </div>
                       <p className="text-xl font-black text-green-900 md:text-2xl">{formatBaht(booking.totalAmount, intlLocale(locale))}</p>
                     </div>
+                    {(booking.status === "PENDING" || booking.status === "CONFIRMED") && (
                     <Link href={`${base}/${booking.bookingCode}`} className="mt-4 inline-flex items-center gap-2 rounded-full bg-green-800 px-5 py-2.5 text-base font-bold text-yellow-300 hover:bg-green-900 md:text-lg">
                       <Ticket className="size-5" /> {booking.status === "PENDING" ? t("ไปชำระเงิน", "Proceed to Payment") : t("เปิด E-ticket", "Open E-ticket")}
                     </Link>
+                    )}
                   </article>
                 );
               })
@@ -195,7 +198,7 @@ function BookingResults({
                       <p className="mt-1 font-mono text-sm text-slate-600">{order.passCode}</p>
                       <p className="mt-1 text-base text-slate-600 md:text-lg">{t("สมัครเมื่อ", "Purchased on")} {formatDateTime(order.createdAt, intlLocale(locale))}</p>
                     </div>
-                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-800">{order.status}</span>
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-800">{bookingStatusLabel(order.status, locale)}</span>
                   </div>
                   {order.barcodeAccessToken ? (
                   <a href={`/api/season-passes/${encodeURIComponent(order.passCode)}/barcode?token=${encodeURIComponent(order.barcodeAccessToken)}`} className="mt-4 inline-flex items-center gap-2 rounded-full bg-green-800 px-5 py-2.5 text-base font-bold text-yellow-300 hover:bg-green-900 md:text-lg">
@@ -243,4 +246,15 @@ function EmptyResult({ text }: { text: string }) {
 function maskPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
   return digits.length >= 7 ? `${digits.slice(0, 3)}-***-${digits.slice(-4)}` : phone;
+}
+
+function bookingStatusLabel(status: string, locale: Locale) {
+  const labels: Record<string, [string, string]> = {
+    PENDING: ["รอชำระเงิน / รอการยืนยัน", "Pending payment / confirmation"],
+    CONFIRMED: ["ยืนยันแล้ว", "Confirmed"],
+    CANCELLED: ["ยกเลิกแล้ว", "Cancelled"],
+    REFUNDED: ["คืนเงินแล้ว", "Refunded"],
+  };
+  const label = labels[status];
+  return label ? localize(locale, ...label) : status;
 }
