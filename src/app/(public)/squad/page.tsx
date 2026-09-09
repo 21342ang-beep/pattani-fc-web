@@ -150,28 +150,7 @@ function PlayerCard({ player: p, locale }: { player: PlayerDoc; locale: Locale }
   const photoUrl = mediaUrl(p.photo);
   return (
     <Card className="group relative h-full overflow-hidden rounded-2xl border-slate-200 bg-white p-0 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-yellow-400/50 hover:shadow-xl hover:shadow-green-900/10">
-      <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-green-800 via-green-900 to-green-950">
-        {/* radial glow */}
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(250,204,21,0.22),transparent_60%)]"
-        />
-        {/* subtle grid */}
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:28px_28px]"
-        />
-
-        {/* giant decorative jersey number */}
-        {p.jerseyNumber !== undefined && (
-          <span
-            aria-hidden
-            className="absolute -bottom-4 -right-3 select-none text-[11rem] font-black leading-none text-white/[0.06]"
-          >
-            {p.jerseyNumber}
-          </span>
-        )}
-
+      <div className="relative aspect-[4/5] overflow-hidden bg-white">
         {/* position pill */}
         <span
           className={`absolute left-3 top-3 rounded-full bg-gradient-to-br ${accent} px-3 py-1.5 text-sm font-black tracking-widest text-green-950 shadow-md md:text-base`}
@@ -186,13 +165,9 @@ function PlayerCard({ player: p, locale }: { player: PlayerDoc; locale: Locale }
           </span>
         )}
 
-        {/* photo — circular avatar so small source images stay crisp */}
+        {/* photo without a frame or circular crop */}
         <div className="absolute left-1/2 top-1/2 flex size-[58%] -translate-x-1/2 -translate-y-[58%] items-center justify-center">
-          <div
-            aria-hidden
-            className={`absolute inset-0 rounded-full bg-gradient-to-br ${accent} opacity-30 blur-2xl transition group-hover:opacity-60`}
-          />
-          <div className="relative aspect-square h-full overflow-hidden rounded-full border-4 border-yellow-300/90 bg-green-950 shadow-2xl shadow-black/40 ring-1 ring-white/10">
+          <div className="relative aspect-square h-full overflow-hidden">
             {photoUrl ? (
               <Image
                 src={photoUrl}
@@ -200,26 +175,26 @@ function PlayerCard({ player: p, locale }: { player: PlayerDoc; locale: Locale }
                 fill
                 unoptimized
                 sizes="(min-width: 1024px) 200px, (min-width: 640px) 25vw, 40vw"
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                className="object-contain transition-transform duration-500 group-hover:scale-105"
               />
             ) : (
-              <div className="flex h-full items-center justify-center text-2xl font-black text-white/40">
+              <div className="flex h-full items-center justify-center text-2xl font-black text-green-900/40">
                 {p.name.slice(0, 1)}
               </div>
             )}
           </div>
         </div>
 
-        {/* bottom overlay with name */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-green-950 via-green-950/85 to-transparent px-4 pb-4 pt-14">
-          <p className="text-xs font-bold uppercase tracking-widest text-yellow-300/85 md:text-sm">
+        {/* player details on a plain white background */}
+        <div className="absolute inset-x-0 bottom-0 bg-white p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-green-700 md:text-sm">
             {positionLabel(p.position, locale)}
           </p>
-          <h3 className="mt-0.5 line-clamp-1 text-xl font-black text-white md:text-2xl">
+          <h3 className="mt-0.5 line-clamp-1 text-xl font-black text-green-950 md:text-2xl">
             {p.name}
           </h3>
           {p.nationality && (
-            <p className="mt-0.5 text-sm font-medium text-green-100/70 md:text-base">
+            <p className="mt-0.5 text-sm font-medium text-slate-600 md:text-base">
               {p.nationality}
             </p>
           )}
