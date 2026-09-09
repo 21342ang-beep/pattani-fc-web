@@ -149,56 +149,54 @@ function PlayerCard({ player: p, locale }: { player: PlayerDoc; locale: Locale }
   const accent = POSITION_ACCENT[p.position] ?? POSITION_ACCENT.MF;
   const photoUrl = mediaUrl(p.photo);
   return (
-    <Card className="group relative h-full overflow-hidden rounded-2xl border-slate-200 bg-white p-0 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-yellow-400/50 hover:shadow-xl hover:shadow-green-900/10">
+    <Card className="group relative h-full gap-0 overflow-hidden rounded-2xl border-slate-200 bg-white p-0 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-yellow-400/50 hover:shadow-xl hover:shadow-green-900/10">
       <div className="relative aspect-[4/5] overflow-hidden bg-white">
         {/* position pill */}
         <span
-          className={`absolute left-3 top-3 rounded-full bg-gradient-to-br ${accent} px-3 py-1.5 text-sm font-black tracking-widest text-green-950 shadow-md md:text-base`}
+          className={`absolute left-3 top-3 z-10 rounded-full bg-gradient-to-br ${accent} px-3 py-1.5 text-sm font-black tracking-widest text-green-950 shadow-md md:text-base`}
         >
           {p.position}
         </span>
 
         {/* jersey badge */}
         {p.jerseyNumber !== undefined && (
-          <span className="absolute right-3 top-3 rounded-lg bg-yellow-400 px-3 py-1.5 text-lg font-black text-green-950 shadow-lg shadow-yellow-400/20 ring-1 ring-yellow-300 md:text-xl">
+          <span className="absolute right-3 top-3 z-10 rounded-lg bg-yellow-400 px-3 py-1.5 text-lg font-black text-green-950 shadow-lg shadow-yellow-400/20 ring-1 ring-yellow-300 md:text-xl">
             #{p.jerseyNumber}
           </span>
         )}
 
-        {/* photo without a frame or circular crop */}
-        <div className="absolute left-1/2 top-1/2 flex size-[58%] -translate-x-1/2 -translate-y-[58%] items-center justify-center">
-          <div className="relative aspect-square h-full overflow-hidden">
-            {photoUrl ? (
-              <Image
-                src={photoUrl}
-                alt={p.name}
-                fill
-                unoptimized
-                sizes="(min-width: 1024px) 200px, (min-width: 640px) 25vw, 40vw"
-                className="object-contain transition-transform duration-500 group-hover:scale-105"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-2xl font-black text-green-900/40">
-                {p.name.slice(0, 1)}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* player details on a plain white background */}
-        <div className="absolute inset-x-0 bottom-0 bg-white p-4">
-          <p className="text-xs font-bold uppercase tracking-widest text-green-700 md:text-sm">
-            {positionLabel(p.position, locale)}
-          </p>
-          <h3 className="mt-0.5 line-clamp-1 text-xl font-black text-green-950 md:text-2xl">
-            {p.name}
-          </h3>
-          {p.nationality && (
-            <p className="mt-0.5 text-sm font-medium text-slate-600 md:text-base">
-              {p.nationality}
-            </p>
+        {/* Large portrait with player details kept below the photo. */}
+        <div className="absolute inset-0">
+          {photoUrl ? (
+            <Image
+              src={photoUrl}
+              alt={p.name}
+              fill
+              unoptimized
+              sizes="(min-width: 1152px) 265px, (min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
+              className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-2xl font-black text-green-900/40">
+              {p.name.slice(0, 1)}
+            </div>
           )}
         </div>
+      </div>
+
+      {/* player details on a plain white background */}
+      <div className="relative bg-white p-4">
+        <p className="text-xs font-bold uppercase tracking-widest text-green-700 md:text-sm">
+          {positionLabel(p.position, locale)}
+        </p>
+        <h3 className="mt-0.5 line-clamp-1 text-xl font-black text-green-950 md:text-2xl">
+          {p.name}
+        </h3>
+        {p.nationality && (
+          <p className="mt-0.5 text-sm font-medium text-slate-600 md:text-base">
+            {p.nationality}
+          </p>
+        )}
       </div>
     </Card>
   );
