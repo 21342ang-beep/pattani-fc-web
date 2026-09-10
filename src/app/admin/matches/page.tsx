@@ -14,6 +14,7 @@ import BookingSaleToggle from "./BookingSaleToggle";
 import SeasonPassSalePhaseControl from "./SeasonPassSalePhaseControl";
 import SeasonPassSettlementControl from "./SeasonPassSettlementControl";
 import { activeSeasonPassOrderWhere, expirePendingSeasonPassPurchases } from "@/lib/season-pass-expiry";
+import type { PublicSeasonPassTierId } from "@/lib/season-pass-sale-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -112,7 +113,7 @@ export default async function AdminMatchesPage(props: {
             description="กำหนดโควตารวม ที่นั่งสปอนเซอร์ และจำนวนเปิดขายแยกตามแพ็กเกจและโซน"
             className="border-blue-200 bg-blue-50 hover:border-blue-400"
             seasonPassControl={{
-              phase: purchaseSettings.seasonPassSalePhase,
+              openTierIds: [...purchaseSettings.seasonPassOpenTierIds],
               stats: seasonPassStats,
             }}
           />
@@ -272,7 +273,7 @@ function MatchManagementCard({
     isOpen: boolean;
   };
   seasonPassControl?: {
-    phase: "STAFF_ONLY" | "PUBLIC_OPEN" | "CLOSED";
+    openTierIds: PublicSeasonPassTierId[];
     stats: {
       total: number;
       staffBooked: number;
@@ -297,7 +298,7 @@ function MatchManagementCard({
       )}
       {seasonPassControl && (
         <SeasonPassSalePhaseControl
-          initialPhase={seasonPassControl.phase}
+          initialOpenTierIds={seasonPassControl.openTierIds}
           stats={seasonPassControl.stats}
         />
       )}

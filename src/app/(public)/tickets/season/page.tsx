@@ -22,6 +22,7 @@ import { getT } from "@/lib/i18n/server";
 import { intlLocale, localize } from "@/lib/i18n/text";
 import type { Locale } from "@/lib/i18n/dict";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
+import { isSeasonPassTierBookingOpen } from "@/lib/season-pass-sale-policy";
 
 export const metadata = { title: "ตั๋วรายปี — Pattani FC" };
 
@@ -126,7 +127,7 @@ export default async function SeasonTicketsPage() {
               key={t.id}
               tier={t}
               locale={locale}
-              bookingOpen={purchaseSettings.seasonPassBookingOpen}
+              bookingOpen={isSeasonPassTierBookingOpen(purchaseSettings, t.id)}
             />
           ))}
         </div>

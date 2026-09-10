@@ -608,9 +608,12 @@ model TicketPurchaseSetting {
   matchMaxQuantity      Int
   seasonPassMaxQuantity Int
   leagueBookingOpen     Boolean             @default(true)
-  // Legacy deployment/rollback compatibility; new code uses seasonPassSalePhase.
+  // Legacy deployment/rollback compatibility; selective sale uses package fields below.
   seasonPassBookingOpen Boolean             @default(false)
   seasonPassSalePhase   SeasonPassSalePhase @default(STAFF_ONLY)
+  seasonPassVipAdvancedOpen Boolean         @default(false)
+  seasonPassPremiumOpen     Boolean         @default(false)
+  seasonPassGoldOpen        Boolean         @default(false)
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 }

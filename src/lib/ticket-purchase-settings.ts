@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { getOpenSeasonPassTierIds } from "@/lib/season-pass-sale-policy";
 
 export function isMatchTicketBookingOpen(
   match: { competitionType: string },
@@ -16,13 +17,18 @@ export async function getTicketPurchaseSettings() {
       seasonPassMaxQuantity: true,
       leagueBookingOpen: true,
       seasonPassSalePhase: true,
+      seasonPassVipAdvancedOpen: true,
+      seasonPassPremiumOpen: true,
+      seasonPassGoldOpen: true,
     },
   });
   if (!settings) {
     throw new Error("ยังไม่ได้ตั้งค่าจำนวนตั๋วสูงสุด กรุณารัน Prisma migration");
   }
+  const seasonPassOpenTierIds = getOpenSeasonPassTierIds(settings);
   return {
     ...settings,
-    seasonPassBookingOpen: settings.seasonPassSalePhase === "PUBLIC_OPEN",
+    seasonPassOpenTierIds,
+    seasonPassBookingOpen: seasonPassOpenTierIds.length > 0,
   };
 }

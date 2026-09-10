@@ -7,6 +7,7 @@ import { SEASON_LABEL, getSeasonTier } from "@/lib/season-pass-tiers";
 import { calculateSeasonPassZoneRanges } from "@/lib/season-pass-zone-ranges";
 import { getCurrentSeasonPassInitialUses } from "@/lib/season-pass-entitlement";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
+import { isSeasonPassTierBookingOpen } from "@/lib/season-pass-sale-policy";
 import {
   activePublicSeasonPassOrderWhere,
   expirePendingSeasonPassPurchases,
@@ -27,7 +28,7 @@ export default async function SeasonPassApplyPage(props: {
   if (!tier || tier.id === "vvip-elite") notFound();
 
   const purchaseSettings = await getTicketPurchaseSettings();
-  if (!purchaseSettings.seasonPassBookingOpen) redirect("/tickets/season");
+  if (!isSeasonPassTierBookingOpen(purchaseSettings, tier.id)) redirect("/tickets/season");
 
   // ⚠️ mock flow — ไม่มีการเขียน DB ใด ๆ
   // session ใช้แค่ auto-fill ฟอร์มให้สมาชิก (guest กรอกเองได้)

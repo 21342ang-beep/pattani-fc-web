@@ -11,6 +11,7 @@ import { verifyCustomer } from "@/lib/customer-dal";
 import { verifyPermission, verifySuperAdmin } from "@/lib/dal";
 import { rateLimit } from "@/lib/rate-limit";
 import { getTicketPurchaseSettings } from "@/lib/ticket-purchase-settings";
+import { isSeasonPassTierBookingOpen } from "@/lib/season-pass-sale-policy";
 import {
   SEASON_LABEL,
   SEASON_MATCHES,
@@ -184,8 +185,8 @@ export async function createSeasonPassOrder(
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง", fieldErrors };
   }
   const settings = await getTicketPurchaseSettings();
-  if (!settings.seasonPassBookingOpen) {
-    return { ok: false, error: "ขณะนี้ยังไม่เปิดจองตั๋วรายปี" };
+  if (!isSeasonPassTierBookingOpen(settings, parsed.data.tierId)) {
+    return { ok: false, error: "ขณะนี้ยังไม่เปิดขายแพ็กเกจบัตรรายปีที่เลือก" };
   }
   if (parsed.data.quantity > settings.seasonPassMaxQuantity) {
     return {
@@ -234,14 +235,18 @@ export async function createSeasonPassOrder(
     // orders have no deadline and are intentionally left untouched.
     await expirePendingSeasonPassPurchases();
     const result = await prisma.$transaction(async (tx) => {
-      // Serialize sale-state changes with order creation. Once CLOSED/STAFF_ONLY commits,
-      // no new public order can slip through using a stale pre-transaction check.
+      // Serialize sale-state changes with order creation so a package cannot
+      // accept a new order after its individual switch has been closed.
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('season-pass-sale-phase'))::text AS lock_result`;
       const currentSetting = await tx.ticketPurchaseSetting.findUnique({
         where: { id: 1 },
-        select: { seasonPassSalePhase: true },
+        select: {
+          seasonPassVipAdvancedOpen: true,
+          seasonPassPremiumOpen: true,
+          seasonPassGoldOpen: true,
+        },
       });
-      if (currentSetting?.seasonPassSalePhase !== "PUBLIC_OPEN") {
+      if (!currentSetting || !isSeasonPassTierBookingOpen(currentSetting, parsed.data.tierId)) {
         throw new Error("SALE_CLOSED");
       }
 
@@ -374,7 +379,7 @@ export async function createSeasonPassOrder(
     return { ok: true, checkoutCode: result.purchaseCode, passCodes: result.passCodes };
   } catch (error) {
     if (error instanceof Error && error.message === "SALE_CLOSED") {
-      return { ok: false, error: "ขณะนี้ยังไม่เปิดจองตั๋วรายปี" };
+      return { ok: false, error: "ขณะนี้ยังไม่เปิดขายแพ็กเกจบัตรรายปีที่เลือก" };
     }
     if (error instanceof Error && error.message === "ZONE_SOLD_OUT") {
       return { ok: false, error: "บัตรรายปีโซนที่เลือกจำหน่ายหมดแล้ว กรุณาเลือกโซนอื่น" };
