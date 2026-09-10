@@ -8,6 +8,7 @@ import Link from "next/link";
 import BookingStatusSelect from "./BookingStatusSelect";
 import DeleteBookingButton from "./DeleteBookingButton";
 import DeleteAllBookingsButton from "./DeleteAllBookingsButton";
+import { getMatchTicketZoneButtonLabel } from "@/lib/match-ticket-zone-label";
 import {
   getMatchZoneLabel,
   getStadiumZone,
@@ -75,7 +76,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
         where: { id: { in: summaryMatchIds } },
         include: {
           ticketZones: {
-            select: { code: true, name: true, price: true, sortOrder: true },
+            select: { code: true, buttonLabel: true, name: true, price: true, sortOrder: true },
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           },
           zoneLabels: { select: { code: true, label: true } },
@@ -86,6 +87,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
   const zoneSummaries = new Map<string, {
     matchId: string;
     zoneCode: string;
+    zoneButtonLabel: string;
     zoneName: string;
     matchLabel: string;
     kickoffAt: Date | null;
@@ -110,6 +112,9 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     const dynamicZone = match.ticketZones.find((zone) => zone.code === group.zone);
     const legacyZone = getStadiumZone(group.zone);
     const legacyCode = legacyZone ? group.zone as StadiumZoneCode : null;
+    const zoneButtonLabel = dynamicZone
+      ? getMatchTicketZoneButtonLabel(dynamicZone)
+      : group.zone;
     const zoneName = dynamicZone?.name
       ?? (legacyCode ? getMatchZoneLabel(match.zoneLabels, legacyCode) : `โซน ${group.zone}`);
     const configuredPrice = dynamicZone?.price
@@ -119,6 +124,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
     const current = zoneSummaries.get(key) ?? {
       matchId: group.matchId,
       zoneCode: group.zone,
+      zoneButtonLabel,
       zoneName,
       matchLabel: `${match.homeTeam} vs ${match.awayTeam}`,
       kickoffAt: match.kickoffAt,
@@ -540,7 +546,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                           title={`${zone.zoneName} · ยืนยัน ${zone.confirmedTickets} · สแกนแล้ว ${zone.scannedTickets} · คงเหลือ ${zone.remainingTickets} ใบ`}
                           className={`rounded-full border px-2.5 py-1 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-green-700/30 ${zoneSelected ? "border-green-800 bg-green-800 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-green-600 hover:bg-green-50 hover:text-green-900"}`}
                         >
-                          {zone.zoneCode} · เหลือ {zone.remainingTickets.toLocaleString("th-TH")}
+                          {zone.zoneButtonLabel} · เหลือ {zone.remainingTickets.toLocaleString("th-TH")}
                         </Link>
                       );
                     })}
