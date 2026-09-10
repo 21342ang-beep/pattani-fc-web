@@ -249,7 +249,7 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
           homeTeam: true,
           awayTeam: true,
           kickoffAt: true,
-          ticketZones: { select: { code: true, name: true } },
+          ticketZones: { select: { code: true, buttonLabel: true, name: true } },
         },
       },
       beamPayments: {
@@ -614,10 +614,10 @@ export default async function AdminBookingsPage(props: { searchParams: Promise<{
                     const dynamicZone = b.zone ? b.match.ticketZones.find((zone) => zone.code === b.zone) : null;
                     return dynamicZone ? (
                       <span className="mt-2 inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-bold text-violet-800">
-                        {dynamicZone.name} · {dynamicZone.code}
+                        {getMatchTicketZoneButtonLabel(dynamicZone)}
                       </span>
                     ) : (
-                      <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{b.zone ? `โซน ${b.zone}` : "ไม่ระบุโซน"}</span>
+                      <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{b.zone || "ไม่ระบุโซน"}</span>
                     );
                   })()}
                 </td>
