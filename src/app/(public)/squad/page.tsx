@@ -1,18 +1,8 @@
 import Image from "next/image";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { payload } from "@/lib/payload";
-import PageHero from "../_components/PageHero";
 import { getT } from "@/lib/i18n/server";
 import { localize } from "@/lib/i18n/text";
 import type { Locale } from "@/lib/i18n/dict";
-
-const POSITION_ACCENT: Record<string, string> = {
-  GK: "from-amber-400 via-yellow-400 to-yellow-500",
-  DF: "from-sky-400 via-blue-500 to-blue-600",
-  MF: "from-emerald-400 via-green-500 to-green-600",
-  FW: "from-rose-400 via-red-500 to-red-600",
-};
 
 export const revalidate = 300;
 export const metadata = { title: "ผู้เล่นและสตาฟ — Pattani FC" };
@@ -62,34 +52,42 @@ export default async function SquadPage() {
   }
 
   return (
-    <>
-      <PageHero
-        title={t("ผู้เล่นและสตาฟ", "Players & Staff")}
-        subtitle={t("นักเตะชุดใหญ่และทีมงานสตาฟโค้ชของปัตตานี เอฟซี", "Pattani FC first-team players and coaching staff")}
-      />
-      <div className="mx-auto max-w-6xl space-y-10 px-4 py-10">
+    <main className="bg-white">
+      <header className="border-b border-green-900/15 bg-green-950 text-white">
+        <div className="mx-auto max-w-6xl px-4 py-10 md:py-14">
+          <p className="text-sm font-semibold uppercase tracking-wider text-yellow-300">
+            Pattani FC
+          </p>
+          <h1 className="mt-2 text-4xl font-black leading-tight md:text-5xl">
+            {t("ผู้เล่นและสตาฟ", "Players & Staff")}
+          </h1>
+          <p className="mt-2 max-w-2xl text-lg text-green-100 md:text-xl">
+            {t("นักเตะชุดใหญ่และทีมงานสตาฟโค้ชของปัตตานี เอฟซี", "Pattani FC first-team players and coaching staff")}
+          </p>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-6xl space-y-14 px-4 py-10 md:space-y-20 md:py-14">
         {(Object.keys(POSITION_LABEL) as Array<keyof typeof POSITION_LABEL>).map(
           (pos) => {
             const list = grouped[pos];
             if (!list || list.length === 0) return null;
             return (
               <section key={pos}>
-                <div className="mb-5 flex items-end justify-between gap-3 border-b-2 border-green-900/10 pb-3">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`inline-flex items-center justify-center rounded-md bg-gradient-to-br ${POSITION_ACCENT[pos]} px-2.5 py-1 text-[11px] font-black tracking-widest text-green-950 shadow-sm`}
-                    >
+                <div className="mb-6 flex items-end justify-between gap-3 border-b border-green-900/20 pb-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-green-700">
                       {pos}
-                    </span>
-                    <h2 className="text-xl font-black text-green-900 md:text-2xl">
+                    </p>
+                    <h2 className="text-2xl font-black text-green-950 md:text-3xl">
                       {positionLabel(pos, locale)}
                     </h2>
                   </div>
-                  <span className="rounded-full bg-green-900 px-3 py-1 text-xs font-bold text-yellow-300">
+                  <span className="text-sm font-semibold text-slate-500">
                     {list.length} {t("คน", "players")}
                   </span>
                 </div>
-                <ul className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                <ul className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 md:grid-cols-3 lg:grid-cols-4">
                   {list.map((p) => (
                     <li key={String(p.id)}>
                       <PlayerCard player={p} locale={locale} />
@@ -102,21 +100,26 @@ export default async function SquadPage() {
         )}
 
         {players.length === 0 && (
-          <Card className="border-dashed">
-            <CardContent className="py-12 text-center text-muted-foreground">
-              {t("ยังไม่มีข้อมูลผู้เล่นในระบบ", "No player information is available")}
-            </CardContent>
-          </Card>
+          <div className="border border-dashed border-slate-300 py-12 text-center text-slate-500">
+            {t("ยังไม่มีข้อมูลผู้เล่นในระบบ", "No player information is available")}
+          </div>
         )}
 
         {staff.length > 0 && (
           <section>
-            <h2 className="mb-4 text-xl font-bold text-green-900">{t("ทีมงานสตาฟ", "Coaching Staff")}</h2>
-            <ul className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+            <div className="mb-6 border-b border-green-900/20 pb-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-green-700">
+                Staff
+              </p>
+              <h2 className="text-2xl font-black text-green-950 md:text-3xl">
+                {t("ทีมงานสตาฟ", "Coaching Staff")}
+              </h2>
+            </div>
+            <ul className="grid gap-x-5 gap-y-6 sm:grid-cols-2 md:grid-cols-3">
               {staff.map((s) => (
                 <li key={String(s.id)}>
-                  <Card className="flex flex-row items-center gap-3 p-4">
-                    <div className="relative size-16 shrink-0 overflow-hidden rounded-full bg-green-100">
+                  <article className="flex items-center gap-3 border-b border-slate-200 pb-4">
+                    <div className="relative size-16 shrink-0 overflow-hidden bg-slate-100">
                       {s.photoUrl && (
                         <Image
                           src={s.photoUrl}
@@ -128,44 +131,28 @@ export default async function SquadPage() {
                         />
                       )}
                     </div>
-                    <div>
-                      <p className="font-semibold text-green-900">{s.name}</p>
-                      <Badge variant="secondary" className="mt-1 text-[11px]">
+                    <div className="min-w-0">
+                      <p className="truncate text-lg font-bold text-green-950">{s.name}</p>
+                      <p className="text-sm text-slate-500">
                         {staffRoleLabel(s.role, locale)}
-                      </Badge>
+                      </p>
                     </div>
-                  </Card>
+                  </article>
                 </li>
               ))}
             </ul>
           </section>
         )}
       </div>
-    </>
+    </main>
   );
 }
 
 function PlayerCard({ player: p, locale }: { player: PlayerDoc; locale: Locale }) {
-  const accent = POSITION_ACCENT[p.position] ?? POSITION_ACCENT.MF;
   const photoUrl = mediaUrl(p.photo);
   return (
-    <Card className="group relative h-full gap-0 overflow-hidden rounded-2xl border-slate-200 bg-white p-0 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-yellow-400/50 hover:shadow-xl hover:shadow-green-900/10">
+    <article className="h-full bg-white">
       <div className="relative aspect-[4/5] overflow-hidden bg-white">
-        {/* position pill */}
-        <span
-          className={`absolute left-3 top-3 z-10 rounded-full bg-gradient-to-br ${accent} px-3 py-1.5 text-sm font-black tracking-widest text-green-950 shadow-md md:text-base`}
-        >
-          {p.position}
-        </span>
-
-        {/* jersey badge */}
-        {p.jerseyNumber !== undefined && (
-          <span className="absolute right-3 top-3 z-10 rounded-lg bg-yellow-400 px-3 py-1.5 text-lg font-black text-green-950 shadow-lg shadow-yellow-400/20 ring-1 ring-yellow-300 md:text-xl">
-            #{p.jerseyNumber}
-          </span>
-        )}
-
-        {/* Large portrait with player details kept below the photo. */}
         <div className="absolute inset-0">
           {photoUrl ? (
             <Image
@@ -173,8 +160,8 @@ function PlayerCard({ player: p, locale }: { player: PlayerDoc; locale: Locale }
               alt={p.name}
               fill
               unoptimized={!photoUrl.startsWith("/payload-api/media/file/")}
-              sizes="(min-width: 1152px) 265px, (min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
-              className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+              sizes="(min-width: 1152px) 265px, (min-width: 768px) 33vw, 50vw"
+              className="object-cover object-top"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-2xl font-black text-green-900/40">
@@ -184,21 +171,27 @@ function PlayerCard({ player: p, locale }: { player: PlayerDoc; locale: Locale }
         </div>
       </div>
 
-      {/* player details on a plain white background */}
-      <div className="relative bg-white p-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-green-700 md:text-sm">
-          {positionLabel(p.position, locale)}
-        </p>
-        <h3 className="mt-0.5 line-clamp-1 text-xl font-black text-green-950 md:text-2xl">
-          {p.name}
-        </h3>
-        {p.nationality && (
-          <p className="mt-0.5 text-sm font-medium text-slate-600 md:text-base">
-            {p.nationality}
-          </p>
+      <div className="flex gap-3 border-t border-green-900/15 pt-3">
+        {p.jerseyNumber !== undefined && (
+          <span className="shrink-0 text-xl font-black text-green-800 md:text-2xl">
+            {p.jerseyNumber}
+          </span>
         )}
+        <div className="min-w-0">
+          <h3 className="line-clamp-1 text-lg font-black leading-tight text-green-950 md:text-xl">
+            {p.name}
+          </h3>
+          <p className="text-xs text-slate-500 md:text-sm">
+            {positionLabel(p.position, locale)}
+          </p>
+          {p.nationality && (
+            <p className="text-xs text-slate-500 md:text-sm">
+              {p.nationality}
+            </p>
+          )}
+        </div>
       </div>
-    </Card>
+    </article>
   );
 }
 
